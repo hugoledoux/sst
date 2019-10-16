@@ -4,7 +4,6 @@ use std::fs::File;
 use std::io::Seek;
 use std::io::{self, Write};
 use std::io::{BufRead, BufReader};
-use std::path::Path;
 
 #[derive(Clone)]
 pub struct Point {
@@ -154,10 +153,3 @@ fn pass_1(f: &File) -> Vec<f64> {
     }
     bbox
 }
-
-// fn stream1() {
-//     let stdin = std::io::stdin();
-//     for line in stdin.lock().lines() {
-//         println!("{}", line.unwrap());
-//     }
-// }
