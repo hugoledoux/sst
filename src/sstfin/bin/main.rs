@@ -1,8 +1,10 @@
+use std::env;
 use std::fmt;
 use std::fs::File;
 use std::io::Seek;
 use std::io::{self, Write};
 use std::io::{BufRead, BufReader};
+use std::path::Path;
 
 #[derive(Clone)]
 pub struct Point {
@@ -18,9 +20,11 @@ impl fmt::Display for Point {
 }
 
 fn main() {
-    // stream1();
+    let args: Vec<String> = env::args().collect();
+    println!("My path is {}.", args[1]);
+    let f = File::open(&args[1]).expect("Unable to open file");
 
-    let f = File::open("/Users/hugo/code/dt-comparisons/data/5.txt").expect("Unable to open file");
+    // let f = File::open("/Users/hugo/code/dt-comparison/data/5.txt").expect("Unable to open file");
 
     //-- pass #1
     let mut bbox = pass_1(&f);
@@ -39,7 +43,7 @@ fn main() {
     let mut g: Vec<Vec<usize>> = pass_2(&f, &bbox, cellsize);
 
     //-- pass #3
-    pass_3(&f, &bbox, cellsize, &mut g);
+    let _re = pass_3(&f, &bbox, cellsize, &mut g);
 }
 
 fn pass_3(
@@ -88,7 +92,12 @@ fn pass_3(
             z: v[2],
         });
         if g[gxy.0][gxy.1] == 0 {
-            // println!("FINALISATION OF CELL {}--{}", gxy.0, gxy.1);
+            for pt in gpts[gxy.0][gxy.1].iter() {
+                io::stdout().write_all(&format!("v {} {} {}\n", pt.x, pt.y, pt.z).as_bytes())?;
+            }
+            io::stdout().write_all(&format!("c {} {}\n", gxy.0, gxy.1).as_bytes())?;
+            gpts[gxy.0][gxy.1].clear();
+            gpts[gxy.0][gxy.1].shrink_to_fit();
         }
     }
     Ok(())
