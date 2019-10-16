@@ -1,3 +1,8 @@
+use std::io::BufRead;
+
 fn main() {
-    println!("sstdel");
+    let stdin = std::io::stdin();
+    for line in stdin.lock().lines() {
+        println!("{}", line.unwrap());
+    }
 }

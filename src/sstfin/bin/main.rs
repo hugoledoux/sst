@@ -1,6 +1,7 @@
 use std::fmt;
 use std::fs::File;
 use std::io::Seek;
+use std::io::{self, Write};
 use std::io::{BufRead, BufReader};
 
 #[derive(Clone)]
@@ -34,24 +35,52 @@ fn main() {
     println!("bbox {:?}", bbox);
 
     //-- pass #2
-    let cellsize: usize = 10;
+    let cellsize: usize = 100;
     let mut g: Vec<Vec<usize>> = pass_2(&f, &bbox, cellsize);
 
     //-- pass #3
     pass_3(&f, &bbox, cellsize, &mut g);
 }
 
-fn pass_3(mut f: &File, bbox: &Vec<f64>, cellsize: usize, g: &mut Vec<Vec<usize>>) {
+fn pass_3(
+    mut f: &File,
+    bbox: &Vec<f64>,
+    cellsize: usize,
+    g: &mut Vec<Vec<usize>>,
+) -> io::Result<()> {
     let width: usize = ((bbox[2] - bbox[0]) / cellsize as f64).ceil() as usize;
     let height: usize = ((bbox[3] - bbox[1]) / cellsize as f64).ceil() as usize;
     let mut gpts: Vec<Vec<Vec<Point>>> = vec![vec![Vec::new(); height]; width];
     let _re = f.seek(std::io::SeekFrom::Start(0)); //-- reset to begining of the file
     let f = BufReader::new(f);
+    //-- total number of points
+    let mut total: usize = 0;
+    for (i, _gx) in g.iter().enumerate() {
+        for (j, _gy) in g[i].iter().enumerate() {
+            total += g[i][j];
+        }
+    }
+    io::stdout().write_all(b"# sstfin\n")?;
+    io::stdout().write_all(&format!("n {}\n", total).as_bytes())?;
+    //-- cellsize
+    io::stdout().write_all(&format!("c {}\n", cellsize).as_bytes())?;
+    io::stdout().write_all(&format!("d {} {}\n", width, height).as_bytes())?;
+    //-- bbox
+    io::stdout().write_all(&format!("b {} {}\n", bbox[0], bbox[1]).as_bytes())?;
+    //-- cells that have no points
+    for (i, _gx) in g.iter().enumerate() {
+        for (j, _gy) in g[i].iter().enumerate() {
+            if g[i][j] == 0 {
+                io::stdout().write_all(&format!("c {} {}\n", i, j).as_bytes())?;
+            }
+        }
+    }
+
     for l in f.lines() {
         let l = l.expect("Unable to read line");
         let v: Vec<f64> = l.split(' ').map(|s| s.parse().unwrap()).collect();
         let gxy: (usize, usize) = get_gx_gy(v[0], v[1], bbox[0], bbox[1], cellsize);
-        println!("{}--{}", gxy.0, gxy.1);
+        // println!("{}--{}", gxy.0, gxy.1);
         g[gxy.0][gxy.1] -= 1;
         gpts[gxy.0][gxy.1].push(Point {
             x: v[0],
@@ -59,15 +88,11 @@ fn pass_3(mut f: &File, bbox: &Vec<f64>, cellsize: usize, g: &mut Vec<Vec<usize>
             z: v[2],
         });
         if g[gxy.0][gxy.1] == 0 {
-            println!("FINALISATION OF CELL {}--{}", gxy.0, gxy.1);
+            // println!("FINALISATION OF CELL {}--{}", gxy.0, gxy.1);
         }
     }
+    Ok(())
 }
-
-// fn finalise_cell(lspts: &mut <Vec<Point>>)
-// {
-
-// }
 
 fn pass_2(mut f: &File, bbox: &Vec<f64>, cellsize: usize) -> Vec<Vec<usize>> {
     let width: usize = ((bbox[2] - bbox[0]) / cellsize as f64).ceil() as usize;
