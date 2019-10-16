@@ -21,10 +21,14 @@ impl fmt::Display for Point {
 
 fn main() {
     let args: Vec<String> = env::args().collect();
+    if args.len() != 3 {
+        println!("params not given: sstfin file cellsize");
+        return;
+    }
     println!("My path is {}.", args[1]);
     let f = File::open(&args[1]).expect("Unable to open file");
-
     // let f = File::open("/Users/hugo/code/dt-comparison/data/5.txt").expect("Unable to open file");
+    let cellsize: usize = args[2].parse::<usize>().unwrap();
 
     //-- pass #1
     let mut bbox = pass_1(&f);
@@ -39,7 +43,6 @@ fn main() {
     println!("bbox {:?}", bbox);
 
     //-- pass #2
-    let cellsize: usize = 100;
     let mut g: Vec<Vec<usize>> = pass_2(&f, &bbox, cellsize);
 
     //-- pass #3
