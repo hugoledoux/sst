@@ -1,0 +1,13 @@
+[package]
+name = "sst"
+version = "0.1.0"
+authors = ["Hugo Ledoux <h.ledoux@tudelft.nl>"]
+edition = "2018"
+
+[[bin]]
+name = "sstfin"
+path = "src/sstfin/bin/main.rs"
+
+[[bin]]
+name = "sstdel"
+path = "src/sstdel/bin/main.rs"
