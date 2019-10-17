@@ -1,3 +1,5 @@
+use rand::{thread_rng, Rng};
+use std::collections::HashMap;
 use std::env;
 use std::fmt;
 use std::fs::File;
@@ -10,6 +12,16 @@ pub struct Point {
     pub x: f64,
     pub y: f64,
     pub z: f64,
+}
+
+impl Point {
+    pub fn new() -> Point {
+        Point {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+        }
+    }
 }
 
 impl fmt::Display for Point {
@@ -30,7 +42,9 @@ fn main() {
     let cellsize: usize = args[2].parse::<usize>().unwrap();
 
     //-- pass #1
-    let mut bbox = pass_1(&f);
+    let re = pass_1(&f);
+    let mut bbox = re.0;
+    let totalpts: usize = re.1;
     // println!("bbox {:?}", bbox);
     let deltax = bbox[2] - bbox[0];
     let deltay = bbox[3] - bbox[1];
@@ -41,11 +55,24 @@ fn main() {
     }
     println!("bbox {:?}", bbox);
 
-    //-- pass #2
-    let mut g: Vec<Vec<usize>> = pass_2(&f, &bbox, cellsize);
+    //-- chunkler
+    let mut rng = thread_rng();
+    let mut chunked: HashMap<usize, Point> = HashMap::new();
+    let nc: usize = (totalpts as f64 * 0.001) as usize; //-- TODO: what is a good value?
+    for _i in 0..nc {
+        chunked.insert(rng.gen_range(0, totalpts), Point::new());
+    }
+    println!("Size chunked: {}", chunked.len());
 
+    //-- pass #2
+    let mut g: Vec<Vec<usize>> = pass_2(&f, &bbox, cellsize, &mut chunked);
+    // for (theid, p) in &chunked {
+    //     println!("key={}; data={}", theid, p);
+    // }
+
+    // return;
     //-- pass #3
-    let _re = pass_3(&f, &bbox, cellsize, &mut g);
+    let _re = pass_3(&f, &bbox, cellsize, &mut g, &chunked);
 }
 
 fn pass_3(
@@ -53,6 +80,7 @@ fn pass_3(
     bbox: &Vec<f64>,
     cellsize: usize,
     g: &mut Vec<Vec<usize>>,
+    chunked: &HashMap<usize, Point>,
 ) -> io::Result<()> {
     let width: usize = ((bbox[2] - bbox[0]) / cellsize as f64).ceil() as usize;
     let height: usize = ((bbox[3] - bbox[1]) / cellsize as f64).ceil() as usize;
@@ -82,17 +110,24 @@ fn pass_3(
         }
     }
 
-    for l in f.lines() {
+    //-- chunker: promote these points at the top of the stream
+    for (_, pt) in chunked {
+        io::stdout().write_all(&format!("v {} {} {}\n", pt.x, pt.y, pt.z).as_bytes())?;
+    }
+    //-- read again the file
+    for (i, l) in f.lines().enumerate() {
         let l = l.expect("Unable to read line");
         let v: Vec<f64> = l.split(' ').map(|s| s.parse().unwrap()).collect();
         let gxy: (usize, usize) = get_gx_gy(v[0], v[1], bbox[0], bbox[1], cellsize);
         // println!("{}--{}", gxy.0, gxy.1);
         g[gxy.0][gxy.1] -= 1;
-        gpts[gxy.0][gxy.1].push(Point {
-            x: v[0],
-            y: v[1],
-            z: v[2],
-        });
+        if !chunked.contains_key(&i) {
+            gpts[gxy.0][gxy.1].push(Point {
+                x: v[0],
+                y: v[1],
+                z: v[2],
+            });
+        }
         if g[gxy.0][gxy.1] == 0 {
             for pt in gpts[gxy.0][gxy.1].iter() {
                 io::stdout().write_all(&format!("v {} {} {}\n", pt.x, pt.y, pt.z).as_bytes())?;
@@ -105,18 +140,32 @@ fn pass_3(
     Ok(())
 }
 
-fn pass_2(mut f: &File, bbox: &Vec<f64>, cellsize: usize) -> Vec<Vec<usize>> {
+fn pass_2(
+    mut f: &File,
+    bbox: &Vec<f64>,
+    cellsize: usize,
+    chunked: &mut HashMap<usize, Point>,
+) -> Vec<Vec<usize>> {
     let width: usize = ((bbox[2] - bbox[0]) / cellsize as f64).ceil() as usize;
     let height: usize = ((bbox[3] - bbox[1]) / cellsize as f64).ceil() as usize;
     let mut g: Vec<Vec<usize>> = vec![vec![0; height]; width];
     let _re = f.seek(std::io::SeekFrom::Start(0)); //-- reset to begining of the file
     let f = BufReader::new(f);
-    for l in f.lines() {
+    for (i, l) in f.lines().enumerate() {
         let l = l.expect("Unable to read line");
         let v: Vec<f64> = l.split(' ').map(|s| s.parse().unwrap()).collect();
         let gxy: (usize, usize) = get_gx_gy(v[0], v[1], bbox[0], bbox[1], cellsize);
         // println!("{}--{}", gxy.0, gxy.1);
         g[gxy.0][gxy.1] += 1;
+        //-- chunking
+        if chunked.contains_key(&i) == true {
+            let pc = chunked.entry(i).or_insert(Point::new());
+            *pc = Point {
+                x: v[0],
+                y: v[1],
+                z: v[2],
+            };
+        }
     }
     g
 }
@@ -128,16 +177,18 @@ fn get_gx_gy(x: f64, y: f64, minx: f64, miny: f64, cellsize: usize) -> (usize, u
     )
 }
 
-fn pass_1(f: &File) -> Vec<f64> {
+fn pass_1(f: &File) -> (Vec<f64>, usize) {
     let f = BufReader::new(f);
     let mut bbox: Vec<f64> = Vec::new();
     bbox.push(std::f64::MAX);
     bbox.push(std::f64::MAX);
     bbox.push(std::f64::MIN);
     bbox.push(std::f64::MIN);
+    let mut n: usize = 0;
     for l in f.lines() {
         let l = l.expect("Unable to read line");
         let v: Vec<f64> = l.split(' ').map(|s| s.parse().unwrap()).collect();
+        n += 1;
         //-- minxy
         for i in 0..2 {
             if v[i] < bbox[i] {
@@ -151,5 +202,5 @@ fn pass_1(f: &File) -> Vec<f64> {
             }
         }
     }
-    bbox
+    (bbox, n)
 }
