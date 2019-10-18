@@ -10,9 +10,12 @@ fn main() {
     let mut bbox: [f64; 4] = [std::f64::MAX, std::f64::MAX, std::f64::MIN, std::f64::MIN];
     let mut gpts: Vec<Vec<Vec<usize>>>;
 
+    let mut dt = startin::Triangulation::new();
+
     let stdin = std::io::stdin();
     for line in stdin.lock().lines() {
         let l = line.unwrap();
+        println!("{}", l);
         if l.is_empty() {
             continue;
         }
@@ -44,14 +47,15 @@ fn main() {
                 bbox[0] = re.0;
                 bbox[1] = re.1;
             }
-            'v' => continue,
-            'x' => continue,
+            'v' => {
+                let re = parse_3_f64(&l);
+                let _re = dt.insert_one_pt(re.0, re.1, re.2);
+            }
+            'x' => println!("Cell {}", l),
             _ => println!("WRONGLY FORMATTED STREAM. ABORT."),
         }
     }
 
-    let mut dt = startin::Triangulation::new();
-    let _re = dt.insert_one_pt(1.0, 2.0, 3.0);
     println!("# points: {}", dt.number_of_vertices());
     println!("totalpts: {}", totalpts);
 }
@@ -67,10 +71,14 @@ fn main() {
 // }
 
 fn parse_2_usize(l: &String) -> (usize, usize) {
-    let mut it = l.split_whitespace();
-    let a: usize = it.next().unwrap().parse::<usize>().unwrap();
-    let b: usize = it.next().unwrap().parse::<usize>().unwrap();
+    let ls: Vec<&str> = l.split_whitespace().collect();
+    let a: usize = ls[1].parse::<usize>().unwrap();
+    let b: usize = ls[2].parse::<usize>().unwrap();
     (a, b)
+    // let mut it = l.split_whitespace();
+    // let a: usize = it.next().unwrap().parse::<usize>().unwrap();
+    // let b: usize = it.next().unwrap().parse::<usize>().unwrap();
+    // (a, b)
 }
 
 fn parse_2_f64(l: &String) -> (f64, f64) {
@@ -80,6 +88,13 @@ fn parse_2_f64(l: &String) -> (f64, f64) {
     (a, b)
 }
 
+fn parse_3_f64(l: &String) -> (f64, f64, f64) {
+    let mut it = l.split_whitespace();
+    let a: f64 = it.next().unwrap().parse::<f64>().unwrap();
+    let b: f64 = it.next().unwrap().parse::<f64>().unwrap();
+    let c: f64 = it.next().unwrap().parse::<f64>().unwrap();
+    (a, b, c)
+}
 fn doiets() {
     println!("iets.");
 }
