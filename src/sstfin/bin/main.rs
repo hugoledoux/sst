@@ -36,7 +36,7 @@ fn main() {
         println!("params not given: sstfin file cellsize");
         return;
     }
-    println!("My path is {}.", args[1]);
+    // println!("My path is {}.", args[1]);
     let f = File::open(&args[1]).expect("Unable to open file");
     // let f = File::open("/Users/hugo/code/dt-comparison/data/5.txt").expect("Unable to open file");
     let cellsize: usize = args[2].parse::<usize>().unwrap();
@@ -53,7 +53,7 @@ fn main() {
     } else {
         bbox[2] = bbox[0] + deltay;
     }
-    println!("bbox {:?}", bbox);
+    // println!("bbox {:?}", bbox);
 
     //-- chunkler
     let mut rng = thread_rng();
@@ -62,15 +62,11 @@ fn main() {
     for _i in 0..nc {
         chunked.insert(rng.gen_range(0, totalpts), Point::new());
     }
-    println!("Size chunked: {}", chunked.len());
+    // println!("Size chunked: {}", chunked.len());
 
     //-- pass #2
     let mut g: Vec<Vec<usize>> = pass_2(&f, &bbox, cellsize, &mut chunked);
-    // for (theid, p) in &chunked {
-    //     println!("key={}; data={}", theid, p);
-    // }
 
-    // return;
     //-- pass #3
     let _re = pass_3(&f, &bbox, cellsize, &mut g, &chunked);
 }
