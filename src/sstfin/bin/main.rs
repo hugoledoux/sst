@@ -96,6 +96,7 @@ fn pass_3(
     io::stdout().write_all(&format!("c {}\n", cellsize).as_bytes())?;
     io::stdout().write_all(&format!("d {} {}\n", width, height).as_bytes())?;
     //-- bbox
+    // io::stdout().write_all(&format!("b {:.3} {:.3}\n", bbox[0], bbox[1]).as_bytes())?;
     io::stdout().write_all(&format!("b {} {}\n", bbox[0], bbox[1]).as_bytes())?;
     //-- cells that have no points
     for (i, _gx) in g.iter().enumerate() {
@@ -128,7 +129,7 @@ fn pass_3(
             for pt in gpts[gxy.0][gxy.1].iter() {
                 io::stdout().write_all(&format!("v {} {} {}\n", pt.x, pt.y, pt.z).as_bytes())?;
             }
-            io::stdout().write_all(&format!("c {} {}\n", gxy.0, gxy.1).as_bytes())?;
+            io::stdout().write_all(&format!("x {} {}\n", gxy.0, gxy.1).as_bytes())?;
             gpts[gxy.0][gxy.1].clear();
             gpts[gxy.0][gxy.1].shrink_to_fit();
         }
