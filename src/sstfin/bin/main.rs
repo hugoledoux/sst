@@ -43,17 +43,9 @@ fn main() {
 
     //-- pass #1
     let re = pass_1(&f);
-    let mut bbox = re.0;
+    let bbox = re.0;
+    println!("bbox {:?}", bbox);
     let totalpts: usize = re.1;
-    // println!("bbox {:?}", bbox);
-    let deltax = bbox[2] - bbox[0];
-    let deltay = bbox[3] - bbox[1];
-    if deltax >= deltay {
-        bbox[3] = bbox[1] + deltax;
-    } else {
-        bbox[2] = bbox[0] + deltay;
-    }
-    // println!("bbox {:?}", bbox);
 
     //-- chunkler
     let mut rng = thread_rng();
