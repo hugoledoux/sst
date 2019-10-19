@@ -36,9 +36,7 @@ fn main() {
         println!("params not given: sstfin file cellsize");
         return;
     }
-    // println!("My path is {}.", args[1]);
     let f = File::open(&args[1]).expect("Unable to open file");
-    // let f = File::open("/Users/hugo/code/dt-comparison/data/5.txt").expect("Unable to open file");
     let cellsize: usize = args[2].parse::<usize>().unwrap();
 
     //-- pass #1
@@ -47,20 +45,20 @@ fn main() {
     println!("bbox {:?}", bbox);
     let totalpts: usize = re.1;
 
-    //-- chunkler
+    //-- sprinkler
     let mut rng = thread_rng();
-    let mut chunked: HashMap<usize, Point> = HashMap::new();
+    let mut sprinkled: HashMap<usize, Point> = HashMap::new();
     let nc: usize = (totalpts as f64 * 0.001) as usize; //-- TODO: what is a good value?
     for _i in 0..nc {
-        chunked.insert(rng.gen_range(0, totalpts), Point::new());
+        sprinkled.insert(rng.gen_range(0, totalpts), Point::new());
     }
-    // println!("Size chunked: {}", chunked.len());
+    // println!("Size sprinkled: {}", sprinkled.len());
 
     //-- pass #2
-    let mut g: Vec<Vec<usize>> = pass_2(&f, &bbox, cellsize, &mut chunked);
+    let mut g: Vec<Vec<usize>> = pass_2(&f, &bbox, cellsize, &mut sprinkled);
 
     //-- pass #3
-    let _re = pass_3(&f, &bbox, cellsize, &mut g, &chunked);
+    let _re = pass_3(&f, &bbox, cellsize, &mut g, &sprinkled);
 }
 
 fn pass_3(
@@ -68,7 +66,7 @@ fn pass_3(
     bbox: &Vec<f64>,
     cellsize: usize,
     g: &mut Vec<Vec<usize>>,
-    chunked: &HashMap<usize, Point>,
+    sprinkled: &HashMap<usize, Point>,
 ) -> io::Result<()> {
     let width: usize = ((bbox[2] - bbox[0]) / cellsize as f64).ceil() as usize;
     let height: usize = ((bbox[3] - bbox[1]) / cellsize as f64).ceil() as usize;
@@ -100,7 +98,7 @@ fn pass_3(
     }
 
     //-- chunker: promote these points at the top of the stream
-    for (_, pt) in chunked {
+    for (_, pt) in sprinkled {
         io::stdout().write_all(&format!("v {} {} {}\n", pt.x, pt.y, pt.z).as_bytes())?;
     }
     //-- read again the file
@@ -110,7 +108,7 @@ fn pass_3(
         let gxy: (usize, usize) = get_gx_gy(v[0], v[1], bbox[0], bbox[1], cellsize);
         // println!("{}--{}", gxy.0, gxy.1);
         g[gxy.0][gxy.1] -= 1;
-        if !chunked.contains_key(&i) {
+        if !sprinkled.contains_key(&i) {
             gpts[gxy.0][gxy.1].push(Point {
                 x: v[0],
                 y: v[1],
@@ -133,7 +131,7 @@ fn pass_2(
     mut f: &File,
     bbox: &Vec<f64>,
     cellsize: usize,
-    chunked: &mut HashMap<usize, Point>,
+    sprinkled: &mut HashMap<usize, Point>,
 ) -> Vec<Vec<usize>> {
     let width: usize = ((bbox[2] - bbox[0]) / cellsize as f64).ceil() as usize;
     let height: usize = ((bbox[3] - bbox[1]) / cellsize as f64).ceil() as usize;
@@ -147,8 +145,8 @@ fn pass_2(
         // println!("{}--{}", gxy.0, gxy.1);
         g[gxy.0][gxy.1] += 1;
         //-- chunking
-        if chunked.contains_key(&i) == true {
-            let pc = chunked.entry(i).or_insert(Point::new());
+        if sprinkled.contains_key(&i) == true {
+            let pc = sprinkled.entry(i).or_insert(Point::new());
             *pc = Point {
                 x: v[0],
                 y: v[1],

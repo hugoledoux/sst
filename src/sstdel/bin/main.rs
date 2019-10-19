@@ -60,16 +60,6 @@ fn main() {
     // println!("totalpts: {}", totalpts);
 }
 
-// fn parse_grid_dimensions(l: &String, gpts: &mut Vec<Vec<Vec<usize>>>) {
-//     let mut it = l.split_whitespace();
-//     let wit = it.next();
-//     let hit = it.next();
-//     let width: usize = wit.unwrap().parse::<usize>().unwrap();
-//     it.next();
-//     let height: usize = hit.unwrap().parse::<usize>().unwrap();
-//     gpts = vec![vec![Vec::new(); height]; width];
-// }
-
 fn parse_2_usize(l: &String) -> (usize, usize) {
     let ls: Vec<&str> = l.split_whitespace().collect();
     let a: usize = ls[1].parse::<usize>().unwrap();
@@ -91,10 +81,3 @@ fn parse_3_f64(l: &String) -> (f64, f64, f64) {
     let c: f64 = ls[3].parse::<f64>().unwrap();
     (a, b, c)
 }
-fn doiets() {
-    println!("iets.");
-}
-
-// let l = l.expect("Unable to read line");
-// let v: Vec<f64> = l.split(' ').map(|s| s.parse().unwrap()).collect();
-// let gxy: (usize, usize) = get_gx_gy(v[0], v[1], bbox[0], bbox[1], cellsize);
