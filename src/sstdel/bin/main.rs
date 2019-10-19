@@ -56,8 +56,8 @@ fn main() {
         }
     }
 
-    println!("# points: {}", dt.number_of_vertices());
-    println!("totalpts: {}", totalpts);
+    println!("\n===\nDT # points: {}", dt.number_of_vertices());
+    // println!("totalpts: {}", totalpts);
 }
 
 // fn parse_grid_dimensions(l: &String, gpts: &mut Vec<Vec<Vec<usize>>>) {
@@ -75,24 +75,20 @@ fn parse_2_usize(l: &String) -> (usize, usize) {
     let a: usize = ls[1].parse::<usize>().unwrap();
     let b: usize = ls[2].parse::<usize>().unwrap();
     (a, b)
-    // let mut it = l.split_whitespace();
-    // let a: usize = it.next().unwrap().parse::<usize>().unwrap();
-    // let b: usize = it.next().unwrap().parse::<usize>().unwrap();
-    // (a, b)
 }
 
 fn parse_2_f64(l: &String) -> (f64, f64) {
-    let mut it = l.split_whitespace();
-    let a: f64 = it.next().unwrap().parse::<f64>().unwrap();
-    let b: f64 = it.next().unwrap().parse::<f64>().unwrap();
+    let ls: Vec<&str> = l.split_whitespace().collect();
+    let a: f64 = ls[1].parse::<f64>().unwrap();
+    let b: f64 = ls[2].parse::<f64>().unwrap();
     (a, b)
 }
 
 fn parse_3_f64(l: &String) -> (f64, f64, f64) {
-    let mut it = l.split_whitespace();
-    let a: f64 = it.next().unwrap().parse::<f64>().unwrap();
-    let b: f64 = it.next().unwrap().parse::<f64>().unwrap();
-    let c: f64 = it.next().unwrap().parse::<f64>().unwrap();
+    let ls: Vec<&str> = l.split_whitespace().collect();
+    let a: f64 = ls[1].parse::<f64>().unwrap();
+    let b: f64 = ls[2].parse::<f64>().unwrap();
+    let c: f64 = ls[3].parse::<f64>().unwrap();
     (a, b, c)
 }
 fn doiets() {
