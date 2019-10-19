@@ -38,8 +38,9 @@ fn main() {
 
     let args: Vec<String> = env::args().collect();
     if args.len() != 3 {
-        error!("Input parameter not given: cellsize");
-        return;
+        error!("Input parameter not given: cellsize. Abort.");
+        // eprintln!("Input parameter not given: cellsize");
+        std::process::exit(1);
     }
     let f = File::open(&args[1]).expect("Unable to open file");
     let cellsize: usize = args[2].parse::<usize>().unwrap();
