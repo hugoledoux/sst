@@ -15,7 +15,7 @@ fn main() {
     let stdin = std::io::stdin();
     for line in stdin.lock().lines() {
         let l = line.unwrap();
-        println!("{}", l);
+        // println!("{}", l);
         if l.is_empty() {
             continue;
         }
@@ -51,7 +51,8 @@ fn main() {
                 let re = parse_3_f64(&l);
                 let _re = dt.insert_one_pt(re.0, re.1, re.2);
             }
-            'x' => println!("Cell {}", l),
+            'x' => continue,
+            // 'x' => println!("Cell '{}' is finalised.", l),
             _ => println!("WRONGLY FORMATTED STREAM. ABORT."),
         }
     }

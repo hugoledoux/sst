@@ -42,7 +42,7 @@ fn main() {
     //-- pass #1
     let re = pass_1(&f);
     let bbox = re.0;
-    println!("bbox {:?}", bbox);
+    // println!("bbox {:?}", bbox);
     let totalpts: usize = re.1;
 
     //-- sprinkler
