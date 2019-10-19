@@ -2,20 +2,24 @@
 #[allow(unused_variables)]
 extern crate startin;
 
+#[macro_use]
+extern crate log; //info/debug/error
 use std::io::BufRead;
 
 fn main() {
+    env_logger::init();
     let mut totalpts: usize = 0;
     let mut cellsize: usize = 0;
     let mut bbox: [f64; 4] = [std::f64::MAX, std::f64::MAX, std::f64::MIN, std::f64::MIN];
     let mut gpts: Vec<Vec<Vec<usize>>>;
 
     let mut dt = startin::Triangulation::new();
+    info!("Init DT");
 
     let stdin = std::io::stdin();
     for line in stdin.lock().lines() {
         let l = line.unwrap();
-        // println!("{}", l);
+        // println!("=> {}", l);
         if l.is_empty() {
             continue;
         }
@@ -53,11 +57,11 @@ fn main() {
             }
             'x' => continue,
             // 'x' => println!("Cell '{}' is finalised.", l),
-            _ => println!("WRONGLY FORMATTED STREAM. ABORT."),
+            _ => error!("WRONGLY FORMATTED STREAM. ABORT."),
         }
     }
 
-    println!("\n===\nDT # points: {}", dt.number_of_vertices());
+    info!("DT # points: {}", dt.number_of_vertices());
     // println!("totalpts: {}", totalpts);
 }
 

@@ -7,6 +7,9 @@ use std::io::Seek;
 use std::io::{self, Write};
 use std::io::{BufRead, BufReader};
 
+#[macro_use]
+extern crate log; //info/debug/error
+
 #[derive(Clone)]
 pub struct Point {
     pub x: f64,
@@ -31,9 +34,11 @@ impl fmt::Display for Point {
 }
 
 fn main() {
+    env_logger::init();
+
     let args: Vec<String> = env::args().collect();
     if args.len() != 3 {
-        println!("params not given: sstfin file cellsize");
+        error!("Input parameter not given: cellsize");
         return;
     }
     let f = File::open(&args[1]).expect("Unable to open file");
@@ -42,8 +47,9 @@ fn main() {
     //-- pass #1
     let re = pass_1(&f);
     let bbox = re.0;
-    // println!("bbox {:?}", bbox);
     let totalpts: usize = re.1;
+    info!("First pass ✅");
+    info!("bbox={:?}", bbox);
 
     //-- sprinkler
     let mut rng = thread_rng();
@@ -52,13 +58,15 @@ fn main() {
     for _i in 0..nc {
         sprinkled.insert(rng.gen_range(0, totalpts), Point::new());
     }
-    // println!("Size sprinkled: {}", sprinkled.len());
+    info!("Sprinkled points: {}", sprinkled.len());
 
     //-- pass #2
     let mut g: Vec<Vec<usize>> = pass_2(&f, &bbox, cellsize, &mut sprinkled);
+    info!("Second pass ✅");
 
     //-- pass #3
     let _re = pass_3(&f, &bbox, cellsize, &mut g, &sprinkled);
+    info!("Third pass ✅");
 }
 
 fn pass_3(
@@ -135,6 +143,10 @@ fn pass_2(
 ) -> Vec<Vec<usize>> {
     let width: usize = ((bbox[2] - bbox[0]) / cellsize as f64).ceil() as usize;
     let height: usize = ((bbox[3] - bbox[1]) / cellsize as f64).ceil() as usize;
+    info!(
+        "Virtual grid is {}x{}; cellsize={}",
+        width, height, cellsize
+    );
     let mut g: Vec<Vec<usize>> = vec![vec![0; height]; width];
     let _re = f.seek(std::io::SeekFrom::Start(0)); //-- reset to begining of the file
     let f = BufReader::new(f);

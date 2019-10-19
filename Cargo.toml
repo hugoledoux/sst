@@ -9,6 +9,8 @@ path = "../startin/"
 
 [dependencies]
 rand = "0.7.2"
+log = "0.4.8"
+env_logger = "0.7.1"
 
 [[bin]]
 name = "sstfin"
