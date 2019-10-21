@@ -6,8 +6,8 @@ extern crate startin;
 extern crate log; //info/debug/error
 use std::collections::HashSet;
 
+use std::io::BufRead;
 use std::io::{self, Write};
-use std::io::{BufRead, BufReader};
 
 fn main() -> io::Result<()> {
     env_logger::init();
@@ -103,7 +103,7 @@ fn main() -> io::Result<()> {
     // }
     // println!("total left={}", total);
     //-- write the leftovers
-    for w in gpts {
+    for w in &gpts {
         for h in w {
             for each in h.iter() {
                 let p = dt.get_point(*each).unwrap();
