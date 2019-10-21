@@ -1,3 +1,5 @@
+//-- sstdel
+
 #[allow(dead_code)]
 #[allow(unused_variables)]
 extern crate startin;
@@ -93,16 +95,14 @@ fn main() -> io::Result<()> {
         }
     }
     info!("Finished reading the stream");
-    info!("Writing the leftover vertices in the DT");
+    let mut total: usize = 0;
+    for w in &gpts {
+        for h in w {
+            total += h.len();
+        }
+    }
+    info!("Writing the {} vertices left in the DT", total);
     info!("DT # points: {}", dt.number_of_vertices());
-    // let mut total: usize = 0;
-    // for (i, w) in gpts.iter().enumerate() {
-    //     for (j, h) in w.iter().enumerate() {
-    //         println!("cell={}-{} => {}", i, j, h.len());
-    //         total += h.len();
-    //     }
-    // }
-    // println!("total left={}", total);
     //-- write the leftovers
     for w in &gpts {
         for h in w {
