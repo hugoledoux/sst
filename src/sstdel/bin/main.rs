@@ -92,7 +92,8 @@ fn main() -> io::Result<()> {
             }
         }
     }
-    info!("Finished reading the stream, writing the leftover vertices in the DT");
+    info!("Finished reading the stream");
+    info!("Writing the leftover vertices in the DT");
     info!("DT # points: {}", dt.number_of_vertices());
     // let mut total: usize = 0;
     // for (i, w) in gpts.iter().enumerate() {

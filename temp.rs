@@ -3,7 +3,7 @@ fn main() {
     use std::collections::HashMap;
     // Type inference lets us omit an explicit type signature (which
     // would be `HashMap<String, String>` in this example).
-    let mut book_reviews = HashMap::new();
+    let mut book_reviews<int,&str> = HashMap::new();
     // Review some books.
     book_reviews.insert(28, "My favorite book.".to_string());
     book_reviews.insert(888, "Hugo Ledoux".to_string());
