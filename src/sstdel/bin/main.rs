@@ -4,6 +4,7 @@ extern crate startin;
 
 #[macro_use]
 extern crate log; //info/debug/error
+use std::collections::HashSet;
 use std::io::BufRead;
 
 fn main() {
@@ -67,17 +68,22 @@ fn main() {
                     Ok(x) => pos = x,
                     Err(x) => pos = x,
                 };
-                // println!("999: {}", pos);
                 let g = get_gx_gy(v.0, v.1, bbox[0], bbox[1], cellsize);
                 gpts[g.0][g.1].push(pos);
             }
             'x' => {
                 //-- finalise a cell
                 let re = parse_2_usize(&l);
-                finalise_cell(&mut dt, &mut gpts, (re.0, re.1));
-                // println!("Finalise cell {}", l);
+                if gpts[re.0][re.1].is_empty() == false {
+                    let mut gbbox: [f64; 4] = [0.0, 0.0, 0.0, 0.0];
+                    get_cell_bbox(re.0, re.1, &bbox, cellsize, &mut gbbox);
+                    finalise_cell(&mut dt, &mut gpts, (re.0, re.1), &gbbox);
+                }
             }
-            _ => error!("Wrongly formatted stream. Abort."),
+            _ => {
+                error!("Wrongly formatted stream. Abort.");
+                std::process::exit(1);
+            }
         }
     }
 
@@ -88,14 +94,19 @@ fn finalise_cell(
     dt: &mut startin::Triangulation,
     gpts: &mut Vec<Vec<Vec<usize>>>,
     cell: (usize, usize),
+    gbbox: &[f64],
 ) {
-    // println!("Finalise_cell() {}--{}", cell.0, cell.1);
     info!(
         "cell finalised {}--{} ({} vertices)",
         cell.0,
         cell.1,
         gpts[cell.0][cell.1].len()
     );
+    //-- verify which vertices are final
+    let mut hpts: HashSet<usize> = HashSet::new();
+    for theid in &gpts[cell.0][cell.1] {
+        // dt.get_point(each);
+    }
 }
 
 fn get_gx_gy(x: f64, y: f64, minx: f64, miny: f64, cellsize: usize) -> (usize, usize) {
@@ -103,6 +114,13 @@ fn get_gx_gy(x: f64, y: f64, minx: f64, miny: f64, cellsize: usize) -> (usize, u
         ((x - minx) / cellsize as f64) as usize,
         ((y - miny) / cellsize as f64) as usize,
     )
+}
+
+fn get_cell_bbox(gx: usize, gy: usize, bbox: &[f64], cellsize: usize, gbbox: &mut [f64]) {
+    gbbox[0] = bbox[0] + (gx * cellsize) as f64;
+    gbbox[1] = bbox[1] + (gy * cellsize) as f64;
+    gbbox[2] = bbox[0] + (gx * (cellsize + 1)) as f64;
+    gbbox[3] = bbox[1] + (gy * (cellsize + 1)) as f64;
 }
 
 fn parse_2_usize(l: &String) -> (usize, usize) {
