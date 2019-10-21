@@ -5,14 +5,16 @@ extern crate startin;
 #[macro_use]
 extern crate log; //info/debug/error
 use std::collections::HashSet;
-use std::io::BufRead;
+
+use std::io::{self, Write};
+use std::io::{BufRead, BufReader};
 
 fn main() {
     env_logger::init();
     let mut totalpts: usize = 0;
     let mut cellsize: usize = 0;
     let mut bbox: [f64; 2] = [std::f64::MIN, std::f64::MIN];
-    let mut gpts: Vec<Vec<Vec<usize>>> = Vec::new();
+    let mut gpts: Vec<Vec<HashSet<usize>>> = Vec::new();
 
     let mut dt = startin::Triangulation::new();
     info!("Init DT");
@@ -50,7 +52,7 @@ fn main() {
                 let re = parse_2_usize(&l);
                 gpts.resize(re.0, Vec::new());
                 for each in &mut gpts {
-                    each.resize(re.1, Vec::new());
+                    each.resize(re.1, HashSet::new());
                 }
             }
             'b' => {
@@ -63,13 +65,13 @@ fn main() {
                 //-- vertex
                 let v = parse_3_f64(&l);
                 let re = dt.insert_one_pt(v.0, v.1, v.2);
-                let pos: usize;
                 match re {
-                    Ok(x) => pos = x,
-                    Err(x) => pos = x,
+                    Ok(x) => {
+                        let g = get_gx_gy(v.0, v.1, bbox[0], bbox[1], cellsize);
+                        gpts[g.0][g.1].insert(x);
+                    }
+                    Err(_x) => continue,
                 };
-                let g = get_gx_gy(v.0, v.1, bbox[0], bbox[1], cellsize);
-                gpts[g.0][g.1].push(pos);
             }
             'x' => {
                 //-- finalise a cell
@@ -77,6 +79,10 @@ fn main() {
                 if gpts[re.0][re.1].is_empty() == false {
                     let mut gbbox: [f64; 4] = [0.0, 0.0, 0.0, 0.0];
                     get_cell_bbox(re.0, re.1, &bbox, cellsize, &mut gbbox);
+                    // println!("re={}-{}", re.0, re.1);
+                    // println!("box={:?}", bbox);
+                    // println!("cellsize={}", cellsize);
+                    // println!("gbbox={:?}", gbbox);
                     finalise_cell(&mut dt, &mut gpts, (re.0, re.1), &gbbox);
                 }
             }
@@ -92,21 +98,59 @@ fn main() {
 
 fn finalise_cell(
     dt: &mut startin::Triangulation,
-    gpts: &mut Vec<Vec<Vec<usize>>>,
-    cell: (usize, usize),
+    gpts: &mut Vec<Vec<HashSet<usize>>>,
+    cellid: (usize, usize),
     gbbox: &[f64],
-) {
+) -> io::Result<()> {
+    let cell = &mut gpts[cellid.0][cellid.1];
     info!(
         "cell finalised {}--{} ({} vertices)",
-        cell.0,
-        cell.1,
-        gpts[cell.0][cell.1].len()
+        cellid.0,
+        cellid.1,
+        cell.len()
     );
-    //-- verify which vertices are final
-    let mut hpts: HashSet<usize> = HashSet::new();
-    for theid in &gpts[cell.0][cell.1] {
-        // dt.get_point(each);
+    //-- verify which vertices can be finalised/flushed
+    let mut finpts: HashSet<usize> = HashSet::new();
+    for theid in cell.iter() {
+        // let p = dt.get_point(each);
+        let re = dt.adjacent_vertices_to_vertex(*theid).unwrap();
+        let mut fin: bool = true;
+        for v in re {
+            if cell.contains(&v) == false {
+                fin = false;
+                break;
+            }
+        }
+        if fin == true {
+            // println!("=>{}", theid);
+            //-- check every triangle for encroachment
+            let lts = dt.incident_triangles_to_vertex(*theid).unwrap();
+            for t in &lts {
+                // println!("t {}", t);
+                if startin::geom::circumcentre_encroach_bbox(
+                    &dt.get_point(t.v[0]).unwrap(),
+                    &dt.get_point(t.v[1]).unwrap(),
+                    &dt.get_point(t.v[2]).unwrap(),
+                    &gbbox,
+                ) == true
+                {
+                    fin = false;
+                    break;
+                }
+            }
+        }
+        if fin == true {
+            // println!("YOUOOOOO {}", theid);
+            let p = dt.get_point(*theid).unwrap();
+            io::stdout()
+                .write_all(&format!("v {} {} {} {}\n", theid, p[0], p[1], p[2]).as_bytes())?;
+            io::stdout().write_all(
+                &format!("{:?}\n", dt.adjacent_vertices_to_vertex(*theid).unwrap()).as_bytes(),
+            )?;
+            // io::stdout().write_all(&format!("n {}\n", total).as_bytes())?;
+        }
     }
+    Ok(())
 }
 
 fn get_gx_gy(x: f64, y: f64, minx: f64, miny: f64, cellsize: usize) -> (usize, usize) {
@@ -119,8 +163,8 @@ fn get_gx_gy(x: f64, y: f64, minx: f64, miny: f64, cellsize: usize) -> (usize, u
 fn get_cell_bbox(gx: usize, gy: usize, bbox: &[f64], cellsize: usize, gbbox: &mut [f64]) {
     gbbox[0] = bbox[0] + (gx * cellsize) as f64;
     gbbox[1] = bbox[1] + (gy * cellsize) as f64;
-    gbbox[2] = bbox[0] + (gx * (cellsize + 1)) as f64;
-    gbbox[3] = bbox[1] + (gy * (cellsize + 1)) as f64;
+    gbbox[2] = bbox[0] + ((gx + 1) * cellsize) as f64;
+    gbbox[3] = bbox[1] + ((gy + 1) * cellsize) as f64;
 }
 
 fn parse_2_usize(l: &String) -> (usize, usize) {
