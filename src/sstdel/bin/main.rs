@@ -9,7 +9,7 @@ use std::collections::HashSet;
 use std::io::{self, Write};
 use std::io::{BufRead, BufReader};
 
-fn main() {
+fn main() -> io::Result<()> {
     env_logger::init();
     let mut totalpts: usize = 0;
     let mut cellsize: usize = 0;
@@ -92,8 +92,30 @@ fn main() {
             }
         }
     }
-
+    info!("Finished reading the stream, writing the leftover vertices in the DT");
     info!("DT # points: {}", dt.number_of_vertices());
+    // let mut total: usize = 0;
+    // for (i, w) in gpts.iter().enumerate() {
+    //     for (j, h) in w.iter().enumerate() {
+    //         println!("cell={}-{} => {}", i, j, h.len());
+    //         total += h.len();
+    //     }
+    // }
+    // println!("total left={}", total);
+    //-- write the leftovers
+    for w in gpts {
+        for h in w {
+            for each in h.iter() {
+                let p = dt.get_point(*each).unwrap();
+                io::stdout()
+                    .write_all(&format!("v {} {} {} {}\n", *each, p[0], p[1], p[2]).as_bytes())?;
+                io::stdout().write_all(
+                    &format!("{:?}\n", dt.adjacent_vertices_to_vertex(*each).unwrap()).as_bytes(),
+                )?;
+            }
+        }
+    }
+    Ok(())
 }
 
 fn finalise_cell(
@@ -104,7 +126,7 @@ fn finalise_cell(
 ) -> io::Result<()> {
     let cell = &mut gpts[cellid.0][cellid.1];
     info!(
-        "cell finalised {}--{} ({} vertices)",
+        "Cell {}--{} finalised ({} vertices)",
         cellid.0,
         cellid.1,
         cell.len()
@@ -140,15 +162,16 @@ fn finalise_cell(
             }
         }
         if fin == true {
-            // println!("YOUOOOOO {}", theid);
-            let p = dt.get_point(*theid).unwrap();
-            io::stdout()
-                .write_all(&format!("v {} {} {} {}\n", theid, p[0], p[1], p[2]).as_bytes())?;
-            io::stdout().write_all(
-                &format!("{:?}\n", dt.adjacent_vertices_to_vertex(*theid).unwrap()).as_bytes(),
-            )?;
-            // io::stdout().write_all(&format!("n {}\n", total).as_bytes())?;
+            finpts.insert(*theid);
         }
+    }
+    for each in &finpts {
+        let p = dt.get_point(*each).unwrap();
+        io::stdout().write_all(&format!("v {} {} {} {}\n", *each, p[0], p[1], p[2]).as_bytes())?;
+        io::stdout().write_all(
+            &format!("{:?}\n", dt.adjacent_vertices_to_vertex(*each).unwrap()).as_bytes(),
+        )?;
+        cell.remove(each);
     }
     Ok(())
 }
