@@ -107,10 +107,16 @@ fn main() -> io::Result<()> {
         for h in w {
             for each in h.iter() {
                 let p = dt.get_point(*each).unwrap();
-                io::stdout()
-                    .write_all(&format!("v {} {} {} {}\n", *each, p[0], p[1], p[2]).as_bytes())?;
                 io::stdout().write_all(
-                    &format!("{:?}\n", dt.adjacent_vertices_to_vertex(*each).unwrap()).as_bytes(),
+                    &format!(
+                        "v {} {} {} {} {:?}\n",
+                        *each,
+                        p[0],
+                        p[1],
+                        p[2],
+                        dt.adjacent_vertices_to_vertex(*each).unwrap()
+                    )
+                    .as_bytes(),
                 )?;
             }
         }
@@ -167,9 +173,16 @@ fn finalise_cell(
     }
     for each in &finpts {
         let p = dt.get_point(*each).unwrap();
-        io::stdout().write_all(&format!("v {} {} {} {}\n", *each, p[0], p[1], p[2]).as_bytes())?;
         io::stdout().write_all(
-            &format!("{:?}\n", dt.adjacent_vertices_to_vertex(*each).unwrap()).as_bytes(),
+            &format!(
+                "v {} {} {} {} {:?}\n",
+                *each,
+                p[0],
+                p[1],
+                p[2],
+                dt.adjacent_vertices_to_vertex(*each).unwrap()
+            )
+            .as_bytes(),
         )?;
         cell.remove(each);
     }
