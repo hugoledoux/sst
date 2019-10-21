@@ -10,8 +10,8 @@ fn main() {
     env_logger::init();
     let mut totalpts: usize = 0;
     let mut cellsize: usize = 0;
-    let mut bbox: [f64; 4] = [std::f64::MAX, std::f64::MAX, std::f64::MIN, std::f64::MIN];
-    let mut gpts: Vec<Vec<Vec<usize>>>;
+    let mut bbox: [f64; 2] = [std::f64::MIN, std::f64::MIN];
+    let mut gpts: Vec<Vec<Vec<usize>>> = Vec::new();
 
     let mut dt = startin::Triangulation::new();
     info!("Init DT");
@@ -27,6 +27,7 @@ fn main() {
         match ch {
             '#' => continue,
             'n' => {
+                //-- number of points
                 totalpts = l
                     .split_whitespace()
                     .last()
@@ -35,6 +36,7 @@ fn main() {
                     .unwrap()
             }
             'c' => {
+                //-- cellsize
                 cellsize = l
                     .split_whitespace()
                     .last()
@@ -43,26 +45,64 @@ fn main() {
                     .unwrap()
             }
             'd' => {
+                //-- dimension grid
                 let re = parse_2_usize(&l);
-                gpts = vec![vec![Vec::new(); re.0]; re.1];
+                gpts.resize(re.0, Vec::new());
+                for each in &mut gpts {
+                    each.resize(re.1, Vec::new());
+                }
             }
             'b' => {
+                //-- bbox
                 let re = parse_2_f64(&l);
                 bbox[0] = re.0;
                 bbox[1] = re.1;
             }
             'v' => {
-                let re = parse_3_f64(&l);
-                let _re = dt.insert_one_pt(re.0, re.1, re.2);
+                //-- vertex
+                let v = parse_3_f64(&l);
+                let re = dt.insert_one_pt(v.0, v.1, v.2);
+                let pos: usize;
+                match re {
+                    Ok(x) => pos = x,
+                    Err(x) => pos = x,
+                };
+                // println!("999: {}", pos);
+                let g = get_gx_gy(v.0, v.1, bbox[0], bbox[1], cellsize);
+                gpts[g.0][g.1].push(pos);
             }
-            'x' => continue,
-            // 'x' => println!("Cell '{}' is finalised.", l),
-            _ => error!("WRONGLY FORMATTED STREAM. ABORT."),
+            'x' => {
+                //-- finalise a cell
+                let re = parse_2_usize(&l);
+                finalise_cell(&mut dt, &mut gpts, (re.0, re.1));
+                // println!("Finalise cell {}", l);
+            }
+            _ => error!("Wrongly formatted stream. Abort."),
         }
     }
 
     info!("DT # points: {}", dt.number_of_vertices());
-    // println!("totalpts: {}", totalpts);
+}
+
+fn finalise_cell(
+    dt: &mut startin::Triangulation,
+    gpts: &mut Vec<Vec<Vec<usize>>>,
+    cell: (usize, usize),
+) {
+    // println!("Finalise_cell() {}--{}", cell.0, cell.1);
+    info!(
+        "cell finalised {}--{} ({} vertices)",
+        cell.0,
+        cell.1,
+        gpts[cell.0][cell.1].len()
+    );
+}
+
+fn get_gx_gy(x: f64, y: f64, minx: f64, miny: f64, cellsize: usize) -> (usize, usize) {
+    (
+        ((x - minx) / cellsize as f64) as usize,
+        ((y - miny) / cellsize as f64) as usize,
+    )
 }
 
 fn parse_2_usize(l: &String) -> (usize, usize) {
