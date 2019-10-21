@@ -101,7 +101,7 @@ fn pass_3(
     for (i, _gx) in g.iter().enumerate() {
         for (j, _gy) in g[i].iter().enumerate() {
             if g[i][j] == 0 {
-                io::stdout().write_all(&format!("c {} {}\n", i, j).as_bytes())?;
+                io::stdout().write_all(&format!("x {} {}\n", i, j).as_bytes())?;
             }
         }
     }
