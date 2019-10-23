@@ -85,7 +85,7 @@ fn main() -> io::Result<()> {
                     // println!("box={:?}", bbox);
                     // println!("cellsize={}", cellsize);
                     // println!("gbbox={:?}", gbbox);
-                    finalise_cell(&mut dt, &mut gpts, (re.0, re.1), &gbbox);
+                    let _re = finalise_cell(&mut dt, &mut gpts, (re.0, re.1), &gbbox);
                 }
             }
             _ => {
@@ -95,13 +95,23 @@ fn main() -> io::Result<()> {
         }
     }
     info!("Finished reading the stream");
+    info!("dt.number_of_vertices() = {}", dt.number_of_vertices());
+
+    // println!("{}", dt.printme(false));
+    // std::process::exit(1);
+
     let mut total: usize = 0;
     for w in &gpts {
         for h in w {
             total += h.len();
         }
     }
-    info!("Writing the {} vertices left in the DT", total);
+    info!(
+        "Writing the {} vertices left in the DT (total={}; thus {:.1}%)",
+        total,
+        totalpts,
+        ((total as f64) / (totalpts as f64) * 100.0)
+    );
     info!("DT # points: {}", dt.number_of_vertices());
     //-- write the leftovers
     for w in &gpts {
@@ -186,6 +196,9 @@ fn finalise_cell(
             .as_bytes(),
         )?;
         cell.remove(each);
+    }
+    for each in &finpts {
+        dt.remove_star_no_deletion(*each);
     }
     Ok(())
 }
