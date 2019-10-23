@@ -4,10 +4,11 @@ version = "0.1.0"
 authors = ["Hugo Ledoux <h.ledoux@tudelft.nl>"]
 edition = "2018"
 
-[dependencies.startin]
-path = "../startin/"
+# [dependencies.startin]
+# path = "../startin/"
 
 [dependencies]
+hashbrown = "0.6.1"
 rand = "0.7.2"
 log = "0.4.8"
 env_logger = "0.7.1"

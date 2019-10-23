@@ -2,7 +2,7 @@
 
 #[allow(dead_code)]
 #[allow(unused_variables)]
-extern crate startin;
+mod startin;
 
 #[macro_use]
 extern crate log; //info/debug/error
