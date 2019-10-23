@@ -707,6 +707,11 @@ impl Triangulation {
     fn walk(&self, x: &[f64]) -> Triangle {
         //-- find the starting tr
         let mut cur = self.cur;
+        if !self.stars.contains_key(&cur) {
+            error!("walk(): cur={} doesn't exist", cur);
+            info!("dt.size() = {}", self.stars.len());
+            println!("dt.size() = {}", self.stars.len());
+        }
         //-- jump-and-walk
         if self.jump_and_walk == true {
             let mut rng = thread_rng();
@@ -935,18 +940,29 @@ impl Triangulation {
         let mut s = String::from("**********\n");
         // s.push_str(&format!("#pts: {}\n", self.number_pts()));
 
-        for (i, p) in &self.stars {
-            // for (i, p) in self.stars.iter().enumerate() {
-            // s.push_str(&format!("{}: {}\n", i, self.stars[i].link));
-            s.push_str(&format!("{}: [", i));
-            for each in p.link.iter() {
-                s.push_str(&format!("{} - ", each));
+        let mut allkeys: Vec<&usize> = self.stars.keys().collect();
+        allkeys.sort();
+        for each in allkeys {
+            let v = self.stars.get(each).unwrap();
+            s.push_str(&format!("{}: [", *each));
+            for each2 in v.link.iter() {
+                s.push_str(&format!("{} - ", each2));
             }
             s.push_str(&format!("]\n"));
-            if withxyz == true {
-                s.push_str(&format!("\t{:?}\n", self.stars[&i].pt));
-            }
         }
+
+        // for (i, p) in &self.stars {
+        //     // for (i, p) in self.stars.iter().enumerate() {
+        //     // s.push_str(&format!("{}: {}\n", i, self.stars[i].link));
+        //     s.push_str(&format!("{}: [", i));
+        //     for each in p.link.iter() {
+        //         s.push_str(&format!("{} - ", each));
+        //     }
+        //     s.push_str(&format!("]\n"));
+        //     if withxyz == true {
+        //         s.push_str(&format!("\t{:?}\n", self.stars[&i].pt));
+        //     }
+        // }
         s.push_str("**********\n");
         s
     }
