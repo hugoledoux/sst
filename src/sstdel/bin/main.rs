@@ -8,8 +8,9 @@ mod startin;
 extern crate log; //info/debug/error
 use std::collections::HashSet;
 
-use std::io::BufRead;
+use std::fs::File;
 use std::io::{self, Write};
+use std::io::{BufRead, BufReader};
 
 fn main() -> io::Result<()> {
     env_logger::init();
@@ -21,9 +22,14 @@ fn main() -> io::Result<()> {
     let mut dt = startin::Triangulation::new();
     info!("Init DT");
 
-    let stdin = std::io::stdin();
-    for line in stdin.lock().lines() {
-        let l = line.unwrap();
+    //PUTBACK let stdin = std::io::stdin();
+    //PUTBACK for line in stdin.lock().lines() {
+    let fi =
+        File::open("/Users/hugo/projects/sst/data/square400.stream").expect("Unable to open file");
+    let f = BufReader::new(fi);
+    for l in f.lines() {
+        let l = l.expect("Unable to read line");
+        //PUTBACK let l = line.unwrap();
         // println!("=> {}", l);
         if l.is_empty() {
             continue;
