@@ -226,6 +226,16 @@ impl Triangulation {
         }
     }
 
+    pub fn remove_star_no_deletion(&mut self, v: usize) -> bool {
+        let re = self.stars.remove(&v);
+        if re.is_some() {
+            true
+        } else {
+            println!("=== OH NO ===");
+            false
+        }
+    }
+
     fn insert_one_pt_init_phase(&mut self, x: f64, y: f64, z: f64) -> Result<usize, usize> {
         let p: [f64; 3] = [x, y, z];
         for i in 1..self.stars.len() {
