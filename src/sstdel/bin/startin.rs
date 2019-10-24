@@ -5,8 +5,11 @@ pub mod geom;
 use rand::prelude::thread_rng;
 use rand::Rng;
 use std::fmt;
+use std::io::{self, Write};
+use std::io::{BufRead, BufReader};
 
 use hashbrown::HashMap;
+use std::collections::HashSet;
 
 extern crate rand;
 
@@ -200,39 +203,168 @@ impl Star {
 
 //----------------------
 pub struct Triangulation {
-    // stars: Vec<Star>,
     stars: HashMap<usize, Star>,
     snaptol: f64,
     cur: usize,
     is_init: bool,
     jump_and_walk: bool,
     robust_predicates: bool,
+    //-- stuff for the grid
+    cellsize: usize,
+    gpts: Vec<Vec<HashSet<usize>>>,
+    minx: f64,
+    miny: f64,
 }
 
 impl Triangulation {
     //-- new
-    pub fn new() -> Triangulation {
-        let mut l: HashMap<usize, Star> = HashMap::new();
-        // let mut l: HashMap<usize, Star> = HashMap::with_capacity(1000);
-        l.insert(0, Star::new(-99999.99999, -99999.99999, -99999.99999));
-        let es: Vec<usize> = Vec::new();
+    pub fn new(w: usize, h: usize, c: usize, mx: f64, my: f64) -> Triangulation {
+        let mut s: HashMap<usize, Star> = HashMap::new();
+        s.insert(0, Star::new(-99999.99999, -99999.99999, -99999.99999));
+        let g: Vec<Vec<HashSet<usize>>> = Vec::new();
         Triangulation {
-            stars: l,
+            stars: s,
             snaptol: 0.001,
             cur: 0,
             is_init: false,
             jump_and_walk: false,
             robust_predicates: true,
+            gpts: g,
+            cellsize: c,
+            minx: mx,
+            miny: my,
         }
     }
 
-    pub fn remove_star_no_deletion(&mut self, v: usize) -> bool {
+    pub fn finalise_cell(&mut self, gx: usize, gy: usize) -> io::Result<()> {
+        if self.gpts[gx][gy].is_empty() == true {
+            return Ok(());
+        }
+        // let cell = &mut self.gpts[gx][gy];
+        let mut gbbox: [f64; 4] = [0.0, 0.0, 0.0, 0.0];
+        self.get_bbox_cell(gx, gy, &mut gbbox);
+        let mut finpts: HashSet<usize> = HashSet::new();
+        for theid in self.gpts[gx][gy].iter() {
+            let re = self.adjacent_vertices_to_vertex(*theid).unwrap();
+            let mut fin: bool = true;
+            for v in re {
+                if self.gpts[gx][gy].contains(&v) == false {
+                    fin = false;
+                    break;
+                }
+            }
+            if fin == true {
+                // println!("=>{}", theid);
+                //-- check every triangle for encroachment
+                let lts = self.incident_triangles_to_vertex(*theid).unwrap();
+                for t in &lts {
+                    // println!("t {}", t);
+                    if geom::circumcentre_encroach_bbox(
+                        &self.get_point(t.v[0]).unwrap(),
+                        &self.get_point(t.v[1]).unwrap(),
+                        &self.get_point(t.v[2]).unwrap(),
+                        &gbbox,
+                    ) == true
+                    {
+                        fin = false;
+                        break;
+                    }
+                }
+            }
+            if fin == true {
+                finpts.insert(*theid);
+            }
+        }
+        for each in &finpts {
+            let p = self.get_point(*each).unwrap();
+            io::stdout().write_all(
+                &format!(
+                    "v {} {} {} {} {:?}\n",
+                    *each,
+                    p[0],
+                    p[1],
+                    p[2],
+                    self.adjacent_vertices_to_vertex(*each).unwrap()
+                )
+                .as_bytes(),
+            )?;
+            self.gpts[gx][gy].remove(each);
+        }
+        //-- TODO: put this back
+        // for each in &finpts {
+        //     self.remove_star_no_deletion(*each);
+        // }
+        Ok(())
+    }
+
+    pub fn finalise_leftover_triangles(&mut self) -> io::Result<()> {
+        let mut total: usize = 0;
+        for w in &self.gpts {
+            for h in w {
+                total += h.len();
+            }
+        }
+        info!("Writing the {} vertices left in the DT", total);
+        info!("DT # points: {}", self.number_of_vertices());
+        //-- write the leftovers
+        for w in &self.gpts {
+            for h in w {
+                for each in h.iter() {
+                    let p = self.get_point(*each).unwrap();
+                    io::stdout().write_all(
+                        &format!(
+                            "v {} {} {} {} {:?}\n",
+                            *each,
+                            p[0],
+                            p[1],
+                            p[2],
+                            self.adjacent_vertices_to_vertex(*each).unwrap()
+                        )
+                        .as_bytes(),
+                    )?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn get_gx_gy(&self, x: f64, y: f64) -> (usize, usize) {
+        (
+            ((x - self.minx) / self.cellsize as f64) as usize,
+            ((y - self.miny) / self.cellsize as f64) as usize,
+        )
+    }
+
+    fn get_bbox_cell(&self, gx: usize, gy: usize, gbbox: &mut [f64]) {
+        gbbox[0] = self.minx + (gx * self.cellsize) as f64;
+        gbbox[1] = self.miny + (gy * self.cellsize) as f64;
+        gbbox[2] = self.minx + ((gx + 1) * self.cellsize) as f64;
+        gbbox[3] = self.miny + ((gy + 1) * self.cellsize) as f64;
+    }
+
+    fn flush_star(&mut self, v: usize) -> bool {
         let re = self.stars.remove(&v);
         if re.is_some() {
             true
         } else {
             println!("=== OH NO ===");
             false
+        }
+    }
+
+    pub fn set_cellsize(&mut self, c: usize) {
+        self.cellsize = c;
+    }
+
+    pub fn set_bbox(&mut self, mx: f64, my: f64) {
+        self.minx = mx;
+        self.miny = my;
+    }
+
+    pub fn set_grid_dimensions(&mut self, w: usize, h: usize) {
+        self.gpts.resize(w, Vec::new());
+        for each in &mut self.gpts {
+            each.resize(h, HashSet::new());
         }
     }
 
@@ -711,6 +843,7 @@ impl Triangulation {
             error!("walk(): cur={} doesn't exist", cur);
             info!("dt.size() = {}", self.stars.len());
             println!("dt.size() = {}", self.stars.len());
+            cur = *self.stars.keys().next().unwrap();
         }
         //-- jump-and-walk
         if self.jump_and_walk == true {

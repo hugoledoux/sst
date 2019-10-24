@@ -1,5 +1,5 @@
+use hashbrown::HashMap;
 use rand::{thread_rng, Rng};
-use std::collections::HashMap;
 use std::env;
 use std::fmt;
 use std::fs::File;
