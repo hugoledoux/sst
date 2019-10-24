@@ -6,7 +6,6 @@ use rand::prelude::thread_rng;
 use rand::Rng;
 use std::fmt;
 use std::io::{self, Write};
-use std::io::{BufRead, BufReader};
 
 use hashbrown::HashMap;
 use std::collections::HashSet;
@@ -218,7 +217,7 @@ pub struct Triangulation {
 
 impl Triangulation {
     //-- new
-    pub fn new(w: usize, h: usize, c: usize, mx: f64, my: f64) -> Triangulation {
+    pub fn new() -> Triangulation {
         let mut s: HashMap<usize, Star> = HashMap::new();
         s.insert(0, Star::new(-99999.99999, -99999.99999, -99999.99999));
         let g: Vec<Vec<HashSet<usize>>> = Vec::new();
@@ -230,13 +229,19 @@ impl Triangulation {
             jump_and_walk: false,
             robust_predicates: true,
             gpts: g,
-            cellsize: c,
-            minx: mx,
-            miny: my,
+            cellsize: 0,
+            minx: std::f64::MAX,
+            miny: std::f64::MAX,
         }
     }
 
     pub fn finalise_cell(&mut self, gx: usize, gy: usize) -> io::Result<()> {
+        info!(
+            "Cell {}--{} finalised ({} vertices)",
+            gx,
+            gy,
+            self.gpts[gx][gy].len()
+        );
         if self.gpts[gx][gy].is_empty() == true {
             return Ok(());
         }
@@ -290,10 +295,10 @@ impl Triangulation {
             )?;
             self.gpts[gx][gy].remove(each);
         }
-        //-- TODO: put this back
-        // for each in &finpts {
-        //     self.remove_star_no_deletion(*each);
-        // }
+
+        for each in &finpts {
+            self.flush_star(*each);
+        }
         Ok(())
     }
 
@@ -487,8 +492,18 @@ impl Triangulation {
         }
     }
 
+    pub fn insert_one_pt_with_grid(&mut self, px: f64, py: f64, pz: f64) -> Result<usize, usize> {
+        let re = self.insert_one_pt(px, py, pz);
+        if re.is_ok() {
+            let x = re.unwrap();
+            let g = self.get_gx_gy(px, py);
+            self.gpts[g.0][g.1].insert(x);
+        };
+        re
+    }
+
     //-- insert_one_pt
-    pub fn insert_one_pt(&mut self, px: f64, py: f64, pz: f64) -> Result<usize, usize> {
+    fn insert_one_pt(&mut self, px: f64, py: f64, pz: f64) -> Result<usize, usize> {
         // println!("-->{}", p);
         if self.is_init == false {
             return self.insert_one_pt_init_phase(px, py, pz);

@@ -13,16 +13,14 @@ use std::io::{BufRead, BufReader};
 
 fn main() -> io::Result<()> {
     env_logger::init();
-    let mut totalpts: usize = 0;
-    let mut cellsize: usize = 0;
-    let mut bbox: [f64; 2] = [std::f64::MIN, std::f64::MIN];
-    let mut gwidth: usize = 0;
-    let mut gheight: usize = 0;
-
-    let mut dt = startin::Triangulation::new(0, 0, 0, std::f64::MAX, std::f64::MAX);
-    // let mut dt: startin::Triangulation;
+    let mut _totalpts: usize = 0;
+    // let mut cellsize: usize = 0;
+    // let mut bbox: [f64; 2] = [std::f64::MIN, std::f64::MIN];
+    // let mut gwidth: usize = 0;
+    // let mut gheight: usize = 0;
 
     info!("Init DT");
+    let mut dt = startin::Triangulation::new();
 
     //PUTBACK let stdin = std::io::stdin();
     //PUTBACK for line in stdin.lock().lines() {
@@ -41,7 +39,7 @@ fn main() -> io::Result<()> {
             '#' => continue,
             'n' => {
                 //-- number of points
-                totalpts = l
+                _totalpts = l
                     .split_whitespace()
                     .last()
                     .unwrap()
@@ -50,36 +48,32 @@ fn main() -> io::Result<()> {
             }
             'c' => {
                 //-- cellsize
-                cellsize = l
+                let c = l
                     .split_whitespace()
                     .last()
                     .unwrap()
                     .parse::<usize>()
-                    .unwrap()
+                    .unwrap();
+                dt.set_cellsize(c);
             }
             'd' => {
                 //-- dimension grid
                 let re = parse_2_usize(&l);
-                gwidth = re.0;
-                gheight = re.1;
+                dt.set_grid_dimensions(re.0, re.1);
             }
             'b' => {
                 //-- bbox
                 let re = parse_2_f64(&l);
-                bbox[0] = re.0;
-                bbox[1] = re.1;
-                //-- init the DT
-                dt = startin::Triangulation::new(gwidth, gheight, cellsize, re.0, re.1);
+                dt.set_bbox(re.0, re.1);
             }
             'v' => {
                 //-- vertex
                 let v = parse_3_f64(&l);
-                let _re = dt.insert_one_pt(v.0, v.1, v.2);
+                let _re = dt.insert_one_pt_with_grid(v.0, v.1, v.2);
             }
             'x' => {
                 //-- finalise a cell
                 let re = parse_2_usize(&l);
-                info!("Cell {}--{} finalised", re.0, re.1,);
                 let _re = dt.finalise_cell(re.0, re.1);
             }
             _ => {
