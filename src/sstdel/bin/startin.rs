@@ -841,30 +841,25 @@ impl Triangulation {
     }
 
     fn walk(&self, x: &[f64]) -> Triangle {
+        let g = self.get_gx_gy(x[0], x[1]);
+
         //-- find the starting tr
         let mut cur = self.cur;
         if !self.stars.contains_key(&cur) {
             error!("walk(): cur={} doesn't exist", cur);
-            info!("dt.size() = {}", self.stars.len());
-            println!("dt.size() = {}", self.stars.len());
-            cur = *self.stars.keys().next().unwrap();
-        }
-        //-- jump-and-walk
-        if self.jump_and_walk == true {
-            let mut rng = thread_rng();
-            let mut d: f64 = geom::distance2d_squared(&self.stars[&self.cur].pt, &x);
-            let n = (self.stars.len() as f64).powf(0.25);
-            // let n = (self.stars.len() as f64).powf(0.25) * 7.0;
-            for _i in 0..n as i32 {
-                let re: usize = rng.gen_range(1, self.stars.len());
-                // let dtemp = x.square_2d_distance(&self.stars[re].pt);
-                if self.stars[&re].is_deleted() == true {
-                    continue;
-                }
-                let dtemp = geom::distance2d_squared(&self.stars[&re].pt, &x);
-                if dtemp < d {
-                    cur = re;
-                    d = dtemp;
+            //-- fetch one from the cell
+            if self.gpts[g.0][g.1].len() > 0 {
+                cur = *self.gpts[g.0][g.1].iter().next().unwrap();
+            } else {
+                // cur = *self.stars.keys().next().unwrap();
+                info!("Cell has no vertex in it.");
+                info!("Fall back on brute-force");
+                // cur = *self.stars.keys().next().unwrap();
+                let re = self.walk_bruteforce(x);
+                if re.is_some() {
+                    return re.unwrap();
+                } else {
+                    info!("DRAAAMMAAAAAAAAAA, no triangles found.")
                 }
             }
         }
@@ -873,14 +868,24 @@ impl Triangulation {
 
         //-- 1. find a finite triangle
         tr.v[0] = cur;
-        let l = &self.stars[&cur].link;
+        let l = &self.stars.get(&cur).unwrap().link;
+        let mut b = false;
         for i in 0..(l.len() - 1) {
-            if (l[i] != 0) && (l[i + 1] != 0) {
+            if (l[i] != 0)
+                && (l[i + 1] != 0)
+                && (self.stars.contains_key(&l[i]) == true)
+                && (self.stars.contains_key(&l[i + 1]) == true)
+            {
                 tr.v[1] = l[i];
                 tr.v[2] = l[i + 1];
+                b = true;
                 break;
             }
         }
+        if b == false {
+            info!("Cannot find a starting triangle.");
+        }
+
         //-- 2. order it such that tr0-tr1-x is CCW
         if geom::orient2d(
             &self.stars[&tr.v[0]].pt,
@@ -907,6 +912,130 @@ impl Triangulation {
                 tr.v[2] = tmp;
             }
         }
+
+        info!("here");
+        //-- 3. start the walk
+        //-- we know that tr0-tr1-x is CCW
+        loop {
+            if tr.is_infinite() == true {
+                break;
+            }
+            if geom::orient2d(
+                &self.stars[&tr.v[1]].pt,
+                &self.stars[&tr.v[2]].pt,
+                &x,
+                self.robust_predicates,
+            ) != -1
+            {
+                if geom::orient2d(
+                    &self.stars[&tr.v[2]].pt,
+                    &self.stars[&tr.v[0]].pt,
+                    &x,
+                    self.robust_predicates,
+                ) != -1
+                {
+                    break;
+                } else {
+                    //-- walk to incident to tr1,tr2
+                    // println!("here");
+                    let prev = self.stars[&tr.v[2]].link.get_prev_vertex(tr.v[0]).unwrap();
+                    tr.v[1] = tr.v[2];
+                    tr.v[2] = prev;
+                }
+            } else {
+                //-- walk to incident to tr1,tr2
+                // a.iter().position(|&x| x == 2), Some(1)
+                let prev = self.stars[&tr.v[1]].link.get_prev_vertex(tr.v[2]).unwrap();
+                tr.v[0] = tr.v[2];
+                tr.v[2] = prev;
+            }
+        }
+        return tr;
+    }
+
+    fn walk_bruteforce(&self, x: &[f64]) -> Option<Triangle> {
+        let trs = self.all_triangles_active();
+        for tr in trs.iter() {
+            if geom::intriangle(
+                &self.stars[&tr.v[0]].pt,
+                &self.stars[&tr.v[1]].pt,
+                &self.stars[&tr.v[2]].pt,
+                &x,
+                self.robust_predicates,
+            ) == 1
+            {
+                Some(tr);
+            }
+        }
+        None
+    }
+
+    fn walk_old(&self, x: &[f64]) -> Triangle {
+        let g = self.get_gx_gy(x[0], x[1]);
+        //-- find the starting tr
+        let mut cur = self.cur;
+        if !self.stars.contains_key(&cur) {
+            error!("walk(): cur={} doesn't exist", cur);
+            //-- fetch one from the cell
+            if self.gpts[g.0][g.1].len() > 0 {
+                cur = *self.gpts[g.0][g.1].iter().next().unwrap();
+            } else {
+                // cur = *self.stars.keys().next().unwrap();
+                info!("Cell has no vertex in it.");
+                cur = *self.stars.keys().next().unwrap();
+            }
+        }
+        let mut tr = Triangle { v: [0, 0, 0] };
+        // println!("cur: {}", cur);
+
+        //-- 1. find a finite triangle
+        tr.v[0] = cur;
+        let l = &self.stars.get(&cur).unwrap().link;
+        let mut b = false;
+        for i in 0..(l.len() - 1) {
+            if (l[i] != 0)
+                && (l[i + 1] != 0)
+                && (self.stars.contains_key(&l[i]) == true)
+                && (self.stars.contains_key(&l[i + 1]) == true)
+            {
+                tr.v[1] = l[i];
+                tr.v[2] = l[i + 1];
+                b = true;
+                break;
+            }
+        }
+        if b == false {
+            info!("Cannot find a starting triangle.");
+        }
+
+        //-- 2. order it such that tr0-tr1-x is CCW
+        if geom::orient2d(
+            &self.stars[&tr.v[0]].pt,
+            &self.stars[&tr.v[1]].pt,
+            &x,
+            self.robust_predicates,
+        ) == -1
+        {
+            if geom::orient2d(
+                &self.stars[&tr.v[1]].pt,
+                &self.stars[&tr.v[2]].pt,
+                &x,
+                self.robust_predicates,
+            ) != -1
+            {
+                let tmp: usize = tr.v[0];
+                tr.v[0] = tr.v[1];
+                tr.v[1] = tr.v[2];
+                tr.v[2] = tmp;
+            } else {
+                let tmp: usize = tr.v[1];
+                tr.v[0] = tr.v[2];
+                tr.v[1] = tr.v[0];
+                tr.v[2] = tmp;
+            }
+        }
+
+        info!("here");
         //-- 3. start the walk
         //-- we know that tr0-tr1-x is CCW
         loop {
@@ -1022,6 +1151,27 @@ impl Triangulation {
         trs
     }
 
+    pub fn all_triangles_active(&self) -> Vec<Triangle> {
+        let mut trs: Vec<Triangle> = Vec::new();
+        for (i, star) in &self.stars {
+            //-- reconstruct triangles
+            for (j, value) in star.link.iter().enumerate() {
+                if (i < value) && (self.stars.contains_key(&value) == true) {
+                    // let k = star.l[self.nexti(star.link.len(), j)];
+                    let k = star.link[star.link.next_index(j)];
+                    if (i < &k) && (self.stars.contains_key(&k) == true) {
+                        let tr = Triangle { v: [*i, *value, k] };
+                        if tr.is_infinite() == false {
+                            // println!("{}", tr);
+                            trs.push(tr);
+                        }
+                    }
+                }
+            }
+        }
+        trs
+    }
+
     /// Validates the Delaunay triangulation:
     /// (1) checks each triangle against each vertex (circumcircle tests); very slow
     /// (2) checks whether the convex hull is really convex
@@ -1034,14 +1184,13 @@ impl Triangulation {
         let trs = self.all_triangles();
         for tr in trs.iter() {
             for i in 1..self.stars.len() {
-                if self.stars[&i].is_deleted() == false
-                    && geom::incircle(
-                        &self.stars[&tr.v[0]].pt,
-                        &self.stars[&tr.v[1]].pt,
-                        &self.stars[&tr.v[2]].pt,
-                        &self.stars[&i].pt,
-                        self.robust_predicates,
-                    ) > 0
+                if geom::incircle(
+                    &self.stars[&tr.v[0]].pt,
+                    &self.stars[&tr.v[1]].pt,
+                    &self.stars[&tr.v[2]].pt,
+                    &self.stars[&i].pt,
+                    self.robust_predicates,
+                ) > 0
                 {
                     println!("NOT DELAUNAY FFS!");
                     println!("{} with {}", tr, i);
