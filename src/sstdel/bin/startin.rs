@@ -195,9 +195,6 @@ impl Star {
             link: l,
         }
     }
-    pub fn is_deleted(&self) -> bool {
-        self.link.is_empty()
-    }
 }
 
 //----------------------
@@ -206,7 +203,6 @@ pub struct Triangulation {
     snaptol: f64,
     cur: usize,
     is_init: bool,
-    jump_and_walk: bool,
     robust_predicates: bool,
     //-- stuff for the grid
     cellsize: usize,
@@ -226,7 +222,6 @@ impl Triangulation {
             snaptol: 0.001,
             cur: 0,
             is_init: false,
-            jump_and_walk: false,
             robust_predicates: true,
             gpts: g,
             cellsize: 0,
@@ -452,12 +447,6 @@ impl Triangulation {
 
     pub fn get_snap_tolerance(&self) -> f64 {
         self.snaptol
-    }
-
-    /// Activate/deactive the jump-and-walk strategy for locate().
-    /// If deactivated, then the walk starts from the last inserted triangle.
-    pub fn set_jump_and_walk(&mut self, b: bool) {
-        self.jump_and_walk = b;
     }
 
     pub fn is_using_robust_predicates(&self) -> bool {
