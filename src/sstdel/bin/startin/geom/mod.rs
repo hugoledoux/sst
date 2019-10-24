@@ -93,6 +93,48 @@ pub fn incircle(a: &[f64], b: &[f64], c: &[f64], p: &[f64], robust_predicates: b
     }
 }
 
+pub fn intriangle(a: &[f64], b: &[f64], c: &[f64], p: &[f64], robust_predicates: bool) -> i8 {
+    //-- p is INSIDE   == +1
+    //-- p is OUTSIDE  == -1
+    //-- p is ON == 0
+    //-- (abc is CCW oriented)
+    if robust_predicates == true {
+        return intriangle_robust(&a, &b, &c, &p);
+    } else {
+        return intriangle_fast(&a, &b, &c, &p);
+    }
+}
+
+pub fn intriangle_robust(a: &[f64], b: &[f64], c: &[f64], p: &[f64]) -> i8 {
+    //-- p is INSIDE   == +1
+    //-- p is OUTSIDE  == -1
+    //-- p is ON == 0
+    //-- (abc is CCW oriented)
+    if (orient2d_robust(a, b, p) >= 0)
+        && (orient2d_robust(b, c, p) >= 0)
+        && (orient2d_robust(c, a, p) >= 0)
+    {
+        1
+    } else {
+        -1
+    }
+}
+
+pub fn intriangle_fast(a: &[f64], b: &[f64], c: &[f64], p: &[f64]) -> i8 {
+    //-- p is INSIDE   == +1
+    //-- p is OUTSIDE  == -1
+    //-- p is ON == 0
+    //-- (abc is CCW oriented)
+    if (orient2d_fast(a, b, p) >= 0)
+        && (orient2d_fast(b, c, p) >= 0)
+        && (orient2d_fast(c, a, p) >= 0)
+    {
+        1
+    } else {
+        -1
+    }
+}
+
 pub fn incircle_robust(a: &[f64], b: &[f64], c: &[f64], p: &[f64]) -> i8 {
     //-- CCW    = +1
     //-- CW     = -1
