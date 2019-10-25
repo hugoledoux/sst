@@ -2,10 +2,10 @@
 
 pub mod geom;
 
-use rand::prelude::thread_rng;
-use rand::Rng;
 use std::fmt;
-use std::io::{self, Write};
+use std::fs::File;
+use std::io::Write;
+use std::io::{self};
 
 use hashbrown::HashMap;
 use std::collections::HashSet;
@@ -874,11 +874,11 @@ impl Triangulation {
         }
 
         //-- 4. we are outside the CH of the current dataset
-        info!("WALK FAILED, OUTSIDE THE CH");
+        error!("WALK FAILED, OUTSIDE THE CH");
         let re4 = self.walk_bruteforce_vertices(x);
-        for key in self.stars.keys() {
-            println!("{:?}", key);
-        }
+        // for key in self.stars.keys() {
+        //     println!("{:?}", key);
+        // }
         if re4.is_some() {
             return re4.unwrap();
         } else {
@@ -895,15 +895,17 @@ impl Triangulation {
         if re.is_none() {
             return None;
         }
+
         //--
-        println!(
-            "walk_safe: ({}) -- {}",
-            cur,
-            self.stars.get(&cur).unwrap().link
-        );
-        let a: Vec<&usize> = self.stars.keys().collect();
-        println!("{:?}", a);
+        // println!(
+        //     "walk_safe: ({}) -- {}",
+        //     cur,
+        //     self.stars.get(&cur).unwrap().link
+        // );
+        // let a: Vec<&usize> = self.stars.keys().collect();
+        // println!("{:?}", a);
         //--
+
         tr.v[0] = cur;
         let l = &re.unwrap().link;
         let mut b = false;
@@ -920,8 +922,12 @@ impl Triangulation {
             }
         }
         if b == false {
-            info!("Cannot find a starting triangle.");
-            return None;
+            info!("Cannot find a starting finite triangle.");
+            let pr: usize = l.get_prev_vertex(0).unwrap();
+            tr.v[0] = cur;
+            tr.v[1] = pr;
+            tr.v[2] = 0;
+            return Some(tr);
         }
 
         //-- 2. order it such that tr0-tr1-x is CCW
@@ -1027,7 +1033,15 @@ impl Triangulation {
                 }
             }
         }
-        self.walk_safe(x, vmin)
+        info!("brute-force ON CONVEX HULL");
+        let mut tr = Triangle { v: [0, 0, 0] };
+        let l = &self.stars.get(&vmin).unwrap().link;
+        let pr: usize = l.get_prev_vertex(0).unwrap();
+        tr.v[0] = vmin;
+        tr.v[1] = pr;
+        tr.v[2] = 0;
+        return Some(tr);
+        // self.walk_safe(x, vmin)
     }
 
     fn walk_bruteforce_triangles(&self, x: &[f64]) -> Option<Triangle> {
@@ -1341,6 +1355,34 @@ impl Triangulation {
 
     fn vertex_exists(&self, v: usize) -> bool {
         self.stars.contains_key(&v)
+    }
+
+    /// write an OBJ file to disk
+    pub fn write_obj(&self, path: String, twod: bool) -> std::io::Result<()> {
+        let trs = self.all_triangles_active();
+        let mut f = File::create(path)?;
+        let mut s = String::new();
+        for i in 1..self.stars.len() {
+            if twod == true {
+                s.push_str(&format!(
+                    "v {} {} {}\n",
+                    self.stars[&i].pt[0], self.stars[&i].pt[1], 0
+                ));
+            } else {
+                s.push_str(&format!(
+                    "v {} {} {}\n",
+                    self.stars[&i].pt[0], self.stars[&i].pt[1], self.stars[&i].pt[2]
+                ));
+            }
+        }
+        write!(f, "{}", s).unwrap();
+        let mut s = String::new();
+        for tr in trs.iter() {
+            s.push_str(&format!("f {} {} {}\n", tr.v[0], tr.v[1], tr.v[2]));
+        }
+        write!(f, "{}", s).unwrap();
+        // println!("write fobj: {:.2?}", starttime.elapsed());
+        Ok(())
     }
 }
 

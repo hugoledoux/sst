@@ -27,6 +27,7 @@ fn main() -> io::Result<()> {
     let fi =
         File::open("/Users/hugo/projects/sst/data/square400.stream").expect("Unable to open file");
     let f = BufReader::new(fi);
+    let mut count: usize = 0;
     for l in f.lines() {
         let l = l.expect("Unable to read line");
         //PUTBACK let l = line.unwrap();
@@ -68,6 +69,11 @@ fn main() -> io::Result<()> {
             }
             'v' => {
                 //-- vertex
+                println!("{}", count);
+                count += 1;
+                if count == 50 {
+                    dt.write_obj("/Users/hugo/temp/96.obj".to_string(), true);
+                }
                 let v = parse_3_f64(&l);
                 let _re = dt.insert_one_pt_with_grid(v.0, v.1, v.2);
             }
