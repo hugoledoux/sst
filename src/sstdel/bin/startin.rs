@@ -188,6 +188,7 @@ impl fmt::Display for Link {
 struct Star {
     pub pt: [f64; 3],
     pub link: Link,
+    pub active: bool,
 }
 
 impl Star {
@@ -196,6 +197,7 @@ impl Star {
         Star {
             pt: [x, y, z],
             link: l,
+            active: true,
         }
     }
 }
@@ -296,9 +298,9 @@ impl Triangulation {
             self.gpts[gx][gy].remove(each);
         }
 
-        // for each in &finpts {
-        //     self.flush_star(*each);
-        // }
+        for each in &finpts {
+            self.flush_star(*each);
+        }
         Ok(())
     }
 
@@ -348,13 +350,15 @@ impl Triangulation {
     }
 
     fn flush_star(&mut self, v: usize) -> bool {
-        let re = self.stars.remove(&v);
-        if re.is_some() {
-            true
-        } else {
-            println!("=== OH NO ===");
-            false
-        }
+        self.stars.get_mut(&v).unwrap().active = false;
+        true
+        // let re = self.stars.remove(&v);
+        // if re.is_some() {
+        //     true
+        // } else {
+        //     println!("=== OH NO ===");
+        //     false
+        // }
     }
 
     pub fn set_cellsize(&mut self, c: usize) {
@@ -1403,6 +1407,10 @@ impl Triangulation {
                             l[0][3].push(self.stars[i].pt[0]);
                             l[0][3].push(self.stars[i].pt[1]);
                             let gtr = Geometry::new(Value::Polygon(l));
+                            // let mut attributes = Map::new();
+                            // if self.stars[]
+                            // attributes.insert(String::from("active"), to_value();
+
                             let f = Feature {
                                 bbox: None,
                                 geometry: Some(gtr),

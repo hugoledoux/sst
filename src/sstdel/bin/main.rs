@@ -70,7 +70,7 @@ fn main() -> io::Result<()> {
             'v' => {
                 //-- vertex
                 // println!("{}", count);
-                // count += 1;
+                count += 1;
                 let v = parse_3_f64(&l);
                 let _re = dt.insert_one_pt_with_grid(v.0, v.1, v.2);
             }
@@ -78,6 +78,9 @@ fn main() -> io::Result<()> {
                 //-- finalise a cell
                 let re = parse_2_usize(&l);
                 let _re = dt.finalise_cell(re.0, re.1);
+                if re.0 == 1 && re.1 == 0 {
+                    let _re = dt.write_geojson("/Users/hugo/temp/c-1-0.geojson".to_string());
+                }
             }
             _ => {
                 error!("Wrongly formatted stream. Abort.");
