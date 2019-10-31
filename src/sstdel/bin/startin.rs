@@ -7,6 +7,9 @@ use std::fs::File;
 use std::io::Write;
 use std::io::{self};
 
+use geojson::{Feature, FeatureCollection, Geometry, Value};
+use serde_json::{to_value, Map};
+
 use hashbrown::HashMap;
 use std::collections::HashSet;
 
@@ -293,9 +296,9 @@ impl Triangulation {
             self.gpts[gx][gy].remove(each);
         }
 
-        for each in &finpts {
-            self.flush_star(*each);
-        }
+        // for each in &finpts {
+        //     self.flush_star(*each);
+        // }
         Ok(())
     }
 
@@ -1358,33 +1361,116 @@ impl Triangulation {
     }
 
     /// write an OBJ file to disk
-    pub fn write_obj(&self, path: String, twod: bool) -> std::io::Result<()> {
-        let trs = self.all_triangles_active();
-        let mut f = File::create(path)?;
-        let mut s = String::new();
-        for i in 1..self.stars.len() {
-            if twod == true {
-                s.push_str(&format!(
-                    "v {} {} {}\n",
-                    self.stars[&i].pt[0], self.stars[&i].pt[1], 0
-                ));
-            } else {
-                s.push_str(&format!(
-                    "v {} {} {}\n",
-                    self.stars[&i].pt[0], self.stars[&i].pt[1], self.stars[&i].pt[2]
-                ));
+    pub fn write_geojson(&self, path: String) -> std::io::Result<()> {
+        let mut fc = FeatureCollection {
+            bbox: None,
+            features: vec![],
+            foreign_members: None,
+        };
+        //-- vertices
+        for (i, star) in &self.stars {
+            if *i == 0 {
+                continue;
+            }
+            let pt = Geometry::new(Value::Point(vec![star.pt[0], star.pt[1]]));
+            let mut attributes = Map::new();
+            attributes.insert(String::from("id"), to_value(i.to_string()).unwrap());
+            let f = Feature {
+                bbox: None,
+                geometry: Some(pt),
+                id: None,
+                properties: Some(attributes),
+                foreign_members: None,
+            };
+            fc.features.push(f);
+        }
+
+        //-- triangles
+        for (i, star) in &self.stars {
+            for (j, value) in star.link.iter().enumerate() {
+                if (i < value) && (self.stars.contains_key(&value) == true) {
+                    let k = star.link[star.link.next_index(j)];
+                    if (i < &k) && (self.stars.contains_key(&k) == true) {
+                        let tr = Triangle { v: [*i, *value, k] };
+                        if tr.is_infinite() == false {
+                            let mut l: Vec<Vec<Vec<f64>>> = vec![vec![Vec::with_capacity(1); 4]];
+                            l[0][0].push(self.stars[i].pt[0]);
+                            l[0][0].push(self.stars[i].pt[1]);
+                            l[0][1].push(self.stars[value].pt[0]);
+                            l[0][1].push(self.stars[value].pt[1]);
+                            l[0][2].push(self.stars[&k].pt[0]);
+                            l[0][2].push(self.stars[&k].pt[1]);
+                            l[0][3].push(self.stars[i].pt[0]);
+                            l[0][3].push(self.stars[i].pt[1]);
+                            let gtr = Geometry::new(Value::Polygon(l));
+                            let f = Feature {
+                                bbox: None,
+                                geometry: Some(gtr),
+                                id: None,
+                                properties: None, //Some(attributes),
+                                foreign_members: None,
+                            };
+                            fc.features.push(f);
+                        }
+                    }
+                }
             }
         }
-        write!(f, "{}", s).unwrap();
-        let mut s = String::new();
-        for tr in trs.iter() {
-            s.push_str(&format!("f {} {} {}\n", tr.v[0], tr.v[1], tr.v[2]));
-        }
-        write!(f, "{}", s).unwrap();
-        // println!("write fobj: {:.2?}", starttime.elapsed());
+
+        //-- write the file to disk
+        let mut fo = File::create(path)?;
+        write!(fo, "{}", fc.to_string()).unwrap();
         Ok(())
     }
 }
+
+// for (i, star) in &self.stars {
+//     //-- reconstruct triangles
+//     for (j, value) in star.link.iter().enumerate() {
+//         if (i < value) && (self.stars.contains_key(&value) == true) {
+//             // let k = star.l[self.nexti(star.link.len(), j)];
+//             let k = star.link[star.link.next_index(j)];
+//             if (i < &k) && (self.stars.contains_key(&k) == true) {
+//                 let tr = Triangle { v: [*i, *value, k] };
+//                 if tr.is_infinite() == false {
+//                     // println!("{}", tr);
+//                     trs.push(tr);
+//                 }
+//             }
+//         }
+//     }
+// }
+
+// let trs = self.all_triangles_active();
+// let mut f = File::create(path)?;
+// let mut s = String::new();
+// let mut ids: Vec<&usize> = self.stars.keys().collect();
+// ids.sort();
+// println!("{:?}", ids);
+
+// for i in 1..self.stars.len() {
+//     if twod == true {
+//         s.push_str(&format!(
+//             "v {} {} {}\n",
+//             self.stars[&i].pt[0], self.stars[&i].pt[1], 0
+//         ));
+//     } else {
+//         s.push_str(&format!(
+//             "v {} {} {}\n",
+//             self.stars[&i].pt[0], self.stars[&i].pt[1], self.stars[&i].pt[2]
+//         ));
+//     }
+// }
+// write!(f, "{}", s).unwrap();
+// let mut s = String::new();
+// for tr in trs.iter() {
+//     s.push_str(&format!("f {} {} {}\n", tr.v[0], tr.v[1], tr.v[2]));
+// }
+// write!(f, "{}", s).unwrap();
+// // println!("write fobj: {:.2?}", starttime.elapsed());
+//         Ok(())
+//     }
+// }
 
 impl fmt::Display for Triangulation {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {

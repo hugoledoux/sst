@@ -69,11 +69,8 @@ fn main() -> io::Result<()> {
             }
             'v' => {
                 //-- vertex
-                println!("{}", count);
-                count += 1;
-                if count == 50 {
-                    dt.write_obj("/Users/hugo/temp/96.obj".to_string(), true);
-                }
+                // println!("{}", count);
+                // count += 1;
                 let v = parse_3_f64(&l);
                 let _re = dt.insert_one_pt_with_grid(v.0, v.1, v.2);
             }
@@ -93,6 +90,9 @@ fn main() -> io::Result<()> {
 
     // println!("{}", dt.printme(false));
     // std::process::exit(1);
+
+    info!("Writing GeoJSON file to disk: /Users/hugo/temp/z.geojson");
+    let _re = dt.write_geojson("/Users/hugo/temp/z.geojson".to_string());
 
     let _x = dt.finalise_leftover_triangles();
     Ok(())

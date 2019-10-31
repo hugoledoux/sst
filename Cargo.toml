@@ -12,6 +12,9 @@ hashbrown = "0.6.1"
 rand = "0.7.2"
 log = "0.4.8"
 env_logger = "0.7.1"
+geojson= "*"
+serde_json= "*"
+
 
 [[bin]]
 name = "sstfin"
