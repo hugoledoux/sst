@@ -190,18 +190,26 @@ pub fn circumcentre_encroach_bbox(a: &[f64], b: &[f64], c: &[f64], bbox: &[f64])
     // println!("cc={:?}", c);
     let radius: f64 = distance2d(&cc, a);
     let mut xaxis: f64 = cc[0] - bbox[0];
-    if (bbox[2] - cc[0]) > xaxis {
+    if (bbox[2] - cc[0]) < xaxis {
         xaxis = bbox[2] - cc[0];
     }
-    let mut yaxis: f64 = cc[1] - bbox[1];
-    if (bbox[3] - cc[1]) > xaxis {
-        yaxis = bbox[2] - cc[0];
+    //-- the cc is outside the bbox
+    if xaxis < 0.0 {
+        return true;
     }
-    let mut d: f64 = xaxis;
+    let mut yaxis: f64 = cc[1] - bbox[1];
+    if (bbox[3] - cc[1]) < yaxis {
+        yaxis = bbox[3] - cc[1];
+    }
+    //-- the cc is outside the bbox
+    if yaxis < 0.0 {
+        return true;
+    }
+    let mut mind: f64 = xaxis;
     if yaxis < xaxis {
-        d = yaxis;
+        mind = yaxis;
     }
     // println!("d={}", d);
     // println!("radius={}", radius);
-    return if radius < d { false } else { true };
+    return if radius < mind { false } else { true };
 }
