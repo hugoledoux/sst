@@ -252,6 +252,9 @@ impl Triangulation {
         self.get_bbox_cell(gx, gy, &mut gbbox);
         let mut finpts: HashSet<usize> = HashSet::new();
         for theid in self.gpts[gx][gy].iter() {
+            // if *theid == 58 {
+            //     println!("58!");
+            // }
             let re = self.adjacent_vertices_to_vertex(*theid).unwrap();
             let mut fin: bool = true;
             for v in re {
@@ -1364,7 +1367,7 @@ impl Triangulation {
         self.stars.contains_key(&v)
     }
 
-    /// write an OBJ file to disk
+    /// write a GeoJSON file to disk
     pub fn write_geojson(&self, path: String) -> std::io::Result<()> {
         let mut fc = FeatureCollection {
             bbox: None,
@@ -1379,6 +1382,10 @@ impl Triangulation {
             let pt = Geometry::new(Value::Point(vec![star.pt[0], star.pt[1]]));
             let mut attributes = Map::new();
             attributes.insert(String::from("id"), to_value(i.to_string()).unwrap());
+            attributes.insert(
+                String::from("active"),
+                serde_json::value::Value::Bool(star.active),
+            );
             let f = Feature {
                 bbox: None,
                 geometry: Some(pt),

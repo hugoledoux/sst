@@ -95,8 +95,8 @@ fn pass_3(
     io::stdout().write_all(&format!("c {}\n", cellsize).as_bytes())?;
     io::stdout().write_all(&format!("d {} {}\n", width, height).as_bytes())?;
     //-- bbox
-    // io::stdout().write_all(&format!("b {:.3} {:.3}\n", bbox[0], bbox[1]).as_bytes())?;
     io::stdout().write_all(&format!("b {} {}\n", bbox[0], bbox[1]).as_bytes())?;
+    // io::stdout().write_all(&format!("b {:.3} {:.3}\n", bbox[0], bbox[1]).as_bytes())?;
     //-- cells that have no points
     for (i, _gx) in g.iter().enumerate() {
         for (j, _gy) in g[i].iter().enumerate() {
