@@ -883,7 +883,7 @@ impl Triangulation {
         }
 
         //-- 4. we are outside the CH of the current dataset
-        error!("WALK FAILED, OUTSIDE THE CH");
+        warn!("WALK FAILED, OUTSIDE THE CH");
         let re4 = self.walk_bruteforce_vertices(x);
         // for key in self.stars.keys() {
         //     println!("{:?}", key);
