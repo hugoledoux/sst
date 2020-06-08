@@ -1030,11 +1030,11 @@ impl Triangulation {
     }
 
     fn walk_bruteforce_vertices(&self, x: &[f64]) -> Option<Triangle> {
-        //-- find closest vertex
+        //-- find closest vertex that is on the CH
         let mut dmin: f64 = std::f64::MAX;
         let mut vmin: usize = 0;
         for i in self.stars.keys() {
-            if *i != 0 {
+            if (*i != 0) && (self.is_vertex_convex_hull(*i)) {
                 let d = geom::distance2d_squared(x, &self.stars.get(i).unwrap().pt);
                 if d < dmin {
                     dmin = d;
