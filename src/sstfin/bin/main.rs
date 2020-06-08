@@ -77,9 +77,10 @@ fn pass_3(
     g: &mut Vec<Vec<usize>>,
     sprinkled: &HashMap<usize, Point>,
 ) -> io::Result<()> {
-    let width: usize = ((bbox[2] - bbox[0]) / cellsize as f64).ceil() as usize;
-    let height: usize = ((bbox[3] - bbox[1]) / cellsize as f64).ceil() as usize;
-    let mut gpts: Vec<Vec<Vec<Point>>> = vec![vec![Vec::new(); height]; width];
+    // let width: usize = ((bbox[2] - bbox[0]) / cellsize as f64).ceil() as usize;
+    // let height: usize = ((bbox[3] - bbox[1]) / cellsize as f64).ceil() as usize;
+    let cellno: usize = g[0].len();
+    let mut gpts: Vec<Vec<Vec<Point>>> = vec![vec![Vec::new(); cellno]; cellno];
     let _re = f.seek(std::io::SeekFrom::Start(0)); //-- reset to begining of the file
     let f = BufReader::new(f);
     //-- total number of points
@@ -92,8 +93,8 @@ fn pass_3(
     io::stdout().write_all(b"# sstfin\n")?;
     io::stdout().write_all(&format!("n {}\n", total).as_bytes())?;
     //-- cellsize
-    io::stdout().write_all(&format!("c {}\n", cellsize).as_bytes())?;
-    io::stdout().write_all(&format!("d {} {}\n", width, height).as_bytes())?;
+    io::stdout().write_all(&format!("r {}\n", cellsize).as_bytes())?;
+    io::stdout().write_all(&format!("d {} {}\n", cellno, cellno).as_bytes())?;
     //-- bbox
     io::stdout().write_all(&format!("b {} {}\n", bbox[0], bbox[1]).as_bytes())?;
     // io::stdout().write_all(&format!("b {:.3} {:.3}\n", bbox[0], bbox[1]).as_bytes())?;
@@ -144,11 +145,16 @@ fn pass_2(
 ) -> Vec<Vec<usize>> {
     let width: usize = ((bbox[2] - bbox[0]) / cellsize as f64).ceil() as usize;
     let height: usize = ((bbox[3] - bbox[1]) / cellsize as f64).ceil() as usize;
+    //-- make it a square to have a quadtree
+    let mut cellno = height;
+    if width > height {
+        cellno = width;
+    }
     info!(
         "Virtual grid is {}x{}; cellsize={}",
-        width, height, cellsize
+        cellno, cellno, cellsize
     );
-    let mut g: Vec<Vec<usize>> = vec![vec![0; height]; width];
+    let mut g: Vec<Vec<usize>> = vec![vec![0; cellno]; cellno];
     let _re = f.seek(std::io::SeekFrom::Start(0)); //-- reset to begining of the file
     let f = BufReader::new(f);
     for (i, l) in f.lines().enumerate() {

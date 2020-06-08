@@ -24,8 +24,8 @@ fn main() -> io::Result<()> {
 
     //PUTBACK let stdin = std::io::stdin();
     //PUTBACK for line in stdin.lock().lines() {
-    let fi =
-        File::open("/Users/hugo/projects/sst/data/square400.stream").expect("Unable to open file");
+    let fi = File::open("/Users/hugo/projects/sst/data/rect1.stream").expect("Unable to open file");
+    // File::open("/Users/hugo/projects/sst/data/square400.stream").expect("Unable to open file");
     let f = BufReader::new(fi);
     let mut count: usize = 0;
     for l in f.lines() {
@@ -47,15 +47,15 @@ fn main() -> io::Result<()> {
                     .parse::<usize>()
                     .unwrap()
             }
-            'c' => {
+            'r' => {
                 //-- cellsize
-                let c = l
+                let r = l
                     .split_whitespace()
                     .last()
                     .unwrap()
                     .parse::<usize>()
                     .unwrap();
-                dt.set_cellsize(c);
+                dt.set_cellsize(r);
             }
             'd' => {
                 //-- dimension grid
