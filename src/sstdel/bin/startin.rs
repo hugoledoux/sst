@@ -1069,7 +1069,7 @@ impl Triangulation {
                                 self.robust_predicates,
                             ) == 1
                             {
-                                Some(tr);
+                                return Some(tr);
                             }
                         }
                     }
