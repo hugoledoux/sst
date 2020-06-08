@@ -75,14 +75,17 @@ fn main() -> io::Result<()> {
                 let _re = dt.insert_one_pt_with_grid(v.0, v.1, v.2);
             }
             'x' => {
+                println!("{}", l);
                 //-- finalise a cell
                 let re = parse_2_usize(&l);
                 let _re = dt.finalise_cell(re.0, re.1);
                 if re.0 == 0 && re.1 == 0 {
-                    let _re = dt.write_geojson("/Users/hugo/temp/c-0-0.geojson".to_string());
+                    let _re =
+                        dt.write_geojson_triangles("/Users/hugo/temp/c-0-0.geojson".to_string());
                 }
                 if re.0 == 1 && re.1 == 0 {
-                    let _re = dt.write_geojson("/Users/hugo/temp/c-1-0.geojson".to_string());
+                    let _re =
+                        dt.write_geojson_triangles("/Users/hugo/temp/c-1-0.geojson".to_string());
                 }
             }
             _ => {
@@ -97,8 +100,11 @@ fn main() -> io::Result<()> {
     // println!("{}", dt.printme(false));
     // std::process::exit(1);
 
+    info!("Writing GeoJSON file to disk: /Users/hugo/temp/z.grid.geojson");
+    let _re = dt.write_geojson_grid("/Users/hugo/temp/z.grid.geojson".to_string());
+
     info!("Writing GeoJSON file to disk: /Users/hugo/temp/z.geojson");
-    let _re = dt.write_geojson("/Users/hugo/temp/z.geojson".to_string());
+    let _re = dt.write_geojson_triangles("/Users/hugo/temp/z.geojson".to_string());
 
     let _x = dt.finalise_leftover_triangles();
     Ok(())

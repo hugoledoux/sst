@@ -300,7 +300,6 @@ impl Triangulation {
             )?;
             self.gpts[gx][gy].remove(each);
         }
-
         for each in &finpts {
             self.flush_star(*each);
         }
@@ -353,15 +352,15 @@ impl Triangulation {
     }
 
     fn flush_star(&mut self, v: usize) -> bool {
-        self.stars.get_mut(&v).unwrap().active = false;
-        true
-        // let re = self.stars.remove(&v);
-        // if re.is_some() {
-        //     true
-        // } else {
-        //     println!("=== OH NO ===");
-        //     false
-        // }
+        // self.stars.get_mut(&v).unwrap().active = false;
+        // true
+        let re = self.stars.remove(&v);
+        if re.is_some() {
+            true
+        } else {
+            println!("=== OH NO ===");
+            false
+        }
     }
 
     pub fn set_cellsize(&mut self, c: usize) {
@@ -1367,8 +1366,8 @@ impl Triangulation {
         self.stars.contains_key(&v)
     }
 
-    /// write a GeoJSON file to disk
-    pub fn write_geojson(&self, path: String) -> std::io::Result<()> {
+    /// write a GeoJSON file of the triangles/vertices to disk
+    pub fn write_geojson_triangles(&self, path: String) -> std::io::Result<()> {
         let mut fc = FeatureCollection {
             bbox: None,
             features: vec![],
@@ -1432,6 +1431,44 @@ impl Triangulation {
             }
         }
 
+        //-- write the file to disk
+        let mut fo = File::create(path)?;
+        write!(fo, "{}", fc.to_string()).unwrap();
+        Ok(())
+    }
+
+    /// write a GeoJSON file of the quadtree/grid to disk
+    pub fn write_geojson_grid(&self, path: String) -> std::io::Result<()> {
+        let mut fc = FeatureCollection {
+            bbox: None,
+            features: vec![],
+            foreign_members: None,
+        };
+        for (i, w) in self.gpts.iter().enumerate() {
+            for (j, h) in w.iter().enumerate() {
+                let mut l: Vec<Vec<Vec<f64>>> = vec![vec![Vec::with_capacity(1); 5]];
+                l[0][0].push(self.minx + ((i * self.cellsize) as f64));
+                l[0][0].push(self.miny + ((j * self.cellsize) as f64));
+                l[0][1].push(self.minx + (((i + 1) * self.cellsize) as f64));
+                l[0][1].push(self.miny + ((j * self.cellsize) as f64));
+                l[0][2].push(self.minx + (((i + 1) * self.cellsize) as f64));
+                l[0][2].push(self.miny + (((j + 1) * self.cellsize) as f64));
+                l[0][3].push(self.minx + ((i * self.cellsize) as f64));
+                l[0][3].push(self.miny + (((j + 1) * self.cellsize) as f64));
+                l[0][4].push(self.minx + ((i * self.cellsize) as f64));
+                l[0][4].push(self.miny + ((j * self.cellsize) as f64));
+
+                let gtr = Geometry::new(Value::Polygon(l));
+                let f = Feature {
+                    bbox: None,
+                    geometry: Some(gtr),
+                    id: None,
+                    properties: None, //Some(attributes),
+                    foreign_members: None,
+                };
+                fc.features.push(f);
+            }
+        }
         //-- write the file to disk
         let mut fo = File::create(path)?;
         write!(fo, "{}", fc.to_string()).unwrap();
