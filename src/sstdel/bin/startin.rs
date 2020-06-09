@@ -203,18 +203,85 @@ impl Star {
 }
 
 //----------------------
+struct Quadtree {
+    pub gpts: Vec<Vec<HashSet<usize>>>,
+    pub gfinal: Vec<Vec<bool>>,
+    pub minx: f64,
+    pub miny: f64,
+    pub cellsize: usize,
+    pub griddim: usize,
+}
+
+impl Quadtree {
+    pub fn new() -> Quadtree {
+        let g: Vec<Vec<HashSet<usize>>> = Vec::new();
+        let gf: Vec<Vec<bool>> = Vec::new();
+        Quadtree {
+            gpts: g,
+            gfinal: gf,
+            cellsize: 0,
+            griddim: 0,
+            minx: std::f64::MAX,
+            miny: std::f64::MAX,
+        }
+    }
+
+    pub fn get_cell_count(&self, gx: usize, gy: usize) -> Option<usize> {
+        if gx >= self.griddim || gy > self.griddim {
+            None
+        } else {
+            Some(self.gpts[gx][gy].len())
+        }
+    }
+
+    pub fn get_cell_pts(&self, gx: usize, gy: usize) -> Option<Vec<usize>> {
+        if gx >= self.griddim || gy > self.griddim {
+            None
+        } else {
+            let mut l: Vec<usize> = Vec::new();
+            for each in self.gpts[gx][gy].iter() {
+                l.push(*each);
+            }
+            Some(l)
+        }
+    }
+
+    pub fn set_dimensions(&mut self, griddim: usize) {
+        self.griddim = griddim;
+        self.gpts.resize(griddim, Vec::new());
+        for each in &mut self.gpts {
+            each.resize(griddim, HashSet::new());
+        }
+        self.gfinal.resize(griddim, Vec::new());
+        for each in &mut self.gfinal {
+            each.resize(griddim, false);
+        }
+    }
+
+    fn get_bbox_cell(&self, gx: usize, gy: usize, gbbox: &mut [f64]) {
+        gbbox[0] = self.minx + (gx * self.cellsize) as f64;
+        gbbox[1] = self.miny + (gy * self.cellsize) as f64;
+        gbbox[2] = self.minx + ((gx + 1) * self.cellsize) as f64;
+        gbbox[3] = self.miny + ((gy + 1) * self.cellsize) as f64;
+    }
+
+    fn get_gx_gy(&self, x: f64, y: f64) -> (usize, usize) {
+        (
+            ((x - self.minx) / self.cellsize as f64) as usize,
+            ((y - self.miny) / self.cellsize as f64) as usize,
+        )
+    }
+}
+
+//----------------------
 pub struct Triangulation {
     stars: HashMap<usize, Star>,
+    qt: Quadtree,
     snaptol: f64,
     cur: usize,
     is_init: bool,
     robust_predicates: bool,
-    //-- stuff for the grid
-    cellsize: usize,
-    gpts: Vec<Vec<HashSet<usize>>>,
-    minx: f64,
-    miny: f64,
-    theid: usize,
+    theid: usize, //-- to assign id to new vertices, since some are flushed
 }
 
 impl Triangulation {
@@ -222,18 +289,15 @@ impl Triangulation {
     pub fn new() -> Triangulation {
         let mut s: HashMap<usize, Star> = HashMap::new();
         s.insert(0, Star::new(-99999.99999, -99999.99999, -99999.99999));
-        let g: Vec<Vec<HashSet<usize>>> = Vec::new();
+        let q = Quadtree::new();
         Triangulation {
+            qt: q,
             theid: 1,
             stars: s,
             snaptol: 0.001,
             cur: 0,
             is_init: false,
             robust_predicates: true,
-            gpts: g,
-            cellsize: 0,
-            minx: std::f64::MAX,
-            miny: std::f64::MAX,
         }
     }
 
@@ -242,23 +306,21 @@ impl Triangulation {
             "Cell {}--{} finalised ({} vertices)",
             gx,
             gy,
-            self.gpts[gx][gy].len()
+            self.qt.get_cell_count(gx, gy).unwrap()
         );
-        if self.gpts[gx][gy].is_empty() == true {
+        // if self.qt.gpts[gx][gy].is_empty() == true {
+        if self.qt.get_cell_count(gx, gy).unwrap() == 0 {
             return Ok(());
         }
         // let cell = &mut self.gpts[gx][gy];
         let mut gbbox: [f64; 4] = [0.0, 0.0, 0.0, 0.0];
-        self.get_bbox_cell(gx, gy, &mut gbbox);
+        self.qt.get_bbox_cell(gx, gy, &mut gbbox);
         let mut finpts: HashSet<usize> = HashSet::new();
-        for theid in self.gpts[gx][gy].iter() {
-            // if *theid == 58 {
-            //     println!("58!");
-            // }
+        for theid in self.qt.gpts[gx][gy].iter() {
             let re = self.adjacent_vertices_to_vertex(*theid).unwrap();
             let mut fin: bool = true;
             for v in re {
-                if self.gpts[gx][gy].contains(&v) == false {
+                if self.qt.gpts[gx][gy].contains(&v) == false {
                     fin = false;
                     break;
                 }
@@ -298,7 +360,7 @@ impl Triangulation {
                 )
                 .as_bytes(),
             )?;
-            self.gpts[gx][gy].remove(each);
+            self.qt.gpts[gx][gy].remove(each);
         }
         for each in &finpts {
             self.flush_star(*each);
@@ -308,7 +370,7 @@ impl Triangulation {
 
     pub fn finalise_leftover_triangles(&mut self) -> io::Result<()> {
         let mut total: usize = 0;
-        for w in &self.gpts {
+        for w in &self.qt.gpts {
             for h in w {
                 total += h.len();
             }
@@ -316,7 +378,7 @@ impl Triangulation {
         info!("Writing the {} vertices left in the DT", total);
         info!("DT # points: {}", self.number_of_vertices());
         //-- write the leftovers
-        for w in &self.gpts {
+        for w in &self.qt.gpts {
             for h in w {
                 for each in h.iter() {
                     let p = self.get_point(*each).unwrap();
@@ -337,20 +399,6 @@ impl Triangulation {
         Ok(())
     }
 
-    fn get_gx_gy(&self, x: f64, y: f64) -> (usize, usize) {
-        (
-            ((x - self.minx) / self.cellsize as f64) as usize,
-            ((y - self.miny) / self.cellsize as f64) as usize,
-        )
-    }
-
-    fn get_bbox_cell(&self, gx: usize, gy: usize, gbbox: &mut [f64]) {
-        gbbox[0] = self.minx + (gx * self.cellsize) as f64;
-        gbbox[1] = self.miny + (gy * self.cellsize) as f64;
-        gbbox[2] = self.minx + ((gx + 1) * self.cellsize) as f64;
-        gbbox[3] = self.miny + ((gy + 1) * self.cellsize) as f64;
-    }
-
     fn flush_star(&mut self, v: usize) -> bool {
         // self.stars.get_mut(&v).unwrap().active = false;
         // true
@@ -364,19 +412,16 @@ impl Triangulation {
     }
 
     pub fn set_cellsize(&mut self, c: usize) {
-        self.cellsize = c;
+        self.qt.cellsize = c;
     }
 
     pub fn set_bbox(&mut self, mx: f64, my: f64) {
-        self.minx = mx;
-        self.miny = my;
+        self.qt.minx = mx;
+        self.qt.miny = my;
     }
 
     pub fn set_grid_dimensions(&mut self, w: usize, h: usize) {
-        self.gpts.resize(w, Vec::new());
-        for each in &mut self.gpts {
-            each.resize(h, HashSet::new());
-        }
+        self.qt.set_dimensions(w);
     }
 
     fn insert_one_pt_init_phase(&mut self, x: f64, y: f64, z: f64) -> Result<usize, usize> {
@@ -497,8 +542,8 @@ impl Triangulation {
         let re = self.insert_one_pt(px, py, pz);
         if re.is_ok() {
             let x = re.unwrap();
-            let g = self.get_gx_gy(px, py);
-            self.gpts[g.0][g.1].insert(x);
+            let g = self.qt.get_gx_gy(px, py);
+            self.qt.gpts[g.0][g.1].insert(x);
         };
         re
     }
@@ -868,9 +913,9 @@ impl Triangulation {
 
         //-- 2. try walk from one in the same cell
         warn!("attempt to find one vertex in the grid cell and start from it");
-        let g = self.get_gx_gy(x[0], x[1]);
-        if self.gpts[g.0][g.1].len() > 0 {
-            cur = *self.gpts[g.0][g.1].iter().next().unwrap();
+        let g = self.qt.get_gx_gy(x[0], x[1]);
+        if self.qt.gpts[g.0][g.1].len() > 0 {
+            cur = *self.qt.gpts[g.0][g.1].iter().next().unwrap();
             let re = self.walk_safe(x, cur);
             if re.is_some() {
                 return re.unwrap();
@@ -1082,14 +1127,14 @@ impl Triangulation {
     }
 
     fn walk_old(&self, x: &[f64]) -> Triangle {
-        let g = self.get_gx_gy(x[0], x[1]);
+        let g = self.qt.get_gx_gy(x[0], x[1]);
         //-- find the starting tr
         let mut cur = self.cur;
         if !self.stars.contains_key(&cur) {
             error!("walk(): cur={} doesn't exist", cur);
             //-- fetch one from the cell
-            if self.gpts[g.0][g.1].len() > 0 {
-                cur = *self.gpts[g.0][g.1].iter().next().unwrap();
+            if self.qt.gpts[g.0][g.1].len() > 0 {
+                cur = *self.qt.gpts[g.0][g.1].iter().next().unwrap();
             } else {
                 // cur = *self.stars.keys().next().unwrap();
                 info!("Cell has no vertex in it.");
@@ -1446,19 +1491,19 @@ impl Triangulation {
             features: vec![],
             foreign_members: None,
         };
-        for (i, w) in self.gpts.iter().enumerate() {
+        for (i, w) in self.qt.gpts.iter().enumerate() {
             for (j, h) in w.iter().enumerate() {
                 let mut l: Vec<Vec<Vec<f64>>> = vec![vec![Vec::with_capacity(1); 5]];
-                l[0][0].push(self.minx + ((i * self.cellsize) as f64));
-                l[0][0].push(self.miny + ((j * self.cellsize) as f64));
-                l[0][1].push(self.minx + (((i + 1) * self.cellsize) as f64));
-                l[0][1].push(self.miny + ((j * self.cellsize) as f64));
-                l[0][2].push(self.minx + (((i + 1) * self.cellsize) as f64));
-                l[0][2].push(self.miny + (((j + 1) * self.cellsize) as f64));
-                l[0][3].push(self.minx + ((i * self.cellsize) as f64));
-                l[0][3].push(self.miny + (((j + 1) * self.cellsize) as f64));
-                l[0][4].push(self.minx + ((i * self.cellsize) as f64));
-                l[0][4].push(self.miny + ((j * self.cellsize) as f64));
+                l[0][0].push(self.qt.minx + ((i * self.qt.cellsize) as f64));
+                l[0][0].push(self.qt.miny + ((j * self.qt.cellsize) as f64));
+                l[0][1].push(self.qt.minx + (((i + 1) * self.qt.cellsize) as f64));
+                l[0][1].push(self.qt.miny + ((j * self.qt.cellsize) as f64));
+                l[0][2].push(self.qt.minx + (((i + 1) * self.qt.cellsize) as f64));
+                l[0][2].push(self.qt.miny + (((j + 1) * self.qt.cellsize) as f64));
+                l[0][3].push(self.qt.minx + ((i * self.qt.cellsize) as f64));
+                l[0][3].push(self.qt.miny + (((j + 1) * self.qt.cellsize) as f64));
+                l[0][4].push(self.qt.minx + ((i * self.qt.cellsize) as f64));
+                l[0][4].push(self.qt.miny + ((j * self.qt.cellsize) as f64));
 
                 let gtr = Geometry::new(Value::Polygon(l));
                 let f = Feature {
