@@ -210,6 +210,7 @@ struct Quadtree {
     pub miny: f64,
     pub cellsize: usize,
     pub griddim: usize,
+    depth: u32,
 }
 
 impl Quadtree {
@@ -223,6 +224,20 @@ impl Quadtree {
             griddim: 0,
             minx: std::f64::MAX,
             miny: std::f64::MAX,
+            depth: 0,
+        }
+    }
+
+    pub fn init(&mut self, griddim: usize) {
+        self.griddim = griddim;
+        self.depth = (griddim as f64).log(2.0).ceil() as u32;
+        self.gpts.resize(griddim, Vec::new());
+        for each in &mut self.gpts {
+            each.resize(griddim, HashSet::new());
+        }
+        self.gfinal.resize(griddim, Vec::new());
+        for each in &mut self.gfinal {
+            each.resize(griddim, false);
         }
     }
 
@@ -246,26 +261,21 @@ impl Quadtree {
         }
     }
 
-    pub fn set_dimensions(&mut self, griddim: usize) {
-        self.griddim = griddim;
-        self.gpts.resize(griddim, Vec::new());
-        for each in &mut self.gpts {
-            each.resize(griddim, HashSet::new());
-        }
-        self.gfinal.resize(griddim, Vec::new());
-        for each in &mut self.gfinal {
-            each.resize(griddim, false);
-        }
-    }
-
-    fn get_bbox_cell(&self, gx: usize, gy: usize, gbbox: &mut [f64]) {
+    fn get_cell_bbox(&self, gx: usize, gy: usize, gbbox: &mut [f64]) {
         gbbox[0] = self.minx + (gx * self.cellsize) as f64;
         gbbox[1] = self.miny + (gy * self.cellsize) as f64;
         gbbox[2] = self.minx + ((gx + 1) * self.cellsize) as f64;
         gbbox[3] = self.miny + ((gy + 1) * self.cellsize) as f64;
     }
 
-    fn get_gx_gy(&self, x: f64, y: f64) -> (usize, usize) {
+    // fn get_cell_bbox_qtc(&self, qtc: Vec<u8>, gbbox: &mut [f64]) {
+    //     gbbox[0] = self.minx + (gx * self.cellsize) as f64;
+    //     gbbox[1] = self.miny + (gy * self.cellsize) as f64;
+    //     gbbox[2] = self.minx + ((gx + 1) * self.cellsize) as f64;
+    //     gbbox[3] = self.miny + ((gy + 1) * self.cellsize) as f64;
+    // }
+
+    fn get_cell_gxgy(&self, x: f64, y: f64) -> (usize, usize) {
         (
             ((x - self.minx) / self.cellsize as f64) as usize,
             ((y - self.miny) / self.cellsize as f64) as usize,
@@ -314,7 +324,7 @@ impl Triangulation {
         }
         // let cell = &mut self.gpts[gx][gy];
         let mut gbbox: [f64; 4] = [0.0, 0.0, 0.0, 0.0];
-        self.qt.get_bbox_cell(gx, gy, &mut gbbox);
+        self.qt.get_cell_bbox(gx, gy, &mut gbbox);
         let mut finpts: HashSet<usize> = HashSet::new();
         for theid in self.qt.gpts[gx][gy].iter() {
             let re = self.adjacent_vertices_to_vertex(*theid).unwrap();
@@ -421,7 +431,7 @@ impl Triangulation {
     }
 
     pub fn set_grid_dimensions(&mut self, w: usize, h: usize) {
-        self.qt.set_dimensions(w);
+        self.qt.init(w);
     }
 
     fn insert_one_pt_init_phase(&mut self, x: f64, y: f64, z: f64) -> Result<usize, usize> {
@@ -542,7 +552,7 @@ impl Triangulation {
         let re = self.insert_one_pt(px, py, pz);
         if re.is_ok() {
             let x = re.unwrap();
-            let g = self.qt.get_gx_gy(px, py);
+            let g = self.qt.get_cell_gxgy(px, py);
             self.qt.gpts[g.0][g.1].insert(x);
         };
         re
@@ -913,7 +923,7 @@ impl Triangulation {
 
         //-- 2. try walk from one in the same cell
         warn!("attempt to find one vertex in the grid cell and start from it");
-        let g = self.qt.get_gx_gy(x[0], x[1]);
+        let g = self.qt.get_cell_gxgy(x[0], x[1]);
         if self.qt.gpts[g.0][g.1].len() > 0 {
             cur = *self.qt.gpts[g.0][g.1].iter().next().unwrap();
             let re = self.walk_safe(x, cur);
@@ -1127,7 +1137,7 @@ impl Triangulation {
     }
 
     fn walk_old(&self, x: &[f64]) -> Triangle {
-        let g = self.qt.get_gx_gy(x[0], x[1]);
+        let g = self.qt.get_cell_gxgy(x[0], x[1]);
         //-- find the starting tr
         let mut cur = self.cur;
         if !self.stars.contains_key(&cur) {
