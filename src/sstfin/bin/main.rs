@@ -143,18 +143,20 @@ fn pass_2(
     cellsize: usize,
     sprinkled: &mut HashMap<usize, Point>,
 ) -> Vec<Vec<usize>> {
-    let width: usize = ((bbox[2] - bbox[0]) / cellsize as f64).ceil() as usize;
-    let height: usize = ((bbox[3] - bbox[1]) / cellsize as f64).ceil() as usize;
+    let width = (bbox[2] - bbox[0]) / cellsize as f64;
+    let height = (bbox[3] - bbox[1]) / cellsize as f64;
     //-- make it a square to have a quadtree
-    let mut cellno = height;
-    if width > height {
-        cellno = width;
+    let mut tmp = width;
+    if height > width {
+        tmp = height;
     }
+    //-- needs to be a power^2 so that is quadtree
+    let cellno: u32 = (2_u32).pow(tmp.log(2.0).ceil() as u32);
     info!(
         "Virtual grid is {}x{}; cellsize={}",
         cellno, cellno, cellsize
     );
-    let mut g: Vec<Vec<usize>> = vec![vec![0; cellno]; cellno];
+    let mut g: Vec<Vec<usize>> = vec![vec![0; cellno as usize]; cellno as usize];
     let _re = f.seek(std::io::SeekFrom::Start(0)); //-- reset to begining of the file
     let f = BufReader::new(f);
     for (i, l) in f.lines().enumerate() {
