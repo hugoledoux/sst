@@ -27,7 +27,7 @@ fn main() -> io::Result<()> {
     let fi = File::open("/Users/hugo/projects/sst/data/rect1.stream").expect("Unable to open file");
     // File::open("/Users/hugo/projects/sst/data/square400.stream").expect("Unable to open file");
     let f = BufReader::new(fi);
-    let mut count: usize = 0;
+    // let mut count: usize = 0;
     for l in f.lines() {
         let l = l.expect("Unable to read line");
         //PUTBACK let l = line.unwrap();
@@ -73,7 +73,7 @@ fn main() -> io::Result<()> {
             'v' => {
                 //-- vertex
                 println!("{}", l);
-                count += 1;
+                // count += 1;
                 let v = parse_3_f64(&l);
                 let _re = dt.insert_one_pt_with_grid(v.0, v.1, v.2);
             }
@@ -84,7 +84,7 @@ fn main() -> io::Result<()> {
                 let _re = dt.finalise_cell(re.0, re.1);
                 let fout = format!("/Users/hugo/temp/sstout/c-{}-{}.geojson", re.0, re.1);
                 let _re = dt.write_geojson_triangles(fout.to_string());
-                if ((re.0 == 3) && (re.1 == 1)) {
+                if (re.0 == 3) && (re.1 == 1) {
                     println!("yo");
                 }
             }
