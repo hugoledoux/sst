@@ -293,7 +293,7 @@ impl Quadtree {
         )
     }
 
-    fn get_qtc(&self, gx: usize, gy: usize) -> Vec<u8> {
+    fn get_cell_qtc(&self, gx: usize, gy: usize) -> Vec<u8> {
         // println!("{:0>4b}", gx);
         // println!("{}", gy.leading_zeros());
         // println!("{:0>4b}", gx & 0b0100);
@@ -328,26 +328,36 @@ impl Quadtree {
     }
 
     fn is_cell_final_qtc(&self, qtc: Vec<u8>) -> bool {
-        // self.gfinal[gx][gy]
         if qtc.len() == self.depth as usize {
-            let (gx, gy) = self.get_cell_qtc(&qtc, 0, 0);
+            let (gx, gy) = self.get_cell_gxgy_from_qtc_traverse(&qtc, 0, 0);
             return self.is_cell_final(gx, gy);
         }
+        // TODO: hierarchical qtc codes
+
         true
     }
 
-    fn get_cell_qtc(&self, c: &[u8], gx: usize, gy: usize) -> (usize, usize) {
+    fn get_cell_gxgy_from_qtc(&self, mut qtc: Vec<u8>) -> (usize, usize) {
+        if qtc.len() < self.depth as usize {
+            for i in 0..(self.depth as usize - qtc.len()) {
+                qtc.push(0);
+            }
+        }
+        self.get_cell_gxgy_from_qtc_traverse(&qtc, 0, 0)
+    }
+
+    fn get_cell_gxgy_from_qtc_traverse(&self, c: &[u8], gx: usize, gy: usize) -> (usize, usize) {
         let a: usize = (self.depth as usize) - c.len();
         let shift = self.griddim / (2_usize.pow(a as u32)) / 2;
         if c.len() > 1 {
             if c[0] == 0 {
-                self.get_cell_qtc(&c[1..], gx, gy);
+                return self.get_cell_gxgy_from_qtc_traverse(&c[1..], gx, gy);
             } else if c[0] == 1 {
-                self.get_cell_qtc(&c[1..], gx, gy + shift);
+                return self.get_cell_gxgy_from_qtc_traverse(&c[1..], gx, gy + shift);
             } else if c[0] == 2 {
-                self.get_cell_qtc(&c[1..], gx + shift, gy);
+                return self.get_cell_gxgy_from_qtc_traverse(&c[1..], gx + shift, gy);
             } else {
-                self.get_cell_qtc(&c[1..], gx + shift, gy + shift);
+                return self.get_cell_gxgy_from_qtc_traverse(&c[1..], gx + shift, gy + shift);
             }
         }
         (gx, gy)
