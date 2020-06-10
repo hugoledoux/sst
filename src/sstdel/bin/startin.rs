@@ -268,18 +268,89 @@ impl Quadtree {
         gbbox[3] = self.miny + ((gy + 1) * self.cellsize) as f64;
     }
 
-    // fn get_cell_bbox_qtc(&self, qtc: Vec<u8>, gbbox: &mut [f64]) {
-    //     gbbox[0] = self.minx + (gx * self.cellsize) as f64;
-    //     gbbox[1] = self.miny + (gy * self.cellsize) as f64;
-    //     gbbox[2] = self.minx + ((gx + 1) * self.cellsize) as f64;
-    //     gbbox[3] = self.miny + ((gy + 1) * self.cellsize) as f64;
-    // }
+    fn get_cell_bbox_qtc(&self, qtc: Vec<u8>, gbbox: &mut [f64]) {
+        let re = self.visitqt(&qtc, 0, 0, 0);
+        // gbbox[0] = self.minx + (gx * self.cellsize) as f64;
+        // gbbox[1] = self.miny + (gy * self.cellsize) as f64;
+        // gbbox[2] = self.minx + ((gx + 1) * self.cellsize) as f64;
+        // gbbox[3] = self.miny + ((gy + 1) * self.cellsize) as f64;
+    }
+
+    fn visitqt(&self, c: &[u8], curdepth: u32, gx: usize, gy: usize) -> (usize, usize) {
+        // if c[0] == 0 {
+        //        gy = gy +
+
+        if c.len() > 1 {
+            self.visitqt(&c[1..], curdepth + 1, 0, 0);
+        }
+        (gx, gy)
+    }
 
     fn get_cell_gxgy(&self, x: f64, y: f64) -> (usize, usize) {
         (
             ((x - self.minx) / self.cellsize as f64) as usize,
             ((y - self.miny) / self.cellsize as f64) as usize,
         )
+    }
+
+    fn get_qtc(&self, gx: usize, gy: usize) -> Vec<u8> {
+        // println!("{:0>4b}", gx);
+        // println!("{}", gy.leading_zeros());
+        // println!("{:0>4b}", gx & 0b0100);
+        // println!("{}", gx & 0b0100);
+        let mut mask: usize = 2_usize.pow(self.depth - 1);
+        // println!("mask: {}", mask);
+        // println!("mask: {:0>4b}", mask);
+        // let mut a: usize = 0b1000;
+        let mut re: Vec<u8> = Vec::new();
+        for i in 0..self.depth {
+            // println!("i:{} -- {:0>4b}", i, mask);
+            // println!("{}", gx & mask == 2_usize.pow(self.depth - i - 1));
+            let a = gx & mask == 2_usize.pow(self.depth - i - 1);
+            let b = gy & mask == 2_usize.pow(self.depth - i - 1);
+
+            if a == false && b == false {
+                re.push(0)
+            } else if a == false && b == true {
+                re.push(1)
+            } else if a == true && b == false {
+                re.push(2)
+            } else {
+                re.push(3)
+            }
+            mask = mask >> 1;
+        }
+        re
+    }
+
+    fn is_cell_final(&self, gx: usize, gy: usize) -> bool {
+        self.gfinal[gx][gy]
+    }
+
+    fn is_cell_final_qtc(&self, qtc: Vec<u8>) -> bool {
+        // self.gfinal[gx][gy]
+        if qtc.len() == self.depth as usize {
+            let (gx, gy) = self.get_cell_qtc(&qtc, 0, 0);
+            return self.is_cell_final(gx, gy);
+        }
+        true
+    }
+
+    fn get_cell_qtc(&self, c: &[u8], gx: usize, gy: usize) -> (usize, usize) {
+        let a: usize = (self.depth as usize) - c.len();
+        let shift = self.griddim / (2_usize.pow(a as u32)) / 2;
+        if c.len() > 1 {
+            if c[0] == 0 {
+                self.get_cell_qtc(&c[1..], gx, gy);
+            } else if c[0] == 1 {
+                self.get_cell_qtc(&c[1..], gx, gy + shift);
+            } else if c[0] == 2 {
+                self.get_cell_qtc(&c[1..], gx + shift, gy);
+            } else {
+                self.get_cell_qtc(&c[1..], gx + shift, gy + shift);
+            }
+        }
+        (gx, gy)
     }
 }
 
@@ -318,6 +389,8 @@ impl Triangulation {
             gy,
             self.qt.get_cell_count(gx, gy).unwrap()
         );
+        self.qt.gfinal[gx][gy] = true;
+        let re = self.qt.get_qtc(gx, gy);
         // if self.qt.gpts[gx][gy].is_empty() == true {
         if self.qt.get_cell_count(gx, gy).unwrap() == 0 {
             return Ok(());
