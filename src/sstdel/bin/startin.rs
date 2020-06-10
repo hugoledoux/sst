@@ -327,20 +327,74 @@ impl Quadtree {
         self.gfinal[gx][gy]
     }
 
-    fn is_cell_final_qtc(&self, qtc: Vec<u8>) -> bool {
+    fn is_cell_final_qtc(&self, qtc: &[u8]) -> bool {
         if qtc.len() == self.depth as usize {
             let (gx, gy) = self.get_cell_gxgy_from_qtc_traverse(&qtc, 0, 0);
             return self.is_cell_final(gx, gy);
         }
-        // TODO: hierarchical qtc codes
-
+        let mut c2: Vec<u8> = Vec::new();
+        for each in qtc {
+            c2.push(*each);
+        }
+        for i in 0..(self.depth as usize - qtc.len()) {
+            c2.push(0);
+            if self.is_cell_final_qtc(&c2) == false {
+                return false;
+            }
+            c2.pop();
+            c2.push(1);
+            if self.is_cell_final_qtc(&c2) == false {
+                return false;
+            }
+            c2.pop();
+            c2.push(2);
+            if self.is_cell_final_qtc(&c2) == false {
+                return false;
+            }
+            c2.pop();
+            c2.push(3);
+            if self.is_cell_final_qtc(&c2) == false {
+                return false;
+            }
+        }
         true
     }
 
-    fn get_cell_gxgy_from_qtc(&self, mut qtc: Vec<u8>) -> (usize, usize) {
-        if qtc.len() < self.depth as usize {
+    // fn get_cells_gxgy_from_qtc(&self, qtc: &[u8], gs: &mut Vec<usize>) {
+    //     if qtc.len() == self.depth as usize {
+    //         let (gx, gy) = self.get_cell_gxgy_from_qtc(&qtc);
+    //         gs.push(gx);
+    //         gs.push(gy);
+    //         return;
+    //     }
+    //     let mut c2: Vec<u8> = Vec::new();
+    //     for each in qtc {
+    //         c2.push(*each);
+    //     }
+    //     for i in 0..(self.depth as usize - qtc.len()) {
+    //         c2.push(0);
+    //         self.get_cells_gxgy_from_qtc(&c2, gs);
+    //         c2.pop();
+    //         c2.push(1);
+    //         self.get_cells_gxgy_from_qtc(&c2, gs);
+    //         c2.pop();
+    //         c2.push(2);
+    //         self.get_cells_gxgy_from_qtc(&c2, gs);
+    //         c2.pop();
+    //         c2.push(3);
+    //         self.get_cells_gxgy_from_qtc(&c2, gs);
+    //     }
+    // }
+
+    /// returns the (single) bottom-right of the depth of the qtc
+    fn get_cell_gxgy_from_qtc(&self, qtc: &Vec<u8>) -> (usize, usize) {
+        let mut c2: Vec<u8> = Vec::new();
+        for each in qtc {
+            c2.push(*each);
+        }
+        if c2.len() < self.depth as usize {
             for i in 0..(self.depth as usize - qtc.len()) {
-                qtc.push(0);
+                c2.push(0);
             }
         }
         self.get_cell_gxgy_from_qtc_traverse(&qtc, 0, 0)
@@ -360,7 +414,15 @@ impl Quadtree {
                 return self.get_cell_gxgy_from_qtc_traverse(&c[1..], gx + shift, gy + shift);
             }
         }
-        (gx, gy)
+        if c[0] == 0 {
+            (gx, gy)
+        } else if c[0] == 1 {
+            (gx, gy + shift)
+        } else if c[0] == 2 {
+            (gx + shift, gy)
+        } else {
+            (gx + shift, gy + shift)
+        }
     }
 }
 
@@ -400,7 +462,18 @@ impl Triangulation {
             self.qt.get_cell_count(gx, gy).unwrap()
         );
         self.qt.gfinal[gx][gy] = true;
-        let re = self.qt.get_qtc(gx, gy);
+
+        // TODO: remove this and put hierarchical checks for finalisation
+        let mut re = self.qt.get_cell_qtc(gx, gy);
+        // re.pop();
+        let (a, b) = self.qt.get_cell_gxgy_from_qtc(&re);
+        let f = self.qt.is_cell_final_qtc(&re);
+
+        // if gx == 1 && gy == 1 {
+        //     let mut gs: Vec<usize> = Vec::new();
+        //     self.qt.get_cells_gxgy_from_qtc(&re, &mut gs);
+        // }
+
         // if self.qt.gpts[gx][gy].is_empty() == true {
         if self.qt.get_cell_count(gx, gy).unwrap() == 0 {
             return Ok(());
