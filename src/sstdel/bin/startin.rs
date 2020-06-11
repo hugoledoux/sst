@@ -436,6 +436,38 @@ impl Quadtree {
     //     }
     // }
 
+    pub fn test666(&self, qtc: &Vec<u8>) -> (usize, usize) {
+        let mut q2 = vec![0; qtc.len()];
+        q2.clone_from_slice(&qtc);
+        self.traverse(&qtc, 0, 0, 0)
+        // self.get_cell_gxgy_from_qtc_traverse(&qtc, 0, 0)
+    }
+
+    fn traverse(&self, c: &[u8], curdepth: usize, gx: usize, gy: usize) -> (usize, usize) {
+        // let a: usize = (self.depth as usize) - c.len();
+        let shift = self.griddim / (2_usize.pow(curdepth as u32)) / 2;
+        if c.len() > 1 {
+            if c[0] == 0 {
+                return self.traverse(&c[1..], curdepth + 1, gx, gy);
+            } else if c[0] == 1 {
+                return self.traverse(&c[1..], curdepth + 1, gx, gy + shift);
+            } else if c[0] == 2 {
+                return self.traverse(&c[1..], curdepth + 1, gx + shift, gy);
+            } else {
+                return self.traverse(&c[1..], curdepth + 1, gx + shift, gy + shift);
+            }
+        }
+        if c[0] == 0 {
+            (gx, gy)
+        } else if c[0] == 1 {
+            (gx, gy + shift)
+        } else if c[0] == 2 {
+            (gx + shift, gy)
+        } else {
+            (gx + shift, gy + shift)
+        }
+    }
+
     /// returns the (single) bottom-right of the depth of the qtc
     fn get_cell_gxgy_from_qtc_2(&self, qtc: &Vec<u8>) -> (usize, usize) {
         self.get_cell_gxgy_from_qtc_traverse(&qtc, 0, 0)
@@ -518,6 +550,7 @@ impl Triangulation {
         );
 
         let re = self.qt.finalise_cell(gx, gy);
+        let re2 = self.qt.test666(&re);
 
         // self.qt.gfinal[gx][gy] = true;
         // TODO: remove this and put hierarchical checks for finalisation
