@@ -245,16 +245,32 @@ impl Quadtree {
         }
     }
 
-    pub fn get_cell_pts(&self, gx: usize, gy: usize) -> Option<Vec<usize>> {
-        if gx >= self.griddim || gy > self.griddim {
-            None
-        } else {
-            let mut l: Vec<usize> = Vec::new();
-            for each in self.gpts[gx][gy].iter() {
-                l.push(*each);
-            }
-            Some(l)
+    pub fn get_cell_pts(&self, gx: usize, gy: usize) -> Vec<usize> {
+        let mut l: Vec<usize> = Vec::new();
+        for each in self.gpts[gx][gy].iter() {
+            l.push(*each);
         }
+        l
+    }
+
+    pub fn get_cell_pts_qtc(&self, qtc: &Vec<u8>) -> Vec<usize> {
+        let (gx, gy) = self.qtc2gxgy(qtc);
+        let mut l: Vec<usize> = Vec::new();
+        for each in self.gpts[gx][gy].iter() {
+            l.push(*each);
+        }
+        l
+    }
+
+    pub fn get_all_cells_from_qtc(&self, qtc: &Vec<u8>) -> Vec<(usize, usize)> {
+        let mut re: Vec<(usize, usize)> = Vec::new();
+        if qtc.len() as u32 == self.depth {
+            re.push(self.qtc2gxgy(qtc));
+            return re;
+        }
+        let mut stack: Vec<Vec<u8>> = Vec::new();
+        stack.push()
+        re
     }
 
     /// Returns the qtc of the cell that is finalised, it can be only the
@@ -407,50 +423,6 @@ impl Quadtree {
             (gx + shift, gy + shift)
         }
     }
-
-    // /// returns the (single) bottom-right of the depth of the qtc
-    // fn get_cell_gxgy_from_qtc_2(&self, qtc: &Vec<u8>) -> (usize, usize) {
-    //     self.get_cell_gxgy_from_qtc_traverse(&qtc, 0, 0)
-    // }
-
-    // /// returns the (single) bottom-right of the depth of the qtc
-    // fn get_cell_gxgy_from_qtc(&self, qtc: &Vec<u8>) -> (usize, usize) {
-    //     let mut c2: Vec<u8> = Vec::new();
-    //     for each in qtc {
-    //         c2.push(*each);
-    //     }
-    //     if c2.len() < self.depth as usize {
-    //         for i in 0..(self.depth as usize - qtc.len()) {
-    //             c2.push(0);
-    //         }
-    //     }
-    //     self.get_cell_gxgy_from_qtc_traverse(&qtc, 0, 0)
-    // }
-
-    // fn get_cell_gxgy_from_qtc_traverse(&self, c: &[u8], gx: usize, gy: usize) -> (usize, usize) {
-    //     let a: usize = (self.depth as usize) - c.len();
-    //     let shift = self.griddim / (2_usize.pow(a as u32)) / 2;
-    //     if c.len() > 1 {
-    //         if c[0] == 0 {
-    //             return self.get_cell_gxgy_from_qtc_traverse(&c[1..], gx, gy);
-    //         } else if c[0] == 1 {
-    //             return self.get_cell_gxgy_from_qtc_traverse(&c[1..], gx, gy + shift);
-    //         } else if c[0] == 2 {
-    //             return self.get_cell_gxgy_from_qtc_traverse(&c[1..], gx + shift, gy);
-    //         } else {
-    //             return self.get_cell_gxgy_from_qtc_traverse(&c[1..], gx + shift, gy + shift);
-    //         }
-    //     }
-    //     if c[0] == 0 {
-    //         (gx, gy)
-    //     } else if c[0] == 1 {
-    //         (gx, gy + shift)
-    //     } else if c[0] == 2 {
-    //         (gx + shift, gy)
-    //     } else {
-    //         (gx + shift, gy + shift)
-    //     }
-    // }
 }
 
 //----------------------
@@ -489,20 +461,15 @@ impl Triangulation {
             self.qt.get_cell_count(gx, gy).unwrap()
         );
 
-        let re = self.qt.finalise_cell(gx, gy);
+        let qtc = self.qt.finalise_cell(gx, gy);
 
-        // let mut q = self.qt.get_cell_qtc(gx, gy);
-        // let re2 = self.qt.test666(&re);
-        // q.pop();
-        // let re2 = self.qt.get_smth(&q);
-
-        // if self.qt.gpts[gx][gy].is_empty() == true {
-        if self.qt.get_cell_count(gx, gy).unwrap() == 0 {
+        //-- nothing to do if single cell finalised and it's empty
+        if (qtc.len() as u32 == self.qt.depth) && (self.qt.get_cell_count(gx, gy).unwrap() == 0) {
             return Ok(());
         }
-        // let cell = &mut self.gpts[gx][gy];
+
         let mut gbbox: [f64; 4] = [0.0, 0.0, 0.0, 0.0];
-        self.qt.get_cell_bbox(gx, gy, &mut gbbox);
+        self.qt.get_cell_bbox_qtc(&qtc, &mut gbbox);
         let mut finpts: HashSet<usize> = HashSet::new();
         for theid in self.qt.gpts[gx][gy].iter() {
             let re = self.adjacent_vertices_to_vertex(*theid).unwrap();
