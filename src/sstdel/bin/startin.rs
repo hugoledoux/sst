@@ -205,8 +205,7 @@ impl Star {
 //----------------------
 struct Quadtree {
     pub gpts: Vec<Vec<HashSet<usize>>>,
-    pub gfinal: Vec<Vec<bool>>,
-    pub gfinal2: HashSet<Vec<u8>>,
+    pub gfinal: HashSet<Vec<u8>>,
     pub minx: f64,
     pub miny: f64,
     pub cellsize: usize,
@@ -217,12 +216,10 @@ struct Quadtree {
 impl Quadtree {
     pub fn new() -> Quadtree {
         let g: Vec<Vec<HashSet<usize>>> = Vec::new();
-        let gf: Vec<Vec<bool>> = Vec::new();
-        let gf2: HashSet<Vec<u8>> = HashSet::new();
+        let gf: HashSet<Vec<u8>> = HashSet::new();
         Quadtree {
             gpts: g,
             gfinal: gf,
-            gfinal2: gf2,
             cellsize: 0,
             griddim: 0,
             minx: std::f64::MAX,
@@ -237,10 +234,6 @@ impl Quadtree {
         self.gpts.resize(griddim, Vec::new());
         for each in &mut self.gpts {
             each.resize(griddim, HashSet::new());
-        }
-        self.gfinal.resize(griddim, Vec::new());
-        for each in &mut self.gfinal {
-            each.resize(griddim, false);
         }
     }
 
@@ -269,7 +262,7 @@ impl Quadtree {
         let mut q2 = vec![0; qtc.len()];
         q2.clone_from_slice(&qtc);
         //-- add to the hashset
-        self.gfinal2.insert(qtc);
+        self.gfinal.insert(qtc);
         //-- check parents
         let mut done = false;
         while !done {
@@ -286,31 +279,31 @@ impl Quadtree {
     fn finalise_parent(&mut self, qtc: &Vec<u8>) -> bool {
         let mut q2 = vec![0; qtc.len() - 1];
         q2.clone_from_slice(&qtc[..qtc.len() - 1]);
-        if self.gfinal2.contains(&q2) == true {
+        if self.gfinal.contains(&q2) == true {
             return true;
         }
         let f = true;
         q2.push(0);
-        if self.gfinal2.contains(&q2) == false {
+        if self.gfinal.contains(&q2) == false {
             return false;
         }
         q2.pop();
         q2.push(1);
-        if self.gfinal2.contains(&q2) == false {
+        if self.gfinal.contains(&q2) == false {
             return false;
         }
         q2.pop();
         q2.push(2);
-        if self.gfinal2.contains(&q2) == false {
+        if self.gfinal.contains(&q2) == false {
             return false;
         }
         q2.pop();
         q2.push(3);
-        if self.gfinal2.contains(&q2) == false {
+        if self.gfinal.contains(&q2) == false {
             return false;
         }
         q2.pop();
-        self.gfinal2.insert(q2);
+        self.gfinal.insert(q2);
         true
     }
 
@@ -376,12 +369,12 @@ impl Quadtree {
     }
 
     fn is_cell_final(&self, gx: usize, gy: usize) -> bool {
-        self.gfinal2.contains(&self.get_cell_qtc(gx, gy))
+        self.gfinal.contains(&self.get_cell_qtc(gx, gy))
         // TODO: delete the leaves that are delete by their parents?
     }
 
     fn is_cell_final_qtc(&self, qtc: &Vec<u8>) -> bool {
-        self.gfinal2.contains(qtc)
+        self.gfinal.contains(qtc)
     }
 
     // fn is_cell_final_qtc(&self, qtc: &[u8]) -> bool {
