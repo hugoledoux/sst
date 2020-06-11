@@ -206,6 +206,7 @@ impl Star {
 struct Quadtree {
     pub gpts: Vec<Vec<HashSet<usize>>>,
     pub gfinal: Vec<Vec<bool>>,
+    pub gfinal2: HashSet<Vec<u8>>,
     pub minx: f64,
     pub miny: f64,
     pub cellsize: usize,
@@ -217,9 +218,11 @@ impl Quadtree {
     pub fn new() -> Quadtree {
         let g: Vec<Vec<HashSet<usize>>> = Vec::new();
         let gf: Vec<Vec<bool>> = Vec::new();
+        let gf2: HashSet<Vec<u8>> = HashSet::new();
         Quadtree {
             gpts: g,
             gfinal: gf,
+            gfinal2: gf2,
             cellsize: 0,
             griddim: 0,
             minx: std::f64::MAX,
@@ -261,6 +264,56 @@ impl Quadtree {
         }
     }
 
+    pub fn finalise_cell(&mut self, gx: usize, gy: usize) -> Vec<u8> {
+        let qtc = self.get_cell_qtc(gx, gy);
+        let mut q2 = vec![0; qtc.len()];
+        q2.clone_from_slice(&qtc);
+        //-- add to the hashset
+        self.gfinal2.insert(qtc);
+        //-- check parents
+        let mut done = false;
+        while !done {
+            if self.finalise_parent(&q2) == true {
+                q2.pop();
+            } else {
+                done = true;
+            }
+        }
+        println!("{:?}", q2);
+        q2
+    }
+
+    fn finalise_parent(&mut self, qtc: &Vec<u8>) -> bool {
+        let mut q2 = vec![0; qtc.len() - 1];
+        q2.clone_from_slice(&qtc[..qtc.len() - 1]);
+        if self.gfinal2.contains(&q2) == true {
+            return true;
+        }
+        let f = true;
+        q2.push(0);
+        if self.gfinal2.contains(&q2) == false {
+            return false;
+        }
+        q2.pop();
+        q2.push(1);
+        if self.gfinal2.contains(&q2) == false {
+            return false;
+        }
+        q2.pop();
+        q2.push(2);
+        if self.gfinal2.contains(&q2) == false {
+            return false;
+        }
+        q2.pop();
+        q2.push(3);
+        if self.gfinal2.contains(&q2) == false {
+            return false;
+        }
+        q2.pop();
+        self.gfinal2.insert(q2);
+        true
+    }
+
     fn get_cell_bbox(&self, gx: usize, gy: usize, gbbox: &mut [f64]) {
         gbbox[0] = self.minx + (gx * self.cellsize) as f64;
         gbbox[1] = self.miny + (gy * self.cellsize) as f64;
@@ -268,23 +321,23 @@ impl Quadtree {
         gbbox[3] = self.miny + ((gy + 1) * self.cellsize) as f64;
     }
 
-    fn get_cell_bbox_qtc(&self, qtc: Vec<u8>, gbbox: &mut [f64]) {
-        let re = self.visitqt(&qtc, 0, 0, 0);
-        // gbbox[0] = self.minx + (gx * self.cellsize) as f64;
-        // gbbox[1] = self.miny + (gy * self.cellsize) as f64;
-        // gbbox[2] = self.minx + ((gx + 1) * self.cellsize) as f64;
-        // gbbox[3] = self.miny + ((gy + 1) * self.cellsize) as f64;
-    }
+    // fn get_cell_bbox_qtc(&self, qtc: Vec<u8>, gbbox: &mut [f64]) {
+    //     let re = self.visitqt(&qtc, 0, 0, 0);
+    //     // gbbox[0] = self.minx + (gx * self.cellsize) as f64;
+    //     // gbbox[1] = self.miny + (gy * self.cellsize) as f64;
+    //     // gbbox[2] = self.minx + ((gx + 1) * self.cellsize) as f64;
+    //     // gbbox[3] = self.miny + ((gy + 1) * self.cellsize) as f64;
+    // }
 
-    fn visitqt(&self, c: &[u8], curdepth: u32, gx: usize, gy: usize) -> (usize, usize) {
-        // if c[0] == 0 {
-        //        gy = gy +
+    // fn visitqt(&self, c: &[u8], curdepth: u32, gx: usize, gy: usize) -> (usize, usize) {
+    //     // if c[0] == 0 {
+    //     //        gy = gy +
 
-        if c.len() > 1 {
-            self.visitqt(&c[1..], curdepth + 1, 0, 0);
-        }
-        (gx, gy)
-    }
+    //     if c.len() > 1 {
+    //         self.visitqt(&c[1..], curdepth + 1, 0, 0);
+    //     }
+    //     (gx, gy)
+    // }
 
     fn get_cell_gxgy(&self, x: f64, y: f64) -> (usize, usize) {
         (
@@ -308,7 +361,6 @@ impl Quadtree {
             // println!("{}", gx & mask == 2_usize.pow(self.depth - i - 1));
             let a = gx & mask == 2_usize.pow(self.depth - i - 1);
             let b = gy & mask == 2_usize.pow(self.depth - i - 1);
-
             if a == false && b == false {
                 re.push(0)
             } else if a == false && b == true {
@@ -324,41 +376,46 @@ impl Quadtree {
     }
 
     fn is_cell_final(&self, gx: usize, gy: usize) -> bool {
-        self.gfinal[gx][gy]
+        self.gfinal2.contains(&self.get_cell_qtc(gx, gy))
+        // TODO: delete the leaves that are delete by their parents?
     }
 
-    fn is_cell_final_qtc(&self, qtc: &[u8]) -> bool {
-        if qtc.len() == self.depth as usize {
-            let (gx, gy) = self.get_cell_gxgy_from_qtc_traverse(&qtc, 0, 0);
-            return self.is_cell_final(gx, gy);
-        }
-        let mut c2: Vec<u8> = Vec::new();
-        for each in qtc {
-            c2.push(*each);
-        }
-        for i in 0..(self.depth as usize - qtc.len()) {
-            c2.push(0);
-            if self.is_cell_final_qtc(&c2) == false {
-                return false;
-            }
-            c2.pop();
-            c2.push(1);
-            if self.is_cell_final_qtc(&c2) == false {
-                return false;
-            }
-            c2.pop();
-            c2.push(2);
-            if self.is_cell_final_qtc(&c2) == false {
-                return false;
-            }
-            c2.pop();
-            c2.push(3);
-            if self.is_cell_final_qtc(&c2) == false {
-                return false;
-            }
-        }
-        true
+    fn is_cell_final_qtc(&self, qtc: &Vec<u8>) -> bool {
+        self.gfinal2.contains(qtc)
     }
+
+    // fn is_cell_final_qtc(&self, qtc: &[u8]) -> bool {
+    //     if qtc.len() == self.depth as usize {
+    //         let (gx, gy) = self.get_cell_gxgy_from_qtc_traverse(&qtc, 0, 0);
+    //         return self.is_cell_final(gx, gy);
+    //     }
+    //     let mut c2: Vec<u8> = Vec::new();
+    //     for each in qtc {
+    //         c2.push(*each);
+    //     }
+    //     for i in 0..(self.depth as usize - qtc.len()) {
+    //         c2.push(0);
+    //         if self.is_cell_final_qtc(&c2) == false {
+    //             return false;
+    //         }
+    //         c2.pop();
+    //         c2.push(1);
+    //         if self.is_cell_final_qtc(&c2) == false {
+    //             return false;
+    //         }
+    //         c2.pop();
+    //         c2.push(2);
+    //         if self.is_cell_final_qtc(&c2) == false {
+    //             return false;
+    //         }
+    //         c2.pop();
+    //         c2.push(3);
+    //         if self.is_cell_final_qtc(&c2) == false {
+    //             return false;
+    //         }
+    //     }
+    //     true
+    // }
 
     // fn get_cells_gxgy_from_qtc(&self, qtc: &[u8], gs: &mut Vec<usize>) {
     //     if qtc.len() == self.depth as usize {
@@ -385,6 +442,11 @@ impl Quadtree {
     //         self.get_cells_gxgy_from_qtc(&c2, gs);
     //     }
     // }
+
+    /// returns the (single) bottom-right of the depth of the qtc
+    fn get_cell_gxgy_from_qtc_2(&self, qtc: &Vec<u8>) -> (usize, usize) {
+        self.get_cell_gxgy_from_qtc_traverse(&qtc, 0, 0)
+    }
 
     /// returns the (single) bottom-right of the depth of the qtc
     fn get_cell_gxgy_from_qtc(&self, qtc: &Vec<u8>) -> (usize, usize) {
@@ -461,14 +523,15 @@ impl Triangulation {
             gy,
             self.qt.get_cell_count(gx, gy).unwrap()
         );
-        self.qt.gfinal[gx][gy] = true;
 
+        let re = self.qt.finalise_cell(gx, gy);
+
+        // self.qt.gfinal[gx][gy] = true;
         // TODO: remove this and put hierarchical checks for finalisation
-        let mut re = self.qt.get_cell_qtc(gx, gy);
+        // let mut re = self.qt.get_cell_qtc(gx, gy);
         // re.pop();
-        let (a, b) = self.qt.get_cell_gxgy_from_qtc(&re);
-        let f = self.qt.is_cell_final_qtc(&re);
-
+        // let (a, b) = self.qt.get_cell_gxgy_from_qtc(&re);
+        // let f = self.qt.is_cell_final_qtc(&re);
         // if gx == 1 && gy == 1 {
         //     let mut gs: Vec<usize> = Vec::new();
         //     self.qt.get_cells_gxgy_from_qtc(&re, &mut gs);
