@@ -496,17 +496,6 @@ impl Triangulation {
         // q.pop();
         // let re2 = self.qt.get_smth(&q);
 
-        // self.qt.gfinal[gx][gy] = true;
-        // TODO: remove this and put hierarchical checks for finalisation
-        // let mut re = self.qt.get_cell_qtc(gx, gy);
-        // re.pop();
-        // let (a, b) = self.qt.get_cell_gxgy_from_qtc(&re);
-        // let f = self.qt.is_cell_final_qtc(&re);
-        // if gx == 1 && gy == 1 {
-        //     let mut gs: Vec<usize> = Vec::new();
-        //     self.qt.get_cells_gxgy_from_qtc(&re, &mut gs);
-        // }
-
         // if self.qt.gpts[gx][gy].is_empty() == true {
         if self.qt.get_cell_count(gx, gy).unwrap() == 0 {
             return Ok(());
