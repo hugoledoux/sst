@@ -257,13 +257,15 @@ impl Quadtree {
         }
     }
 
+    /// Returns the qtc of the cell that is finalised, it can be only the
+    /// current one of its parent (or parent of that one; check recursively)
     pub fn finalise_cell(&mut self, gx: usize, gy: usize) -> Vec<u8> {
         let qtc = self.get_cell_qtc(gx, gy);
         let mut q2 = vec![0; qtc.len()];
         q2.clone_from_slice(&qtc);
         //-- add to the hashset
         self.gfinal.insert(qtc);
-        //-- check parents
+        //-- check parents recursively and add them to gfinals
         let mut done = false;
         while !done {
             if self.finalise_parent(&q2) == true {
@@ -314,23 +316,15 @@ impl Quadtree {
         gbbox[3] = self.miny + ((gy + 1) * self.cellsize) as f64;
     }
 
-    // fn get_cell_bbox_qtc(&self, qtc: Vec<u8>, gbbox: &mut [f64]) {
-    //     let re = self.visitqt(&qtc, 0, 0, 0);
-    //     // gbbox[0] = self.minx + (gx * self.cellsize) as f64;
-    //     // gbbox[1] = self.miny + (gy * self.cellsize) as f64;
-    //     // gbbox[2] = self.minx + ((gx + 1) * self.cellsize) as f64;
-    //     // gbbox[3] = self.miny + ((gy + 1) * self.cellsize) as f64;
-    // }
-
-    // fn visitqt(&self, c: &[u8], curdepth: u32, gx: usize, gy: usize) -> (usize, usize) {
-    //     // if c[0] == 0 {
-    //     //        gy = gy +
-
-    //     if c.len() > 1 {
-    //         self.visitqt(&c[1..], curdepth + 1, 0, 0);
-    //     }
-    //     (gx, gy)
-    // }
+    fn get_cell_bbox_qtc(&self, qtc: &Vec<u8>, gbbox: &mut [f64]) {
+        let (mingx, mingy) = self.qtc2gxgy(qtc);
+        let a: usize = (self.depth as usize) - qtc.len();
+        let shift = 2_usize.pow(a as u32);
+        gbbox[0] = self.minx + (mingx * self.cellsize) as f64;
+        gbbox[1] = self.miny + (mingy * self.cellsize) as f64;
+        gbbox[2] = self.minx + ((mingx + shift) * self.cellsize) as f64;
+        gbbox[3] = self.miny + ((mingy + shift) * self.cellsize) as f64;
+    }
 
     fn get_cell_gxgy(&self, x: f64, y: f64) -> (usize, usize) {
         (
@@ -377,84 +371,30 @@ impl Quadtree {
         self.gfinal.contains(qtc)
     }
 
-    // fn is_cell_final_qtc(&self, qtc: &[u8]) -> bool {
-    //     if qtc.len() == self.depth as usize {
-    //         let (gx, gy) = self.get_cell_gxgy_from_qtc_traverse(&qtc, 0, 0);
-    //         return self.is_cell_final(gx, gy);
-    //     }
-    //     let mut c2: Vec<u8> = Vec::new();
-    //     for each in qtc {
-    //         c2.push(*each);
-    //     }
-    //     for i in 0..(self.depth as usize - qtc.len()) {
-    //         c2.push(0);
-    //         if self.is_cell_final_qtc(&c2) == false {
-    //             return false;
-    //         }
-    //         c2.pop();
-    //         c2.push(1);
-    //         if self.is_cell_final_qtc(&c2) == false {
-    //             return false;
-    //         }
-    //         c2.pop();
-    //         c2.push(2);
-    //         if self.is_cell_final_qtc(&c2) == false {
-    //             return false;
-    //         }
-    //         c2.pop();
-    //         c2.push(3);
-    //         if self.is_cell_final_qtc(&c2) == false {
-    //             return false;
-    //         }
-    //     }
-    //     true
-    // }
-
-    // fn get_cells_gxgy_from_qtc(&self, qtc: &[u8], gs: &mut Vec<usize>) {
-    //     if qtc.len() == self.depth as usize {
-    //         let (gx, gy) = self.get_cell_gxgy_from_qtc(&qtc);
-    //         gs.push(gx);
-    //         gs.push(gy);
-    //         return;
-    //     }
-    //     let mut c2: Vec<u8> = Vec::new();
-    //     for each in qtc {
-    //         c2.push(*each);
-    //     }
-    //     for i in 0..(self.depth as usize - qtc.len()) {
-    //         c2.push(0);
-    //         self.get_cells_gxgy_from_qtc(&c2, gs);
-    //         c2.pop();
-    //         c2.push(1);
-    //         self.get_cells_gxgy_from_qtc(&c2, gs);
-    //         c2.pop();
-    //         c2.push(2);
-    //         self.get_cells_gxgy_from_qtc(&c2, gs);
-    //         c2.pop();
-    //         c2.push(3);
-    //         self.get_cells_gxgy_from_qtc(&c2, gs);
-    //     }
-    // }
-
-    pub fn test666(&self, qtc: &Vec<u8>) -> (usize, usize) {
+    fn qtc2gxgy(&self, qtc: &Vec<u8>) -> (usize, usize) {
         let mut q2 = vec![0; qtc.len()];
         q2.clone_from_slice(&qtc);
-        self.traverse(&qtc, 0, 0, 0)
-        // self.get_cell_gxgy_from_qtc_traverse(&qtc, 0, 0)
+        self.gtc2gxgy_recursion(&qtc, 0, 0, 0)
     }
 
-    fn traverse(&self, c: &[u8], curdepth: usize, gx: usize, gy: usize) -> (usize, usize) {
+    fn gtc2gxgy_recursion(
+        &self,
+        c: &[u8],
+        curdepth: usize,
+        gx: usize,
+        gy: usize,
+    ) -> (usize, usize) {
         // let a: usize = (self.depth as usize) - c.len();
         let shift = self.griddim / (2_usize.pow(curdepth as u32)) / 2;
         if c.len() > 1 {
             if c[0] == 0 {
-                return self.traverse(&c[1..], curdepth + 1, gx, gy);
+                return self.gtc2gxgy_recursion(&c[1..], curdepth + 1, gx, gy);
             } else if c[0] == 1 {
-                return self.traverse(&c[1..], curdepth + 1, gx, gy + shift);
+                return self.gtc2gxgy_recursion(&c[1..], curdepth + 1, gx, gy + shift);
             } else if c[0] == 2 {
-                return self.traverse(&c[1..], curdepth + 1, gx + shift, gy);
+                return self.gtc2gxgy_recursion(&c[1..], curdepth + 1, gx + shift, gy);
             } else {
-                return self.traverse(&c[1..], curdepth + 1, gx + shift, gy + shift);
+                return self.gtc2gxgy_recursion(&c[1..], curdepth + 1, gx + shift, gy + shift);
             }
         }
         if c[0] == 0 {
@@ -468,49 +408,49 @@ impl Quadtree {
         }
     }
 
-    /// returns the (single) bottom-right of the depth of the qtc
-    fn get_cell_gxgy_from_qtc_2(&self, qtc: &Vec<u8>) -> (usize, usize) {
-        self.get_cell_gxgy_from_qtc_traverse(&qtc, 0, 0)
-    }
+    // /// returns the (single) bottom-right of the depth of the qtc
+    // fn get_cell_gxgy_from_qtc_2(&self, qtc: &Vec<u8>) -> (usize, usize) {
+    //     self.get_cell_gxgy_from_qtc_traverse(&qtc, 0, 0)
+    // }
 
-    /// returns the (single) bottom-right of the depth of the qtc
-    fn get_cell_gxgy_from_qtc(&self, qtc: &Vec<u8>) -> (usize, usize) {
-        let mut c2: Vec<u8> = Vec::new();
-        for each in qtc {
-            c2.push(*each);
-        }
-        if c2.len() < self.depth as usize {
-            for i in 0..(self.depth as usize - qtc.len()) {
-                c2.push(0);
-            }
-        }
-        self.get_cell_gxgy_from_qtc_traverse(&qtc, 0, 0)
-    }
+    // /// returns the (single) bottom-right of the depth of the qtc
+    // fn get_cell_gxgy_from_qtc(&self, qtc: &Vec<u8>) -> (usize, usize) {
+    //     let mut c2: Vec<u8> = Vec::new();
+    //     for each in qtc {
+    //         c2.push(*each);
+    //     }
+    //     if c2.len() < self.depth as usize {
+    //         for i in 0..(self.depth as usize - qtc.len()) {
+    //             c2.push(0);
+    //         }
+    //     }
+    //     self.get_cell_gxgy_from_qtc_traverse(&qtc, 0, 0)
+    // }
 
-    fn get_cell_gxgy_from_qtc_traverse(&self, c: &[u8], gx: usize, gy: usize) -> (usize, usize) {
-        let a: usize = (self.depth as usize) - c.len();
-        let shift = self.griddim / (2_usize.pow(a as u32)) / 2;
-        if c.len() > 1 {
-            if c[0] == 0 {
-                return self.get_cell_gxgy_from_qtc_traverse(&c[1..], gx, gy);
-            } else if c[0] == 1 {
-                return self.get_cell_gxgy_from_qtc_traverse(&c[1..], gx, gy + shift);
-            } else if c[0] == 2 {
-                return self.get_cell_gxgy_from_qtc_traverse(&c[1..], gx + shift, gy);
-            } else {
-                return self.get_cell_gxgy_from_qtc_traverse(&c[1..], gx + shift, gy + shift);
-            }
-        }
-        if c[0] == 0 {
-            (gx, gy)
-        } else if c[0] == 1 {
-            (gx, gy + shift)
-        } else if c[0] == 2 {
-            (gx + shift, gy)
-        } else {
-            (gx + shift, gy + shift)
-        }
-    }
+    // fn get_cell_gxgy_from_qtc_traverse(&self, c: &[u8], gx: usize, gy: usize) -> (usize, usize) {
+    //     let a: usize = (self.depth as usize) - c.len();
+    //     let shift = self.griddim / (2_usize.pow(a as u32)) / 2;
+    //     if c.len() > 1 {
+    //         if c[0] == 0 {
+    //             return self.get_cell_gxgy_from_qtc_traverse(&c[1..], gx, gy);
+    //         } else if c[0] == 1 {
+    //             return self.get_cell_gxgy_from_qtc_traverse(&c[1..], gx, gy + shift);
+    //         } else if c[0] == 2 {
+    //             return self.get_cell_gxgy_from_qtc_traverse(&c[1..], gx + shift, gy);
+    //         } else {
+    //             return self.get_cell_gxgy_from_qtc_traverse(&c[1..], gx + shift, gy + shift);
+    //         }
+    //     }
+    //     if c[0] == 0 {
+    //         (gx, gy)
+    //     } else if c[0] == 1 {
+    //         (gx, gy + shift)
+    //     } else if c[0] == 2 {
+    //         (gx + shift, gy)
+    //     } else {
+    //         (gx + shift, gy + shift)
+    //     }
+    // }
 }
 
 //----------------------
@@ -550,7 +490,11 @@ impl Triangulation {
         );
 
         let re = self.qt.finalise_cell(gx, gy);
-        let re2 = self.qt.test666(&re);
+
+        // let mut q = self.qt.get_cell_qtc(gx, gy);
+        // let re2 = self.qt.test666(&re);
+        // q.pop();
+        // let re2 = self.qt.get_smth(&q);
 
         // self.qt.gfinal[gx][gy] = true;
         // TODO: remove this and put hierarchical checks for finalisation
