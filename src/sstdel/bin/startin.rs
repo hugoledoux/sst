@@ -490,7 +490,8 @@ impl Triangulation {
                 let re = self.adjacent_vertices_to_vertex(*theid).unwrap();
                 let mut fin: bool = true;
                 for v in re {
-                    HEREif self.qt.gpts[gx][gy].contains(&v) == false {
+                    // if self.qt.gpts[gx][gy].contains(&v) == false {
+                    if geom::point_in_box(&self.get_point(v).unwrap(), &gbbox) == false {
                         fin = false;
                         break;
                     }
