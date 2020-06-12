@@ -262,19 +262,31 @@ impl Quadtree {
         l
     }
 
-    pub fn get_all_cells_from_qtc(&self, qtc: &Vec<u8>) -> Vec<(usize, usize)> {
+    pub fn get_all_gxgy_from_qtc(&self, qtc: &Vec<u8>) -> Vec<(usize, usize)> {
         let mut re: Vec<(usize, usize)> = Vec::new();
         if qtc.len() as u32 == self.depth {
             re.push(self.qtc2gxgy(qtc));
             return re;
         }
         let mut stack: Vec<Vec<u8>> = Vec::new();
-        stack.push()
+        stack.push(qtc.to_vec());
+        while stack.is_empty() == false {
+            let q = stack.pop().unwrap();
+            if q.len() as u32 == self.depth {
+                re.push(self.qtc2gxgy(&q));
+            } else {
+                for i in 0..4 {
+                    let mut q2 = q.to_vec();
+                    q2.push(i);
+                    stack.push(q2);
+                }
+            }
+        }
         re
     }
 
-    /// Returns the qtc of the cell that is finalised, it can be only the
-    /// current one of its parent (or parent of that one; check recursively)
+    /// Returns the qtc of the cell/s that is/are finalised, it can be only the
+    /// current one or its parent (or parent of that one; check recursively)
     pub fn finalise_cell(&mut self, gx: usize, gy: usize) -> Vec<u8> {
         let qtc = self.get_cell_qtc(gx, gy);
         let mut q2 = vec![0; qtc.len()];
@@ -468,57 +480,61 @@ impl Triangulation {
             return Ok(());
         }
 
+        let allfcells = self.qt.get_all_gxgy_from_qtc(&qtc);
+
         let mut gbbox: [f64; 4] = [0.0, 0.0, 0.0, 0.0];
         self.qt.get_cell_bbox_qtc(&qtc, &mut gbbox);
-        let mut finpts: HashSet<usize> = HashSet::new();
-        for theid in self.qt.gpts[gx][gy].iter() {
-            let re = self.adjacent_vertices_to_vertex(*theid).unwrap();
-            let mut fin: bool = true;
-            for v in re {
-                if self.qt.gpts[gx][gy].contains(&v) == false {
-                    fin = false;
-                    break;
-                }
-            }
-            if fin == true {
-                // println!("=>{}", theid);
-                //-- check every triangle for encroachment
-                let lts = self.incident_triangles_to_vertex(*theid).unwrap();
-                for t in &lts {
-                    // println!("t {}", t);
-                    if geom::circumcentre_encroach_bbox(
-                        &self.get_point(t.v[0]).unwrap(),
-                        &self.get_point(t.v[1]).unwrap(),
-                        &self.get_point(t.v[2]).unwrap(),
-                        &gbbox,
-                    ) == true
-                    {
+        for c in allfcells {
+            let mut finpts: HashSet<usize> = HashSet::new();
+            for theid in self.qt.gpts[c.0][c.1].iter() {
+                let re = self.adjacent_vertices_to_vertex(*theid).unwrap();
+                let mut fin: bool = true;
+                for v in re {
+                    HEREif self.qt.gpts[gx][gy].contains(&v) == false {
                         fin = false;
                         break;
                     }
                 }
+                if fin == true {
+                    // println!("=>{}", theid);
+                    //-- check every triangle for encroachment
+                    let lts = self.incident_triangles_to_vertex(*theid).unwrap();
+                    for t in &lts {
+                        // println!("t {}", t);
+                        if geom::circumcentre_encroach_bbox(
+                            &self.get_point(t.v[0]).unwrap(),
+                            &self.get_point(t.v[1]).unwrap(),
+                            &self.get_point(t.v[2]).unwrap(),
+                            &gbbox,
+                        ) == true
+                        {
+                            fin = false;
+                            break;
+                        }
+                    }
+                }
+                if fin == true {
+                    finpts.insert(*theid);
+                }
             }
-            if fin == true {
-                finpts.insert(*theid);
+            for each in &finpts {
+                let p = self.get_point(*each).unwrap();
+                io::stdout().write_all(
+                    &format!(
+                        "v {} {} {} {} {:?}\n",
+                        *each,
+                        p[0],
+                        p[1],
+                        p[2],
+                        self.adjacent_vertices_to_vertex(*each).unwrap()
+                    )
+                    .as_bytes(),
+                )?;
+                self.qt.gpts[gx][gy].remove(each);
             }
-        }
-        for each in &finpts {
-            let p = self.get_point(*each).unwrap();
-            io::stdout().write_all(
-                &format!(
-                    "v {} {} {} {} {:?}\n",
-                    *each,
-                    p[0],
-                    p[1],
-                    p[2],
-                    self.adjacent_vertices_to_vertex(*each).unwrap()
-                )
-                .as_bytes(),
-            )?;
-            self.qt.gpts[gx][gy].remove(each);
-        }
-        for each in &finpts {
-            self.flush_star(*each);
+            for each in &finpts {
+                self.flush_star(*each);
+            }
         }
         Ok(())
     }
