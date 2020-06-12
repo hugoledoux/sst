@@ -491,6 +491,11 @@ impl Triangulation {
                 let mut fin: bool = true;
                 for v in re {
                     // if self.qt.gpts[gx][gy].contains(&v) == false {
+                    let p = self.get_point(v);
+                    if p.is_none() {
+                        continue;
+                    }
+                    // if p.is_none()
                     if geom::point_in_box(&self.get_point(v).unwrap(), &gbbox) == false {
                         fin = false;
                         break;
