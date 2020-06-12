@@ -504,15 +504,27 @@ impl Triangulation {
                 if fin == true {
                     // println!("=>{}", theid);
                     //-- check every triangle for encroachment
+                    //-- TODO: should incident function only returns non-final triangle?
                     let lts = self.incident_triangles_to_vertex(*theid).unwrap();
                     for t in &lts {
                         // println!("t {}", t);
-                        if geom::circumcentre_encroach_bbox(
-                            &self.get_point(t.v[0]).unwrap(),
-                            &self.get_point(t.v[1]).unwrap(),
-                            &self.get_point(t.v[2]).unwrap(),
-                            &gbbox,
-                        ) == true
+                        if self.is_vertex_convex_hull(t.v[1]) && self.is_vertex_convex_hull(t.v[2])
+                        {
+                            fin = false;
+                            break;
+                        }
+                        let a = self.get_point(t.v[0]);
+                        let b = self.get_point(t.v[1]);
+                        let c = self.get_point(t.v[2]);
+                        if a.is_none() == false
+                            && b.is_none() == false
+                            && c.is_none() == false
+                            && geom::circumcentre_encroach_bbox(
+                                &a.unwrap(),
+                                &b.unwrap(),
+                                &c.unwrap(),
+                                &gbbox,
+                            ) == true
                         {
                             fin = false;
                             break;
