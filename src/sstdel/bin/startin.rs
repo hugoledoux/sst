@@ -296,6 +296,10 @@ impl Quadtree {
         //-- check parents recursively and add them to gfinals
         let mut done = false;
         while !done {
+            if q2.is_empty() == true {
+                // done = true;
+                break;
+            }
             if self.finalise_parent(&q2) == true {
                 q2.pop();
             } else {
@@ -475,6 +479,9 @@ impl Triangulation {
 
         let qtc = self.qt.finalise_cell(gx, gy);
 
+        if qtc.is_empty() == true {
+            return Ok(());
+        }
         //-- nothing to do if single cell finalised and it's empty
         if (qtc.len() as u32 == self.qt.depth) && (self.qt.get_cell_count(gx, gy).unwrap() == 0) {
             return Ok(());
