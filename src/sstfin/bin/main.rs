@@ -92,9 +92,10 @@ fn pass_3(
     }
     io::stdout().write_all(b"# sstfin\n")?;
     io::stdout().write_all(&format!("n {}\n", total).as_bytes())?;
+    //-- number of cells cXc
+    io::stdout().write_all(&format!("c {}\n", cellno).as_bytes())?;
     //-- cellsize
-    io::stdout().write_all(&format!("r {}\n", cellsize).as_bytes())?;
-    io::stdout().write_all(&format!("d {} {}\n", cellno, cellno).as_bytes())?;
+    io::stdout().write_all(&format!("s {}\n", cellsize).as_bytes())?;
     //-- bbox
     io::stdout().write_all(&format!("b {} {}\n", bbox[0], bbox[1]).as_bytes())?;
     // io::stdout().write_all(&format!("b {:.3} {:.3}\n", bbox[0], bbox[1]).as_bytes())?;

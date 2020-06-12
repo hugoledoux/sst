@@ -616,8 +616,8 @@ impl Triangulation {
         self.qt.miny = my;
     }
 
-    pub fn set_grid_dimensions(&mut self, w: usize, h: usize) {
-        self.qt.init(w);
+    pub fn set_grid_dimensions(&mut self, s: usize) {
+        self.qt.init(s);
     }
 
     fn insert_one_pt_init_phase(&mut self, x: f64, y: f64, z: f64) -> Result<usize, usize> {
