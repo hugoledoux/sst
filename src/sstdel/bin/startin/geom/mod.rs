@@ -222,5 +222,5 @@ pub fn circumcentre_encroach_bbox(a: &[f64], b: &[f64], c: &[f64], bbox: &[f64])
 /// |          X
 /// +-----------
 pub fn point_in_box(p: &[f64], bbox: &[f64]) -> bool {
-    p[0] >= bbox[0] && p[0] < bbox[2] && p[1] >= bbox[1] && p[0] < bbox[3]
+    p[0] >= bbox[0] && p[0] < bbox[2] && p[1] >= bbox[1] && p[1] < bbox[3]
 }
