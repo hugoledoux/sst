@@ -24,7 +24,8 @@ fn main() -> io::Result<()> {
 
     //PUTBACK let stdin = std::io::stdin();
     //PUTBACK for line in stdin.lock().lines() {
-    let fi = File::open("/Users/hugo/projects/sst/data/rect1.stream").expect("Unable to open file");
+    let fi =
+        File::open("/Users/hugo/projects/sst/data/rect1_50.stream").expect("Unable to open file");
     // File::open("/Users/hugo/projects/sst/data/square400.stream").expect("Unable to open file");
     let f = BufReader::new(fi);
     // let mut count: usize = 0;
@@ -47,20 +48,25 @@ fn main() -> io::Result<()> {
                     .parse::<usize>()
                     .unwrap()
             }
-            'r' => {
+            's' => {
                 //-- cellsize
-                let r = l
+                let s = l
                     .split_whitespace()
                     .last()
                     .unwrap()
                     .parse::<usize>()
                     .unwrap();
-                dt.set_cellsize(r);
+                dt.set_cellsize(s);
             }
-            'd' => {
-                //-- dimension grid
-                let re = parse_2_usize(&l);
-                dt.set_grid_dimensions(re.0, re.1);
+            'c' => {
+                //-- dimension grid (always square cXc)
+                let c = l
+                    .split_whitespace()
+                    .last()
+                    .unwrap()
+                    .parse::<usize>()
+                    .unwrap();
+                dt.set_grid_dimensions(c);
             }
             'b' => {
                 //-- bbox
@@ -78,15 +84,15 @@ fn main() -> io::Result<()> {
                 let _re = dt.insert_one_pt_with_grid(v.0, v.1, v.2);
             }
             'x' => {
-                println!("{}", l);
                 //-- finalise a cell
+                println!("{}", l);
                 let re = parse_2_usize(&l);
+                if (re.0 == 3) && (re.1 == 2) {
+                    println!("yo");
+                }
                 let _re = dt.finalise_cell(re.0, re.1);
                 let fout = format!("/Users/hugo/temp/sstout/c-{}-{}.geojson", re.0, re.1);
                 let _re = dt.write_geojson_triangles(fout.to_string());
-                if (re.0 == 3) && (re.1 == 1) {
-                    println!("yo");
-                }
             }
             _ => {
                 error!("Wrongly formatted stream. Abort.");
