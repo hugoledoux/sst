@@ -540,19 +540,34 @@ impl Triangulation {
             }
             for each in &finpts {
                 let p = self.get_point(*each).unwrap();
+                let adjs = self.adjacent_vertices_to_vertex(*each).unwrap();
+                //-- reconstruct triangles
+                for (i, adj1) in adjs.iter().enumerate() {
+                    let mut output: bool = false;
+                    let re1 = self.get_point(*adj1);
+                    let mut j = i + 1;
+                    if j == adjs.len() {
+                        j = 0;
+                    }
+                    if re1.is_some() {
+                        let re2 = self.get_point(adjs[j]);
+                        if re2.is_some() {
+                            output = true;
+                        }
+                    }
+                    if output == true {
+                        io::stdout().write_all(
+                            &format!("f {} {} {}\n", *each, adjs[i], adjs[j]).as_bytes(),
+                        )?;
+                    }
+                }
+                //-- write point (finalised!) with its star
                 io::stdout().write_all(
-                    &format!(
-                        "v {} {} {} {} {:?}\n",
-                        *each,
-                        p[0],
-                        p[1],
-                        p[2],
-                        self.adjacent_vertices_to_vertex(*each).unwrap()
-                    )
-                    .as_bytes(),
+                    &format!("v {} {} {} {} {:?}\n", *each, p[0], p[1], p[2], adjs).as_bytes(),
                 )?;
                 self.qt.gpts[c.0][c.1].remove(each);
             }
+            // info!("  ({} flushed cell )", finpts.len());
             for each in &finpts {
                 self.flush_star(*each);
             }
