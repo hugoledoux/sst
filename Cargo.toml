@@ -23,3 +23,7 @@ path = "src/sstfin/bin/main.rs"
 [[bin]]
 name = "sstdel"
 path = "src/sstdel/bin/main.rs"
+
+[[bin]]
+name = "sstobj"
+path = "src/sstobj/bin/main.rs"
