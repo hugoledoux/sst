@@ -99,11 +99,7 @@ impl Link {
 
     fn contains_infinite_vertex(&self) -> bool {
         let pos = self.0.iter().position(|&x| x == 0);
-        if pos == None {
-            return false;
-        } else {
-            return true;
-        }
+        return if pos == None { false } else { true };
     }
 
     fn next_index(&self, i: usize) -> usize {
