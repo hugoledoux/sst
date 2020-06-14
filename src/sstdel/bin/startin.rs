@@ -551,7 +551,7 @@ impl Triangulation {
                     )
                     .as_bytes(),
                 )?;
-                self.qt.gpts[gx][gy].remove(each);
+                self.qt.gpts[c.0][c.1].remove(each);
             }
             for each in &finpts {
                 self.flush_star(*each);
