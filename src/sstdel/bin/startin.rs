@@ -562,26 +562,33 @@ impl Triangulation {
 
     pub fn finalise_leftover_triangles(&mut self) -> io::Result<()> {
         let mut total: usize = 0;
-        for w in &self.qt.gpts {
-            for h in w {
-                total += h.len();
+        for i in &self.qt.gpts {
+            for j in i {
+                total += j.len();
             }
         }
         info!("Writing the {} vertices left in the DT", total);
         info!("DT # points: {}", self.number_of_vertices());
         //-- write the leftovers
-        for w in &self.qt.gpts {
-            for h in w {
-                for each in h.iter() {
-                    let p = self.get_point(*each).unwrap();
+        for i in &self.qt.gpts {
+            for j in i {
+                for v in j.iter() {
+                    let re = self.get_point(*v);
+                    let p = match re {
+                        Some(re) => re,
+                        None => continue,
+                    };
+                    // if p.is_none() {
+                    //     continue;
+                    // }
                     io::stdout().write_all(
                         &format!(
                             "v {} {} {} {} {:?}\n",
-                            *each,
+                            *v,
                             p[0],
                             p[1],
                             p[2],
-                            self.adjacent_vertices_to_vertex(*each).unwrap()
+                            self.adjacent_vertices_to_vertex(*v).unwrap()
                         )
                         .as_bytes(),
                     )?;
