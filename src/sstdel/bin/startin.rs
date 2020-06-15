@@ -475,7 +475,7 @@ impl Triangulation {
 
         let qtc = self.qt.finalise_cell(gx, gy);
 
-        if qtc.is_empty() == true {
+        if (qtc.is_empty() == true) || (self.number_of_vertices() <= 3) {
             return Ok(());
         }
         //-- nothing to do if single cell finalised and it's empty

@@ -87,14 +87,13 @@ fn main() -> io::Result<()> {
                 //-- finalise a cell
                 // println!("=>{}", l);
                 let re = parse_2_usize(&l);
-                // if (re.0 == 2) && (re.1 == 0) {
-                //     println!("yo");
-                // }
-                if dt.number_of_vertices() > 3 {
-                    let _re = dt.finalise_cell(re.0, re.1);
-                    let fout = format!("/Users/hugo/temp/sstout/c-{}-{}.geojson", re.0, re.1);
-                    let _re = dt.write_geojson_triangles(fout.to_string());
+                if (re.0 == 1) && (re.1 == 0) {
+                    println!("yo");
                 }
+
+                let _re = dt.finalise_cell(re.0, re.1);
+                let fout = format!("/Users/hugo/temp/sstout/c-{}-{}.geojson", re.0, re.1);
+                let _re = dt.write_geojson_triangles(fout.to_string());
             }
             _ => {
                 error!("Wrongly formatted stream. Abort.");
