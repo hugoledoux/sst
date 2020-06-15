@@ -184,7 +184,7 @@ impl fmt::Display for Link {
 struct Star {
     pub pt: [f64; 3],
     pub link: Link,
-    pub active: bool,
+    pub written: bool,
 }
 
 impl Star {
@@ -193,7 +193,7 @@ impl Star {
         Star {
             pt: [x, y, z],
             link: l,
-            active: true,
+            written: false,
         }
     }
 }
@@ -556,21 +556,42 @@ impl Triangulation {
                         }
                     }
                     if output == true {
+                        if self.stars[each].written == false {
+                            io::stdout().write_all(
+                                &format!("v {} {} {} {}\n", *each, p[0], p[1], p[2]).as_bytes(),
+                            )?;
+                            self.stars.get_mut(&each).unwrap().written = true;
+                        }
+                        if self.stars[&adjs[i]].written == false {
+                            let tmpp = self.get_point(adjs[i]).unwrap();
+                            io::stdout().write_all(
+                                &format!("v {} {} {} {}\n", adjs[i], tmpp[0], tmpp[1], tmpp[2])
+                                    .as_bytes(),
+                            )?;
+                            self.stars.get_mut(&adjs[i]).unwrap().written = true;
+                        }
+                        if self.stars[&adjs[j]].written == false {
+                            let tmpp = self.get_point(adjs[j]).unwrap();
+                            io::stdout().write_all(
+                                &format!("v {} {} {} {}\n", adjs[j], tmpp[0], tmpp[1], tmpp[2])
+                                    .as_bytes(),
+                            )?;
+                            self.stars.get_mut(&adjs[j]).unwrap().written = true;
+                        }
                         io::stdout().write_all(
                             &format!("f {} {} {}\n", *each, adjs[i], adjs[j]).as_bytes(),
                         )?;
                     }
                 }
                 //-- write point (finalised!) with its star
-                io::stdout().write_all(
-                    &format!("v {} {} {} {} {:?}\n", *each, p[0], p[1], p[2], adjs).as_bytes(),
-                )?;
+                io::stdout().write_all(&format!("x {} {:?}\n", *each, adjs).as_bytes())?;
                 self.qt.gpts[c.0][c.1].remove(each);
-            }
-            // info!("  ({} flushed cell )", finpts.len());
-            for each in &finpts {
                 self.flush_star(*each);
             }
+            // // info!("  ({} flushed cell )", finpts.len());
+            // for each in &finpts {
+            //     self.flush_star(*each);
+            // }
         }
         Ok(())
     }
@@ -1622,8 +1643,8 @@ impl Triangulation {
             let mut attributes = Map::new();
             attributes.insert(String::from("id"), to_value(i.to_string()).unwrap());
             attributes.insert(
-                String::from("active"),
-                serde_json::value::Value::Bool(star.active),
+                String::from("written"),
+                serde_json::value::Value::Bool(star.written),
             );
             let f = Feature {
                 bbox: None,
