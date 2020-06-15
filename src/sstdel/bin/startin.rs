@@ -201,7 +201,7 @@ impl Star {
 //----------------------
 struct Quadtree {
     pub gpts: Vec<Vec<HashSet<usize>>>,
-    pub gfinal: HashSet<Vec<u8>>,
+    pub gfinal: HashSet<Vec<u8>>, //-- the set of finalised qtc cells
     pub minx: f64,
     pub miny: f64,
     pub cellsize: usize,
@@ -538,61 +538,57 @@ impl Triangulation {
                     finpts.insert(*theid);
                 }
             }
-            for each in &finpts {
-                let p = self.get_point(*each).unwrap();
-                let adjs = self.adjacent_vertices_to_vertex(*each).unwrap();
-                //-- reconstruct triangles
-                for (i, adj1) in adjs.iter().enumerate() {
-                    let mut output: bool = false;
-                    let re1 = self.get_point(*adj1);
-                    let mut j = i + 1;
-                    if j == adjs.len() {
-                        j = 0;
-                    }
-                    if re1.is_some() {
-                        let re2 = self.get_point(adjs[j]);
-                        if re2.is_some() {
-                            output = true;
-                        }
-                    }
-                    if output == true {
-                        if self.stars[each].written == false {
-                            io::stdout().write_all(
-                                &format!("v {} {} {} {}\n", *each, p[0], p[1], p[2]).as_bytes(),
-                            )?;
-                            self.stars.get_mut(&each).unwrap().written = true;
-                        }
-                        if self.stars[&adjs[i]].written == false {
-                            let tmpp = self.get_point(adjs[i]).unwrap();
-                            io::stdout().write_all(
-                                &format!("v {} {} {} {}\n", adjs[i], tmpp[0], tmpp[1], tmpp[2])
-                                    .as_bytes(),
-                            )?;
-                            self.stars.get_mut(&adjs[i]).unwrap().written = true;
-                        }
-                        if self.stars[&adjs[j]].written == false {
-                            let tmpp = self.get_point(adjs[j]).unwrap();
-                            io::stdout().write_all(
-                                &format!("v {} {} {} {}\n", adjs[j], tmpp[0], tmpp[1], tmpp[2])
-                                    .as_bytes(),
-                            )?;
-                            self.stars.get_mut(&adjs[j]).unwrap().written = true;
-                        }
-                        io::stdout().write_all(
-                            &format!("f {} {} {}\n", *each, adjs[i], adjs[j]).as_bytes(),
-                        )?;
-                    }
-                }
-                //-- write point (finalised!) with its star
-                io::stdout().write_all(&format!("x {} {:?}\n", *each, adjs).as_bytes())?;
-                self.qt.gpts[c.0][c.1].remove(each);
-                self.flush_star(*each);
+            for each in finpts {
+                let re = self.write_stdout_star(each);
+                self.qt.gpts[c.0][c.1].remove(&each);
+                self.flush_star(each);
             }
-            // // info!("  ({} flushed cell )", finpts.len());
-            // for each in &finpts {
-            //     self.flush_star(*each);
-            // }
         }
+        Ok(())
+    }
+
+    fn write_stdout_star(&mut self, v: usize) -> io::Result<()> {
+        // let p = self.get_point(v).unwrap();
+        let trs = self.incident_triangles_to_vertex(v).unwrap();
+        for tr in &trs {
+            if (tr.v[1] != 0)
+                && (self.vertex_exists(tr.v[1]))
+                && (tr.v[2] != 0)
+                && (self.vertex_exists(tr.v[2]))
+                && tr.is_infinite() == false
+            {
+                if self.stars[&v].written == false {
+                    let p = self.get_point(v).unwrap();
+                    io::stdout()
+                        .write_all(&format!("v {} {} {} {}\n", v, p[0], p[1], p[2]).as_bytes())?;
+                    self.stars.get_mut(&v).unwrap().written = true;
+                }
+                if self.stars[&tr.v[1]].written == false {
+                    let tmpp = self.get_point(tr.v[1]).unwrap();
+                    io::stdout().write_all(
+                        &format!("v {} {} {} {}\n", tr.v[1], tmpp[0], tmpp[1], tmpp[2]).as_bytes(),
+                    )?;
+                    self.stars.get_mut(&tr.v[1]).unwrap().written = true;
+                }
+                if self.stars[&tr.v[2]].written == false {
+                    let tmpp = self.get_point(tr.v[2]).unwrap();
+                    io::stdout().write_all(
+                        &format!("v {} {} {} {}\n", tr.v[2], tmpp[0], tmpp[1], tmpp[2]).as_bytes(),
+                    )?;
+                    self.stars.get_mut(&tr.v[2]).unwrap().written = true;
+                }
+                io::stdout().write_all(&format!("f {} {} {}\n", v, tr.v[1], tr.v[2]).as_bytes())?;
+            }
+        }
+        //-- write point (finalised!) with its star
+        io::stdout().write_all(
+            &format!(
+                "x {} {:?}\n",
+                v,
+                self.adjacent_vertices_to_vertex(v).unwrap()
+            )
+            .as_bytes(),
+        )?;
         Ok(())
     }
 
@@ -606,28 +602,11 @@ impl Triangulation {
         info!("Writing the {} vertices left in the DT", total);
         info!("DT # points: {}", self.number_of_vertices());
         //-- write the leftovers
-        for i in &self.qt.gpts {
-            for j in i {
-                for v in j.iter() {
-                    let re = self.get_point(*v);
-                    let p = match re {
-                        Some(re) => re,
-                        None => continue,
-                    };
-                    // if p.is_none() {
-                    //     continue;
-                    // }
-                    io::stdout().write_all(
-                        &format!(
-                            "v {} {} {} {} {:?}\n",
-                            *v,
-                            p[0],
-                            p[1],
-                            p[2],
-                            self.adjacent_vertices_to_vertex(*v).unwrap()
-                        )
-                        .as_bytes(),
-                    )?;
+        for i in 0..self.qt.griddim {
+            for j in 0..self.qt.griddim {
+                let vs = self.qt.gpts[i][j].clone();
+                for v in vs {
+                    let _re = self.write_stdout_star(v);
                 }
             }
         }
