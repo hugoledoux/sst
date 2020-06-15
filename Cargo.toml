@@ -21,8 +21,8 @@ name = "sstfin"
 path = "src/sstfin/bin/main.rs"
 
 [[bin]]
-name = "sstdel"
-path = "src/sstdel/bin/main.rs"
+name = "sstdt"
+path = "src/sstdt/bin/main.rs"
 
 [[bin]]
 name = "sstobj"

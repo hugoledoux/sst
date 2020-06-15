@@ -26,7 +26,7 @@ fn main() -> io::Result<()> {
 
         //----- reading from file -----//
         // let fi =
-        //     File::open("/Users/hugo/projects/sst/data/s400_50.stream").expect("Unable to open file");
+        //     File::open("/Users/hugo/projects/sst/data/s400_15.stream").expect("Unable to open file");
         // let f = BufReader::new(fi);
         // for l in f.lines() {
         //     let l = l.expect("Unable to read line");
@@ -86,9 +86,9 @@ fn main() -> io::Result<()> {
                 //-- finalise a cell
                 // println!("=>{}", l);
                 let re = parse_2_usize(&l);
-                if (re.0 == 1) && (re.1 == 0) {
-                    println!("yo");
-                }
+                // if (re.0 == 11) && (re.1 == 2) {
+                //     println!("yo");
+                // }
 
                 let _re = dt.finalise_cell(re.0, re.1);
                 let fout = format!("/Users/hugo/temp/sstout/c-{}-{}.geojson", re.0, re.1);

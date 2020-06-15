@@ -1187,11 +1187,7 @@ impl Triangulation {
         }
         if b == false {
             info!("Cannot find a starting finite triangle.");
-            let pr: usize = l.get_prev_vertex(0).unwrap();
-            tr.v[0] = cur;
-            tr.v[1] = pr;
-            tr.v[2] = 0;
-            return Some(tr);
+            return None;
         }
 
         //-- 2. order it such that tr0-tr1-x is CCW
@@ -1300,10 +1296,23 @@ impl Triangulation {
         info!("brute-force ON CONVEX HULL");
         let mut tr = Triangle { v: [0, 0, 0] };
         let l = &self.stars.get(&vmin).unwrap().link;
-        let pr: usize = l.get_prev_vertex(0).unwrap();
-        tr.v[0] = vmin;
-        tr.v[1] = pr;
-        tr.v[2] = 0;
+        let mut v2: usize = l.get_prev_vertex(0).unwrap();
+        if geom::orient2d(
+            &self.stars[&vmin].pt,
+            &self.stars[&v2].pt,
+            &x,
+            self.robust_predicates,
+        ) == 1
+        {
+            tr.v[0] = vmin;
+            tr.v[1] = v2;
+            tr.v[2] = 0;
+        } else {
+            v2 = l.get_next_vertex(0).unwrap();
+            tr.v[0] = v2;
+            tr.v[1] = vmin;
+            tr.v[2] = 0;
+        }
         return Some(tr);
         // self.walk_safe(x, vmin)
     }

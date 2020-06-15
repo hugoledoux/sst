@@ -61,12 +61,11 @@ fn main() -> io::Result<()> {
             }
 
             _ => {
-                error!("Wrongly formatted stream. Abort.");
+                error!("Abort. Wrongly formatted stream. Unknown line: '{}'", l);
                 std::process::exit(1);
             }
         }
     }
-    info!("Finished reading the stream");
 
     for v in vertices {
         io::stdout().write_all(v.as_bytes())?;
@@ -74,5 +73,6 @@ fn main() -> io::Result<()> {
     for f in faces {
         io::stdout().write_all(f.as_bytes())?;
     }
+    info!("✅");
     Ok(())
 }
