@@ -114,6 +114,7 @@ fn main() -> io::Result<()> {
 
     let _x = dt.finalise_leftover_triangles();
 
+    info!("✅");
     Ok(())
 }
 
