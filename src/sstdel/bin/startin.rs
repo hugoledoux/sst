@@ -362,18 +362,12 @@ impl Quadtree {
     }
 
     fn get_cell_qtc(&self, gx: usize, gy: usize) -> Vec<u8> {
-        // println!("{:0>4b}", gx);
-        // println!("{}", gy.leading_zeros());
-        // println!("{:0>4b}", gx & 0b0100);
-        // println!("{}", gx & 0b0100);
-        let mut mask: usize = 2_usize.pow(self.depth - 1);
-        // println!("mask: {}", mask);
-        // println!("mask: {:0>4b}", mask);
-        // let mut a: usize = 0b1000;
         let mut re: Vec<u8> = Vec::new();
+        if self.depth == 0 {
+            return re;
+        }
+        let mut mask: usize = 2_usize.pow(self.depth - 1);
         for i in 0..self.depth {
-            // println!("i:{} -- {:0>4b}", i, mask);
-            // println!("{}", gx & mask == 2_usize.pow(self.depth - i - 1));
             let a = gx & mask == 2_usize.pow(self.depth - i - 1);
             let b = gy & mask == 2_usize.pow(self.depth - i - 1);
             if a == false && b == false {
