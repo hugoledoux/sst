@@ -14,10 +14,6 @@ use std::io::{BufRead, BufReader};
 fn main() -> io::Result<()> {
     env_logger::init();
     let mut _totalpts: usize = 0;
-    // let mut cellsize: usize = 0;
-    // let mut bbox: [f64; 2] = [std::f64::MIN, std::f64::MIN];
-    // let mut gwidth: usize = 0;
-    // let mut gheight: usize = 0;
 
     info!("Init DT");
     let mut dt = startin::Triangulation::new();
