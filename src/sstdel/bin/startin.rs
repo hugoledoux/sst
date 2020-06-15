@@ -302,7 +302,7 @@ impl Quadtree {
                 done = true;
             }
         }
-        println!("{:?}", q2);
+        // println!("{:?}", q2);
         q2
     }
 
@@ -1521,27 +1521,6 @@ impl Triangulation {
         trs
     }
 
-    pub fn all_triangles_active(&self) -> Vec<Triangle> {
-        let mut trs: Vec<Triangle> = Vec::new();
-        for (i, star) in &self.stars {
-            //-- reconstruct triangles
-            for (j, value) in star.link.iter().enumerate() {
-                if (i < value) && (self.stars.contains_key(&value) == true) {
-                    // let k = star.l[self.nexti(star.link.len(), j)];
-                    let k = star.link[star.link.next_index(j)];
-                    if (i < &k) && (self.stars.contains_key(&k) == true) {
-                        let tr = Triangle { v: [*i, *value, k] };
-                        if tr.is_infinite() == false {
-                            // println!("{}", tr);
-                            trs.push(tr);
-                        }
-                    }
-                }
-            }
-        }
-        trs
-    }
-
     /// Validates the Delaunay triangulation:
     /// (1) checks each triangle against each vertex (circumcircle tests); very slow
     /// (2) checks whether the convex hull is really convex
@@ -1655,7 +1634,6 @@ impl Triangulation {
             };
             fc.features.push(f);
         }
-
         //-- triangles
         for (i, star) in &self.stars {
             for (j, value) in star.link.iter().enumerate() {
@@ -1677,7 +1655,6 @@ impl Triangulation {
                             // let mut attributes = Map::new();
                             // if self.stars[]
                             // attributes.insert(String::from("active"), to_value();
-
                             let f = Feature {
                                 bbox: None,
                                 geometry: Some(gtr),
@@ -1691,7 +1668,6 @@ impl Triangulation {
                 }
             }
         }
-
         //-- write the file to disk
         let mut fo = File::create(path)?;
         write!(fo, "{}", fc.to_string()).unwrap();
@@ -1736,54 +1712,6 @@ impl Triangulation {
         Ok(())
     }
 }
-
-// for (i, star) in &self.stars {
-//     //-- reconstruct triangles
-//     for (j, value) in star.link.iter().enumerate() {
-//         if (i < value) && (self.stars.contains_key(&value) == true) {
-//             // let k = star.l[self.nexti(star.link.len(), j)];
-//             let k = star.link[star.link.next_index(j)];
-//             if (i < &k) && (self.stars.contains_key(&k) == true) {
-//                 let tr = Triangle { v: [*i, *value, k] };
-//                 if tr.is_infinite() == false {
-//                     // println!("{}", tr);
-//                     trs.push(tr);
-//                 }
-//             }
-//         }
-//     }
-// }
-
-// let trs = self.all_triangles_active();
-// let mut f = File::create(path)?;
-// let mut s = String::new();
-// let mut ids: Vec<&usize> = self.stars.keys().collect();
-// ids.sort();
-// println!("{:?}", ids);
-
-// for i in 1..self.stars.len() {
-//     if twod == true {
-//         s.push_str(&format!(
-//             "v {} {} {}\n",
-//             self.stars[&i].pt[0], self.stars[&i].pt[1], 0
-//         ));
-//     } else {
-//         s.push_str(&format!(
-//             "v {} {} {}\n",
-//             self.stars[&i].pt[0], self.stars[&i].pt[1], self.stars[&i].pt[2]
-//         ));
-//     }
-// }
-// write!(f, "{}", s).unwrap();
-// let mut s = String::new();
-// for tr in trs.iter() {
-//     s.push_str(&format!("f {} {} {}\n", tr.v[0], tr.v[1], tr.v[2]));
-// }
-// write!(f, "{}", s).unwrap();
-// // println!("write fobj: {:.2?}", starttime.elapsed());
-//         Ok(())
-//     }
-// }
 
 impl fmt::Display for Triangulation {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {

@@ -78,18 +78,18 @@ fn main() -> io::Result<()> {
             }
             'v' => {
                 //-- vertex
-                println!("{}", l);
+                // println!("=>{}", l);
                 // count += 1;
                 let v = parse_3_f64(&l);
                 let _re = dt.insert_one_pt_with_grid(v.0, v.1, v.2);
             }
             'x' => {
                 //-- finalise a cell
-                println!("{}", l);
+                // println!("=>{}", l);
                 let re = parse_2_usize(&l);
-                if (re.0 == 3) && (re.1 == 2) {
-                    println!("yo");
-                }
+                // if (re.0 == 2) && (re.1 == 0) {
+                //     println!("yo");
+                // }
                 let _re = dt.finalise_cell(re.0, re.1);
                 let fout = format!("/Users/hugo/temp/sstout/c-{}-{}.geojson", re.0, re.1);
                 let _re = dt.write_geojson_triangles(fout.to_string());
@@ -109,10 +109,11 @@ fn main() -> io::Result<()> {
     // info!("Writing GeoJSON file to disk: /Users/hugo/temp/z.grid.geojson");
     // let _re = dt.write_geojson_grid("/Users/hugo/temp/z.grid.geojson".to_string());
 
-    info!("Writing GeoJSON file to disk: /Users/hugo/temp/sstout/z.geojson");
-    let _re = dt.write_geojson_triangles("/Users/hugo/temp/sstout/z.geojson".to_string());
+    info!("Writing GeoJSON file to disk before flusing leftover triangles: /Users/hugo/temp/sstout/z_blo.geojson");
+    let _re = dt.write_geojson_triangles("/Users/hugo/temp/sstout/z_blo.geojson".to_string());
 
     let _x = dt.finalise_leftover_triangles();
+
     Ok(())
 }
 
