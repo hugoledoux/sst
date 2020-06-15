@@ -18,17 +18,20 @@ fn main() -> io::Result<()> {
     info!("Init DT");
     let mut dt = startin::Triangulation::new();
 
-    //PUTBACK let stdin = std::io::stdin();
-    //PUTBACK for line in stdin.lock().lines() {
-    let fi =
-        File::open("/Users/hugo/projects/sst/data/rect1_50.stream").expect("Unable to open file");
-    // File::open("/Users/hugo/projects/sst/data/square400.stream").expect("Unable to open file");
-    let f = BufReader::new(fi);
-    // let mut count: usize = 0;
-    for l in f.lines() {
-        let l = l.expect("Unable to read line");
-        //PUTBACK let l = line.unwrap();
-        // println!("=> {}", l);
+    //----- reading from stdin -----//
+    let stdin = std::io::stdin();
+    for line in stdin.lock().lines() {
+        let l = line.unwrap();
+        //----- reading from stdin -----//
+
+        //----- reading from file -----//
+        // let fi =
+        //     File::open("/Users/hugo/projects/sst/data/s400_50.stream").expect("Unable to open file");
+        // let f = BufReader::new(fi);
+        // for l in f.lines() {
+        //     let l = l.expect("Unable to read line");
+        //----- reading from file -----//
+
         if l.is_empty() {
             continue;
         }
