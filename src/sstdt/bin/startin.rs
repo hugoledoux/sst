@@ -1117,10 +1117,10 @@ impl Triangulation {
         if re.is_some() {
             return re.unwrap();
         }
-        warn!("'normal' walk() failed");
+        // warn!("'normal' walk() failed");
 
         //-- 2. try walk from one in the same cell
-        warn!("attempt to find one vertex in the grid cell and start from it");
+        // warn!("attempt to find one vertex in the grid cell and start from it");
         let g = self.qt.get_cell_gxgy(x[0], x[1]);
         if self.qt.gpts[g.0][g.1].len() > 0 {
             cur = *self.qt.gpts[g.0][g.1].iter().next().unwrap();
@@ -1131,14 +1131,14 @@ impl Triangulation {
         }
 
         //-- 3. try brute-force on triangles
-        warn!("attempt to find one triangle brute-force");
+        // warn!("attempt to find one triangle brute-force");
         let re2 = self.walk_bruteforce_triangles(x);
         if re2.is_some() {
             return re2.unwrap();
         }
 
         //-- 4. we are outside the CH of the current dataset
-        warn!("point is outside the CH, finding closest point on the CH");
+        // warn!("point is outside the CH, finding closest point on the CH");
         let re4 = self.walk_bruteforce_vertices(x);
         // for key in self.stars.keys() {
         //     println!("{:?}", key);
