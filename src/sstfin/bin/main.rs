@@ -7,6 +7,8 @@ use std::io::Seek;
 use std::io::{self, Write};
 use std::io::{BufRead, BufReader};
 
+use num_format::{Locale, ToFormattedString};
+
 #[macro_use]
 extern crate log; //info/debug/error
 
@@ -50,6 +52,7 @@ fn main() {
     let bbox = re.0;
     let totalpts: usize = re.1;
     info!("First pass ✅");
+    info!("count pts={}", totalpts.to_formatted_string(&Locale::en));
     info!("bbox={:?}", bbox);
 
     //-- sprinkler
