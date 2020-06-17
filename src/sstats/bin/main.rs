@@ -132,7 +132,46 @@ fn stats_per_cell(mut f: &File, bbox: &Vec<f64>, cellno: usize, resolution: usiz
             }
         }
     }
-    let mut avg: f64 = count as f64 / nonempty as f64;
+    let avg: f64 = count as f64 / nonempty as f64;
+    (avg, max)
+}
+
+fn stats_per_cell_las(
+    path: &Path,
+    bbox: &Vec<f64>,
+    cellno: usize,
+    resolution: usize,
+) -> (f64, usize) {
+    let mut reader = las::Reader::from_path(path).expect("Unable to open reader");
+    let mut g: Vec<Vec<usize>> = vec![vec![0; cellno]; cellno];
+    for each in reader.points() {
+        let p = each.unwrap();
+        // let v: Vec<f64> = l.split(' ').map(|s| s.parse().unwrap()).collect();
+        let mut gxy: (usize, usize) = get_gx_gy(p.x, p.y, bbox[0], bbox[1], resolution);
+        // println!("{}--{}", gxy.0, gxy.1);
+        if gxy.0 == cellno {
+            gxy.0 = cellno - 1;
+        }
+        if gxy.1 == cellno {
+            gxy.1 = cellno - 1;
+        }
+        g[gxy.0][gxy.1] += 1;
+    }
+    let mut max: usize = 0;
+    let mut count: usize = 0;
+    let mut nonempty: usize = 0;
+    for i in 0..cellno {
+        for j in 0..cellno {
+            if g[i][j] > 0 {
+                nonempty += 1;
+                count += g[i][j];
+            }
+            if g[i][j] > max {
+                max = g[i][j];
+            }
+        }
+    }
+    let avg: f64 = count as f64 / nonempty as f64;
     (avg, max)
 }
 
