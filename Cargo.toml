@@ -14,7 +14,11 @@ log = "0.4.8"
 env_logger = "0.7.1"
 geojson= "*"
 serde_json= "*"
+las = { version = "0.7", features = ["laz"] }
 
+[[bin]]
+name = "sstats"
+path = "src/sstats/bin/main.rs"
 
 [[bin]]
 name = "sstfin"
