@@ -440,6 +440,7 @@ pub struct Triangulation {
     is_init: bool,
     robust_predicates: bool,
     theid: usize, //-- to assign id to new vertices, since some are flushed
+    pub max: usize,
 }
 
 impl Triangulation {
@@ -456,6 +457,7 @@ impl Triangulation {
             cur: 0,
             is_init: false,
             robust_predicates: true,
+            max: 1,
         }
     }
 
@@ -753,6 +755,9 @@ impl Triangulation {
             let g = self.qt.get_cell_gxgy(px, py);
             self.qt.gpts[g.0][g.1].insert(x);
         };
+        if self.stars.len() > self.max {
+            self.max = self.stars.len();
+        }
         re
     }
 

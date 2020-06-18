@@ -1,4 +1,4 @@
-//-- sstdel
+//-- sstdt
 
 #[allow(dead_code)]
 #[allow(unused_variables)]
@@ -7,9 +7,8 @@ mod startin;
 #[macro_use]
 extern crate log; //info/debug/error
 
-use std::fs::File;
 use std::io;
-use std::io::{BufRead, BufReader};
+use std::io::BufRead;
 
 fn main() -> io::Result<()> {
     env_logger::init();
@@ -71,9 +70,9 @@ fn main() -> io::Result<()> {
                 //-- bbox
                 let re = parse_2_f64(&l);
                 dt.set_bbox(re.0, re.1);
-                info!("Writing GeoJSON file to disk: /Users/hugo/temp/sstout/z.grid.geojson");
-                let _re =
-                    dt.write_geojson_grid("/Users/hugo/temp/sstout/z.grid.geojson".to_string());
+                // info!("Writing GeoJSON file to disk: /Users/hugo/temp/sstout/z.grid.geojson");
+                // let _re =
+                //     dt.write_geojson_grid("/Users/hugo/temp/sstout/z.grid.geojson".to_string());
             }
             'v' => {
                 //-- vertex
@@ -91,8 +90,8 @@ fn main() -> io::Result<()> {
                 // }
 
                 let _re = dt.finalise_cell(re.0, re.1);
-                let fout = format!("/Users/hugo/temp/sstout/c-{}-{}.geojson", re.0, re.1);
-                let _re = dt.write_geojson_triangles(fout.to_string());
+                // let fout = format!("/Users/hugo/temp/sstout/c-{}-{}.geojson", re.0, re.1);
+                // let _re = dt.write_geojson_triangles(fout.to_string());
             }
             _ => {
                 error!("Wrongly formatted stream. Abort.");
@@ -109,9 +108,10 @@ fn main() -> io::Result<()> {
     // info!("Writing GeoJSON file to disk: /Users/hugo/temp/z.grid.geojson");
     // let _re = dt.write_geojson_grid("/Users/hugo/temp/z.grid.geojson".to_string());
 
-    info!("Writing GeoJSON file to disk before flusing leftover triangles: /Users/hugo/temp/sstout/z_blo.geojson");
-    let _re = dt.write_geojson_triangles("/Users/hugo/temp/sstout/z_blo.geojson".to_string());
+    // info!("Writing GeoJSON file to disk before flusing leftover triangles: /Users/hugo/temp/sstout/z_blo.geojson");
+    // let _re = dt.write_geojson_triangles("/Users/hugo/temp/sstout/z_blo.geojson".to_string());
 
+    info!("max # points in DT during process: {}", dt.max);
     let _x = dt.finalise_leftover_triangles();
 
     info!("✅");
