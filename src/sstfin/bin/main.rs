@@ -213,7 +213,6 @@ fn pass_2_las(
     for path in paths {
         let mut reader = las::Reader::from_path(path).expect("Unable to open reader");
         for each in reader.points() {
-            count += 1;
             let p = each.unwrap();
             let gxy: (usize, usize) = get_gx_gy(p.x, p.y, bbox[0], bbox[1], cellsize);
             g[gxy.0][gxy.1] += 1;
@@ -226,6 +225,7 @@ fn pass_2_las(
                     z: p.z,
                 };
             }
+            count += 1;
         }
     }
     g
@@ -257,7 +257,6 @@ fn pass_2_xyz(
         let f = BufReader::new(f);
         for l in f.lines() {
             let l = l.expect("Unable to read line");
-            count += 1;
             let v: Vec<f64> = l.split(' ').map(|s| s.parse().unwrap()).collect();
             let gxy: (usize, usize) = get_gx_gy(v[0], v[1], bbox[0], bbox[1], cellsize);
             g[gxy.0][gxy.1] += 1;
@@ -270,6 +269,7 @@ fn pass_2_xyz(
                     z: v[2],
                 };
             }
+            count += 1;
         }
     }
     g
@@ -326,24 +326,26 @@ fn pass_3_las(
         }
     }
 
+    //-- find the transform.scale
+    let reader = las::Reader::from_path(&paths[0]).expect("Unable to open reader");
+    let tmp = reader.header().transforms().x.scale;
+    let impdigits = tmp.log10().abs().round() as usize;
+    info!("impdigits {}", impdigits);
+
     //-- chunker: promote these points at the top of the stream
     for (_, pt) in sprinkled {
-        io::stdout().write_all(&format!("v {} {} {}\n", pt.x, pt.y, pt.z).as_bytes())?;
+        io::stdout().write_all(
+            &format!("v {0:.3$} {1:.3$} {2:.3$}\n", pt.x, pt.y, pt.z, impdigits).as_bytes(),
+        )?;
     }
 
     //-- read again the files
     let mut count: usize = 0;
     for path in paths {
         let mut reader = las::Reader::from_path(path).expect("Unable to open reader");
-        let tmp = reader.header().transforms().x.scale;
-        let impdigits = tmp.log10().abs().round() as usize;
-        info!("impdigits {}", impdigits);
         for each in reader.points() {
-            count += 1;
             let p = each.unwrap();
-            count += 1;
             let gxy: (usize, usize) = get_gx_gy(p.x, p.y, bbox[0], bbox[1], cellsize);
-
             g[gxy.0][gxy.1] -= 1;
             if !sprinkled.contains_key(&count) {
                 gpts[gxy.0][gxy.1].push(Point {
@@ -363,6 +365,7 @@ fn pass_3_las(
                 gpts[gxy.0][gxy.1].clear();
                 gpts[gxy.0][gxy.1].shrink_to_fit();
             }
+            count += 1;
         }
     }
     Ok(())
@@ -419,7 +422,6 @@ fn pass_3_xyz(
         for l in f.lines() {
             let l = l.expect("Unable to read line");
             let v: Vec<f64> = l.split(' ').map(|s| s.parse().unwrap()).collect();
-            count += 1;
             let gxy: (usize, usize) = get_gx_gy(v[0], v[1], bbox[0], bbox[1], cellsize);
             g[gxy.0][gxy.1] -= 1;
             if !sprinkled.contains_key(&count) {
@@ -438,6 +440,7 @@ fn pass_3_xyz(
                 gpts[gxy.0][gxy.1].clear();
                 gpts[gxy.0][gxy.1].shrink_to_fit();
             }
+            count += 1;
         }
     }
     Ok(())
