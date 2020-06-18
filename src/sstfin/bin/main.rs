@@ -137,10 +137,10 @@ fn pass_1_las(paths: &Vec<String>) -> (Vec<f64>, usize) {
         if b.min.y < bbox[1] {
             bbox[1] = b.min.y;
         }
-        if b.max.x < bbox[2] {
+        if b.max.x > bbox[2] {
             bbox[2] = b.max.x;
         }
-        if b.max.y < bbox[3] {
+        if b.max.y > bbox[3] {
             bbox[3] = b.max.y;
         }
     }
@@ -335,6 +335,9 @@ fn pass_3_las(
     let mut count: usize = 0;
     for path in paths {
         let mut reader = las::Reader::from_path(path).expect("Unable to open reader");
+        let tmp = reader.header().transforms().x.scale;
+        let impdigits = tmp.log10().abs().round() as usize;
+        info!("impdigits {}", impdigits);
         for each in reader.points() {
             count += 1;
             let p = each.unwrap();
@@ -351,8 +354,10 @@ fn pass_3_las(
             }
             if g[gxy.0][gxy.1] == 0 {
                 for pt in gpts[gxy.0][gxy.1].iter() {
-                    io::stdout()
-                        .write_all(&format!("v {} {} {}\n", pt.x, pt.y, pt.z).as_bytes())?;
+                    io::stdout().write_all(
+                        &format!("v {0:.3$} {1:.3$} {2:.3$}\n", pt.x, pt.y, pt.z, impdigits)
+                            .as_bytes(),
+                    )?;
                 }
                 io::stdout().write_all(&format!("x {} {}\n", gxy.0, gxy.1).as_bytes())?;
                 gpts[gxy.0][gxy.1].clear();
