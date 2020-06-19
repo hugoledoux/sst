@@ -484,60 +484,87 @@ impl Triangulation {
         let mut gbbox: [f64; 4] = [0.0, 0.0, 0.0, 0.0];
         self.qt.get_cell_bbox_qtc(&qtc, &mut gbbox);
         for c in allfcells {
-            let mut finpts: HashSet<usize> = HashSet::new();
-            for theid in self.qt.gpts[c.0][c.1].iter() {
-                let re = self.adjacent_vertices_to_vertex(*theid).unwrap();
-                let mut fin: bool = true;
-                for v in re {
-                    // if self.qt.gpts[gx][gy].contains(&v) == false {
-                    let p = self.get_point(v);
-                    if p.is_none() {
-                        continue;
+            let allvinc = self.qt.gpts[c.0][c.1].clone();
+            for theid in allvinc {
+                let mut re = self.adjacent_vertices_to_vertex(theid).unwrap();
+                let mut repts: Vec<Option<Vec<f64>>> = Vec::with_capacity(re.len());
+
+                for each in &re {
+                    repts.push(self.get_point(*each));
+                }
+                //-- check if edge on CH
+                let mut onch = 0;
+                for (i, _p) in re.iter().enumerate() {
+                    if repts[i].is_some() && self.stars[&re[i]].link.contains_infinite_vertex() {
+                        onch += 1;
                     }
-                    // if p.is_none()
-                    if geom::point_in_box(&self.get_point(v).unwrap(), &gbbox) == false {
+                }
+                if onch >= 2 {
+                    continue;
+                }
+                let theidpt = self.get_point(theid).unwrap();
+                let mut fin: bool = true;
+                re.push(re[0]);
+                repts.push(repts[0].clone());
+                for i in 0..(re.len() - 1) {
+                    if repts[i].is_some() == true
+                        && repts[i + 1].is_some() == true
+                        && geom::circumcentre_encroach_bbox(
+                            &theidpt,
+                            &repts[i].as_ref().unwrap(),
+                            &repts[i + 1].as_ref().unwrap(),
+                            &gbbox,
+                        ) == true
+                    {
                         fin = false;
                         break;
                     }
                 }
                 if fin == true {
-                    // println!("=>{}", theid);
-                    //-- check every triangle for encroachment
-                    //-- TODO: should incident function only returns non-final triangle?
-                    let lts = self.incident_triangles_to_vertex(*theid).unwrap();
-                    for t in &lts {
-                        // println!("t {}", t);
-                        if self.is_vertex_convex_hull(t.v[1]) && self.is_vertex_convex_hull(t.v[2])
-                        {
-                            fin = false;
-                            break;
-                        }
-                        let a = self.get_point(t.v[0]);
-                        let b = self.get_point(t.v[1]);
-                        let c = self.get_point(t.v[2]);
-                        if a.is_none() == false
-                            && b.is_none() == false
-                            && c.is_none() == false
-                            && geom::circumcentre_encroach_bbox(
-                                &a.unwrap(),
-                                &b.unwrap(),
-                                &c.unwrap(),
-                                &gbbox,
-                            ) == true
-                        {
-                            fin = false;
-                            break;
-                        }
-                    }
+                    // write triangles
+                    // if self.stars[&theid].written == false {
+                    //     io::stdout().write_all(
+                    //         &format!("v {} {} {} {}\n", theid, theidpt[0], theidpt[1], theidpt[2])
+                    //             .as_bytes(),
+                    //     )?;
+                    //     self.stars.get_mut(&theid).unwrap().written = true;
+                    // }
+                    // for i in 0..(re.len() - 1) {
+                    //     if repts[i].is_some() == true && self.stars[&re[i]].written == false {
+                    //         io::stdout().write_all(
+                    //             &format!(
+                    //                 "v {} {} {} {}\n",
+                    //                 re[i],
+                    //                 repts[i].as_ref().unwrap()[0],
+                    //                 repts[i].as_ref().unwrap()[1],
+                    //                 repts[i].as_ref().unwrap()[2]
+                    //             )
+                    //             .as_bytes(),
+                    //         )?;
+                    //         self.stars.get_mut(&re[i]).unwrap().written = true;
+                    //     }
+                    // }
+                    // for i in 0..(re.len() - 1) {
+                    //     if repts[i].is_some() == true && self.stars[&re[i]].written == false {
+                    //         io::stdout().write_all(
+                    //             &format!(
+                    //                 "v {} {} {} {}\n",
+                    //                 re[i],
+                    //                 repts[i].as_ref().unwrap()[0],
+                    //                 repts[i].as_ref().unwrap()[1],
+                    //                 repts[i].as_ref().unwrap()[2]
+                    //             )
+                    //             .as_bytes(),
+                    //         )?;
+                    //         self.stars.get_mut(&re[i]).unwrap().written = true;
+                    //     }
+                    // }
+                    //-- finalise the vertex with its star/link
+                    io::stdout().write_all(&format!("x {} {:?}\n", theid, re).as_bytes())?;
+                    //-- flush it from QT and the DS
+                    self.qt.gpts[c.0][c.1].remove(&theid);
+                    self.flush_star(theid);
                 }
-                if fin == true {
-                    finpts.insert(*theid);
-                }
-            }
-            for each in finpts {
-                let re = self.write_stdout_star(each);
-                self.qt.gpts[c.0][c.1].remove(&each);
-                self.flush_star(each);
             }
         }
         Ok(())
