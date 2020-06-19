@@ -1149,24 +1149,38 @@ impl Triangulation {
         if re.is_some() {
             return re.unwrap();
         }
-        // warn!("'normal' walk() failed");
 
         //-- 2. try walk from one in the same cell
         // warn!("attempt to find one vertex in the grid cell and start from it");
         let g = self.qt.get_cell_gxgy(x[0], x[1]);
         if self.qt.gpts[g.0][g.1].len() > 0 {
-            cur = *self.qt.gpts[g.0][g.1].iter().next().unwrap();
-            let re = self.walk_safe(x, cur);
+            let mut dmin: f64 = std::f64::MAX;
+            let mut vmin: usize = 0;
+            for i in &self.qt.gpts[g.0][g.1] {
+                if *i != 0 {
+                    let d = geom::distance2d_squared(x, &self.stars.get(&i).unwrap().pt);
+                    if d < dmin {
+                        dmin = d;
+                        vmin = *i;
+                    }
+                }
+            }
+            // cur = *self.qt.gpts[g.0][g.1].iter().next().unwrap();
+            let re = self.walk_safe(x, vmin);
             if re.is_some() {
                 return re.unwrap();
             }
         }
 
-        //-- 3. try brute-force on triangles
-        // warn!("attempt to find one triangle brute-force");
-        let re2 = self.walk_bruteforce_triangles(x);
+        //-- 3. try brute-force
+        let re2 = self.walk_bruteforce_closest_vertex_then_walksafe(x);
         if re2.is_some() {
             return re2.unwrap();
+        }
+
+        let re3 = self.walk_bruteforce_triangles(x);
+        if re3.is_some() {
+            return re3.unwrap();
         }
 
         //-- 4. we are outside the CH of the current dataset
@@ -1325,7 +1339,7 @@ impl Triangulation {
                 }
             }
         }
-        info!("brute-force ON CONVEX HULL");
+        // info!("brute-force ON CONVEX HULL");
         let mut tr = Triangle { v: [0, 0, 0] };
         let l = &self.stars.get(&vmin).unwrap().link;
         let mut v2: usize = l.get_prev_vertex(0).unwrap();
@@ -1373,6 +1387,22 @@ impl Triangulation {
             }
         }
         return None;
+    }
+
+    fn walk_bruteforce_closest_vertex_then_walksafe(&self, x: &[f64]) -> Option<Triangle> {
+        //-- find closest vertex that is on the CH
+        let mut dmin: f64 = std::f64::MAX;
+        let mut vmin: usize = 0;
+        for i in self.stars.keys() {
+            if *i != 0 {
+                let d = geom::distance2d_squared(x, &self.stars.get(i).unwrap().pt);
+                if d < dmin {
+                    dmin = d;
+                    vmin = *i;
+                }
+            }
+        }
+        self.walk_safe(x, vmin)
     }
 
     fn walk_old(&self, x: &[f64]) -> Triangle {
@@ -1600,9 +1630,9 @@ impl Triangulation {
                 break;
             }
         }
-        if re == false {
-            println!("CONVEX NOT CONVEX");
-        }
+        // if re == false {
+        //     println!("CONVEX NOT CONVEX");
+        // }
         return re;
     }
 
