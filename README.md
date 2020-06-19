@@ -2,13 +2,16 @@
 
 streaming startin
 
+
+
 ```bash
-RUST_LOG=info ./target/debug/sstfin ./data/square400.txt 15 | RUST_LOG=info ./target/debug/sstdt | RUST_LOG=info ./target/debug/sstobj > ~/temp/o.obj
+export RUST_LOG=info
+./target/release/sstfin ../../data/ahn3/crop.laz 20 | ./target/release/sstdt | ./target/release/sstobj > ~/temp/hugo.obj
 ```
 
 
 ```bash
-time RUST_LOG=info ./target/release/sstfin ~/data/ahn3/crop.txt 20 | RUST_LOG=info ./target/release/sstdel > ~/temp/z.txt
+time RUST_LOG=info ./target/release/sstfin ~/data/ahn3/crop.txt 20 | RUST_LOG=info ./target/release/sstdt > ~/temp/z.txt
 ```
 
 ```bash

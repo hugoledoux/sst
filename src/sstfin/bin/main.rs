@@ -75,7 +75,12 @@ fn main() {
         inputformat = InputType::XYZ;
         paths.push(path.to_str().unwrap().to_string());
     } else if path.extension().unwrap() == "files" {
-        println!("input files");
+        let f = File::open(path).expect("Unable to open file");
+        let f = BufReader::new(f);
+        for l in f.lines() {
+            let l = l.expect("Unable to read line");
+            paths.push(l);
+        }
     } else {
         eprintln!("input format not accepted");
         std::process::exit(1);
@@ -88,6 +93,11 @@ fn main() {
 
     let cellsize: usize = matches.value_of("RESOLUTION").unwrap().parse().unwrap();
 
+    let mut sprinkle_param: f64 = 0.001;
+    if matches.occurrences_of("sprinkle") > 0 {
+        sprinkle_param = matches.value_of("sprinkle").unwrap().parse().unwrap();
+    }
+
     //-- pass #1
     let re = pass_1(&paths, &inputformat);
     let bbox = re.0;
@@ -99,7 +109,7 @@ fn main() {
     //-- sprinkler
     let mut rng = thread_rng();
     let mut sprinkled: HashMap<usize, Point> = HashMap::new();
-    let nc: usize = (totalpts as f64 * 0.001) as usize; //-- TODO: what is a good value?
+    let nc: usize = (totalpts as f64 * sprinkle_param) as usize; //-- TODO: what is a good value?
     for _i in 0..nc {
         sprinkled.insert(rng.gen_range(0, totalpts), Point::new());
     }
