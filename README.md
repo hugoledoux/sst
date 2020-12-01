@@ -1,6 +1,6 @@
 # sst
 
-__s__treaming __st__artin
+**s**treaming **st**artin
 
 
 ## To compile them all
@@ -14,7 +14,7 @@ cargo build --release
 
 ## Four different binaries
 
-### 1. __sstfin__
+### 1. **sstfin**
 
   - equivalent to spfinalise
   - finalises a set of points in LAZ or XYZ
@@ -22,25 +22,25 @@ cargo build --release
   - XYZ file is a CSV without header, space separated (see `/data/s400.xyz` for a simple example with 400 points)
   - reads the files on disk
 
-To see the format of the output stream ("spa" is __s__treaming __p__oint __a__scii; binary to follow at some point)
+To see the format of the output stream ("spa" is **s**treaming **p**oint **a**scii; binary to follow at some point)
 
 ```bash
 export RUST_LOG=info
 ./target/release/sstfin ./data/crop.laz 10 > ./data/crop_10.spa
 ```
 
-### 2. __sstdt__
+### 2. **sstdt**
 
   - equivalent to spdelaunay
   - takes as input (stdin) the .spa output of sstfin and creates a DT of the points
-  - outputs a .sma (__s__treaming __m__esh __a__scii)
+  - outputs a .sma (**s**treaming **m**esh **a**scii)
 
 ```bash
 export RUST_LOG=info
 ./target/release/sstfin ./data/crop.laz 10 |  ./target/release/sstdt > ./data/crop_10.sma
 ```
 
-### 3. __sstats__
+### 3. **sstats**
 
   - shows some basics statistics to help you find the optimal cell size
   - reads a LAZ or XYZ file
@@ -60,7 +60,7 @@ y-extent: 99.999
  512x512      1m            23         87  
 ```
 
-### 4. __sstobj__
+### 4. **sstobj**
 
   - takes as input (stdin) the .sma output of sstdt and creates an OBJ file    
 
