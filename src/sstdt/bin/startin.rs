@@ -522,43 +522,35 @@ impl Triangulation {
                 }
                 if fin == true {
                     // write triangles
-                    // if self.stars[&theid].written == false {
-                    //     io::stdout().write_all(
-                    //         &format!("v {} {} {} {}\n", theid, theidpt[0], theidpt[1], theidpt[2])
-                    //             .as_bytes(),
-                    //     )?;
-                    //     self.stars.get_mut(&theid).unwrap().written = true;
-                    // }
-                    // for i in 0..(re.len() - 1) {
-                    //     if repts[i].is_some() == true && self.stars[&re[i]].written == false {
-                    //         io::stdout().write_all(
-                    //             &format!(
-                    //                 "v {} {} {} {}\n",
-                    //                 re[i],
-                    //                 repts[i].as_ref().unwrap()[0],
-                    //                 repts[i].as_ref().unwrap()[1],
-                    //                 repts[i].as_ref().unwrap()[2]
-                    //             )
-                    //             .as_bytes(),
-                    //         )?;
-                    //         self.stars.get_mut(&re[i]).unwrap().written = true;
-                    //     }
-                    // }
-                    // for i in 0..(re.len() - 1) {
-                    //     if repts[i].is_some() == true && self.stars[&re[i]].written == false {
-                    //         io::stdout().write_all(
-                    //             &format!(
-                    //                 "v {} {} {} {}\n",
-                    //                 re[i],
-                    //                 repts[i].as_ref().unwrap()[0],
-                    //                 repts[i].as_ref().unwrap()[1],
-                    //                 repts[i].as_ref().unwrap()[2]
-                    //             )
-                    //             .as_bytes(),
-                    //         )?;
-                    //         self.stars.get_mut(&re[i]).unwrap().written = true;
-                    //     }
-                    // }
+                    if self.stars[&theid].written == false {
+                        io::stdout().write_all(
+                            &format!("v {} {} {} {}\n", theid, theidpt[0], theidpt[1], theidpt[2])
+                                .as_bytes(),
+                        )?;
+                        self.stars.get_mut(&theid).unwrap().written = true;
+                    }
+                    let mut adjs: Vec<usize> = Vec::new();
+                    for each in self.stars[&theid].link.iter() {
+                        adjs.push(*each);
+                    }
+                    for each in adjs {
+                        if (self.vertex_exists(each)) && (self.stars[&each].written == false) {
+                            let eachpt = self.get_point(each).unwrap();
+                            io::stdout().write_all(
+                                &format!("v {} {} {} {}\n", each, eachpt[0], eachpt[1], eachpt[2])
+                                    .as_bytes(),
+                            )?;
+                            self.stars.get_mut(&each).unwrap().written = true;
+                        }
+                    }
+                    //-- write the faces/triangles
+                    for (i, each) in self.stars[&theid].link.iter().enumerate() {
+                        let j = self.stars[&theid].link.next_index(i);
+                        io::stdout().write_all(
+                            &format!("f {} {} {}\n", theid, *each, self.stars[&theid].link[j])
+                                .as_bytes(),
+                        )?;
+                    }
                     //-- finalise the vertex with its star/link
                     io::stdout().write_all(&format!("x {} {:?}\n", theid, re).as_bytes())?;
                     //-- flush it from QT and the DS
