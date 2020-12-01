@@ -26,8 +26,7 @@ fn main() -> io::Result<()> {
         //----- reading from stdin -----//
 
         //----- reading from file -----//
-        // let fi =
-        //     File::open("/Users/hugo/projects/sst/data/square400.stream").expect("Unable to open file");
+        // let fi = File::open("/Users/hugo/projects/sst/data/s400_50.spa").expect("Unable to open file");
         // let f = BufReader::new(fi);
         // for l in f.lines() {
         //     let l = l.expect("Unable to read line");
