@@ -7,8 +7,10 @@ mod startin;
 #[macro_use]
 extern crate log; //info/debug/error
 
+use std::fs::File;
 use std::io;
 use std::io::BufRead;
+use std::io::BufReader;
 
 fn main() -> io::Result<()> {
     env_logger::init();
@@ -25,7 +27,7 @@ fn main() -> io::Result<()> {
 
         //----- reading from file -----//
         // let fi =
-        //     File::open("/Users/hugo/projects/sst/data/s400_15.stream").expect("Unable to open file");
+        //     File::open("/Users/hugo/projects/sst/data/square400.stream").expect("Unable to open file");
         // let f = BufReader::new(fi);
         // for l in f.lines() {
         //     let l = l.expect("Unable to read line");
