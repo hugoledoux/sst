@@ -32,6 +32,11 @@ export RUST_LOG=info
 Multiple LAZ files if you provide them in a `myfiles.files`, see the example in `./data/crop_1_2.files`.
 This reads `crop_1.laz` and then `crop_2.laz` (in that order); I split `crop.laz` to obtain those 2 files.
 
+```bash
+export RUST_LOG=info
+./target/release/sstfin ./data/crop_1_2.files 10 > /dev/null/
+```
+
 ### 2. **sstdt**
 
   - equivalent to spdelaunay
