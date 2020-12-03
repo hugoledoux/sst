@@ -8,9 +8,9 @@ mod startin;
 extern crate log; //info/debug/error
 
 use std::fs::File;
-use std::io;
 use std::io::BufRead;
 use std::io::BufReader;
+use std::io::{self, Write};
 
 fn main() -> io::Result<()> {
     env_logger::init();
@@ -69,8 +69,11 @@ fn main() -> io::Result<()> {
             }
             'b' => {
                 //-- bbox
-                let re = parse_2_f64(&l);
-                dt.set_bbox(re.0, re.1);
+                let re = parse_4_f64(&l);
+                dt.set_bbox(re.0, re.1, re.2, re.3);
+                io::stdout().write_all(
+                    &format!("b {:.3} {:.3} {:.3} {:.3}\n", re.0, re.1, re.2, re.3).as_bytes(),
+                )?;
                 // info!("Writing GeoJSON file to disk: /Users/hugo/temp/sstout/z.grid.geojson");
                 // let _re =
                 //     dt.write_geojson_grid("/Users/hugo/temp/sstout/z.grid.geojson".to_string());
@@ -139,4 +142,13 @@ fn parse_3_f64(l: &String) -> (f64, f64, f64) {
     let b: f64 = ls[2].parse::<f64>().unwrap();
     let c: f64 = ls[3].parse::<f64>().unwrap();
     (a, b, c)
+}
+
+fn parse_4_f64(l: &String) -> (f64, f64, f64, f64) {
+    let ls: Vec<&str> = l.split_whitespace().collect();
+    let a: f64 = ls[1].parse::<f64>().unwrap();
+    let b: f64 = ls[2].parse::<f64>().unwrap();
+    let c: f64 = ls[3].parse::<f64>().unwrap();
+    let d: f64 = ls[4].parse::<f64>().unwrap();
+    (a, b, c, d)
 }

@@ -204,6 +204,8 @@ struct Quadtree {
     pub gfinal: HashSet<Vec<u8>>, //-- the set of finalised qtc cells
     pub minx: f64,
     pub miny: f64,
+    pub maxx: f64,
+    pub maxy: f64,
     pub cellsize: usize,
     pub griddim: usize,
     depth: u32,
@@ -220,6 +222,8 @@ impl Quadtree {
             griddim: 0,
             minx: std::f64::MAX,
             miny: std::f64::MAX,
+            maxx: std::f64::MIN,
+            maxy: std::f64::MIN,
             depth: 0,
         }
     }
@@ -644,9 +648,11 @@ impl Triangulation {
         self.qt.cellsize = c;
     }
 
-    pub fn set_bbox(&mut self, mx: f64, my: f64) {
-        self.qt.minx = mx;
-        self.qt.miny = my;
+    pub fn set_bbox(&mut self, minx: f64, miny: f64, maxx: f64, maxy: f64) {
+        self.qt.minx = minx;
+        self.qt.miny = miny;
+        self.qt.maxx = maxx;
+        self.qt.maxy = maxy;
     }
 
     pub fn set_grid_dimensions(&mut self, s: usize) {

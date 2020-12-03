@@ -324,8 +324,13 @@ fn pass_3_las(
     //-- cellsize
     io::stdout().write_all(&format!("s {}\n", cellsize).as_bytes())?;
     //-- bbox
-    io::stdout().write_all(&format!("b {} {}\n", bbox[0], bbox[1]).as_bytes())?;
-    // io::stdout().write_all(&format!("b {:.3} {:.3}\n", bbox[0], bbox[1]).as_bytes())?;
+    io::stdout().write_all(
+        &format!(
+            "b {:.3} {:.3} {:.3} {:.3}\n",
+            bbox[0], bbox[1], bbox[2], bbox[3]
+        )
+        .as_bytes(),
+    )?;
 
     //-- cells that have no points
     for (i, _gx) in g.iter().enumerate() {
@@ -407,7 +412,13 @@ fn pass_3_xyz(
     //-- cellsize
     io::stdout().write_all(&format!("s {}\n", cellsize).as_bytes())?;
     //-- bbox
-    io::stdout().write_all(&format!("b {} {}\n", bbox[0], bbox[1]).as_bytes())?;
+    io::stdout().write_all(
+        &format!(
+            "b {:.3} {:.3} {:.3} {:.3}\n",
+            bbox[0], bbox[1], bbox[2], bbox[3]
+        )
+        .as_bytes(),
+    )?;
 
     //-- cells that have no points
     for (i, _gx) in g.iter().enumerate() {
