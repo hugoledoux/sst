@@ -2,6 +2,7 @@
 
 pub mod geom;
 
+use crate::Outputmode;
 use std::fmt;
 use std::fs::File;
 use std::io::Write;
@@ -444,6 +445,7 @@ pub struct Triangulation {
     is_init: bool,
     robust_predicates: bool,
     theid: usize, //-- to assign id to new vertices, since some are flushed
+    outputmode: Outputmode,
     pub max: usize,
 }
 
@@ -461,6 +463,7 @@ impl Triangulation {
             cur: 0,
             is_init: false,
             robust_predicates: true,
+            outputmode: Outputmode::Sma,
             max: 1,
         }
     }
@@ -525,38 +528,62 @@ impl Triangulation {
                     }
                 }
                 if fin == true {
-                    // write triangles
-                    if self.stars[&theid].written == false {
-                        io::stdout().write_all(
-                            &format!("v {} {} {} {}\n", theid, theidpt[0], theidpt[1], theidpt[2])
-                                .as_bytes(),
-                        )?;
-                        self.stars.get_mut(&theid).unwrap().written = true;
-                    }
-                    let mut adjs: Vec<usize> = Vec::new();
-                    for each in self.stars[&theid].link.iter() {
-                        adjs.push(*each);
-                    }
-                    for each in adjs {
-                        if (self.vertex_exists(each)) && (self.stars[&each].written == false) {
-                            let eachpt = self.get_point(each).unwrap();
-                            io::stdout().write_all(
-                                &format!("v {} {} {} {}\n", each, eachpt[0], eachpt[1], eachpt[2])
+                    match self.outputmode {
+                        // write triangles
+                        Outputmode::Sma => {
+                            if self.stars[&theid].written == false {
+                                io::stdout().write_all(
+                                    &format!(
+                                        "v {} {} {} {}\n",
+                                        theid, theidpt[0], theidpt[1], theidpt[2]
+                                    )
                                     .as_bytes(),
-                            )?;
-                            self.stars.get_mut(&each).unwrap().written = true;
+                                )?;
+                                self.stars.get_mut(&theid).unwrap().written = true;
+                            }
+                            let mut adjs: Vec<usize> = Vec::new();
+                            for each in self.stars[&theid].link.iter() {
+                                adjs.push(*each);
+                            }
+                            for each in adjs {
+                                if (self.vertex_exists(each))
+                                    && (self.stars[&each].written == false)
+                                {
+                                    let eachpt = self.get_point(each).unwrap();
+                                    io::stdout().write_all(
+                                        &format!(
+                                            "v {} {} {} {}\n",
+                                            each, eachpt[0], eachpt[1], eachpt[2]
+                                        )
+                                        .as_bytes(),
+                                    )?;
+                                    self.stars.get_mut(&each).unwrap().written = true;
+                                }
+                            }
+                            //-- write the faces/triangles
+                            for (i, each) in self.stars[&theid].link.iter().enumerate() {
+                                let j = self.stars[&theid].link.next_index(i);
+                                io::stdout().write_all(
+                                    &format!(
+                                        "f {} {} {}\n",
+                                        theid, *each, self.stars[&theid].link[j]
+                                    )
+                                    .as_bytes(),
+                                )?;
+                            }
+                            io::stdout()
+                                .write_all(&format!("x {} {:?}\n", theid, re).as_bytes())?;
+                        }
+
+                        //-- finalise the vertex with its star/link
+                        Outputmode::Stars => {
+                            io::stdout()
+                                .write_all(&format!("x {} {:?}\n", theid, re).as_bytes())?;
+                        }
+                        _ => {
+                            println!("Option not implemented");
                         }
                     }
-                    //-- write the faces/triangles
-                    for (i, each) in self.stars[&theid].link.iter().enumerate() {
-                        let j = self.stars[&theid].link.next_index(i);
-                        io::stdout().write_all(
-                            &format!("f {} {} {}\n", theid, *each, self.stars[&theid].link[j])
-                                .as_bytes(),
-                        )?;
-                    }
-                    //-- finalise the vertex with its star/link
-                    io::stdout().write_all(&format!("x {} {:?}\n", theid, re).as_bytes())?;
                     //-- flush it from QT and the DS
                     self.qt.gpts[c.0][c.1].remove(&theid);
                     self.flush_star(theid);
@@ -653,6 +680,10 @@ impl Triangulation {
         self.qt.miny = miny;
         self.qt.maxx = maxx;
         self.qt.maxy = maxy;
+    }
+
+    pub fn set_outputmode(&mut self, outmode: Outputmode) {
+        self.outputmode = outmode;
     }
 
     pub fn set_grid_dimensions(&mut self, s: usize) {

@@ -12,24 +12,43 @@ use std::io::BufRead;
 use std::io::BufReader;
 use std::io::{self, Write};
 
+use clap::App;
+
+pub enum Outputmode {
+    Sma,   //-- streaming mesh ascii
+    Smb,   //-- streaming mesh binary
+    Stars, //-- only stars wiht global index
+}
+
 fn main() -> io::Result<()> {
+    let matches = App::new("sstdt")
+        .version("0.2")
+        .about("streaming startin -- Delaunay triangulation")
+        .arg("--stars...       'output stars instead of .sma'")
+        .get_matches();
+
     env_logger::init();
+
     let mut _totalpts: usize = 0;
 
     info!("Init DT");
     let mut dt = startin::Triangulation::new();
 
-    //----- reading from stdin -----//
-    let stdin = std::io::stdin();
-    for line in stdin.lock().lines() {
-        let l = line.unwrap();
-        //----- reading from stdin -----//
+    if matches.occurrences_of("stars") > 0 {
+        dt.set_outputmode(Outputmode::Stars);
+    }
 
-        //----- reading from file -----//
-        // let fi = File::open("/Users/hugo/projects/sst/data/s400_50.spa").expect("Unable to open file");
-        // let f = BufReader::new(fi);
-        // for l in f.lines() {
-        //     let l = l.expect("Unable to read line");
+    //----- reading from stdin -----//
+    // let stdin = std::io::stdin();
+    // for line in stdin.lock().lines() {
+    //     let l = line.unwrap();
+    //----- reading from stdin -----//
+
+    //----- reading from file -----//
+    let fi = File::open("/Users/hugo/projects/sst/data/s400_50.spa").expect("Unable to open file");
+    let f = BufReader::new(fi);
+    for l in f.lines() {
+        let l = l.expect("Unable to read line");
         //----- reading from file -----//
 
         if l.is_empty() {
@@ -126,13 +145,6 @@ fn parse_2_usize(l: &String) -> (usize, usize) {
     let ls: Vec<&str> = l.split_whitespace().collect();
     let a: usize = ls[1].parse::<usize>().unwrap();
     let b: usize = ls[2].parse::<usize>().unwrap();
-    (a, b)
-}
-
-fn parse_2_f64(l: &String) -> (f64, f64) {
-    let ls: Vec<&str> = l.split_whitespace().collect();
-    let a: f64 = ls[1].parse::<f64>().unwrap();
-    let b: f64 = ls[2].parse::<f64>().unwrap();
     (a, b)
 }
 
