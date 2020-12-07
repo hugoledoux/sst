@@ -186,6 +186,7 @@ struct Star {
     pub pt: [f64; 3],
     pub link: Link,
     pub written: bool,
+    pub smaid: usize,
 }
 
 impl Star {
@@ -195,6 +196,7 @@ impl Star {
             pt: [x, y, z],
             link: l,
             written: false,
+            smaid: 0,
         }
     }
 }
@@ -446,6 +448,7 @@ pub struct Triangulation {
     robust_predicates: bool,
     theid: usize, //-- to assign id to new vertices, since some are flushed
     outputmode: Outputmode,
+    smacount: usize,
     pub max: usize,
 }
 
@@ -464,6 +467,7 @@ impl Triangulation {
             is_init: false,
             robust_predicates: true,
             outputmode: Outputmode::Sma,
+            smacount: 1,
             max: 1,
         }
     }
@@ -533,12 +537,11 @@ impl Triangulation {
                         Outputmode::Sma => {
                             if self.stars[&theid].written == false {
                                 io::stdout().write_all(
-                                    &format!(
-                                        "v {} {} {} {}\n",
-                                        theid, theidpt[0], theidpt[1], theidpt[2]
-                                    )
-                                    .as_bytes(),
+                                    &format!("v {} {} {}\n", theidpt[0], theidpt[1], theidpt[2])
+                                        .as_bytes(),
                                 )?;
+                                self.stars.get_mut(&theid).unwrap().smaid = self.smacount;
+                                self.smacount += 1;
                                 self.stars.get_mut(&theid).unwrap().written = true;
                             }
                             let mut adjs: Vec<usize> = Vec::new();
@@ -551,28 +554,32 @@ impl Triangulation {
                                 {
                                     let eachpt = self.get_point(each).unwrap();
                                     io::stdout().write_all(
-                                        &format!(
-                                            "v {} {} {} {}\n",
-                                            each, eachpt[0], eachpt[1], eachpt[2]
-                                        )
-                                        .as_bytes(),
+                                        &format!("v {} {} {}\n", eachpt[0], eachpt[1], eachpt[2])
+                                            .as_bytes(),
                                     )?;
+                                    self.stars.get_mut(&each).unwrap().smaid = self.smacount;
+                                    self.smacount += 1;
                                     self.stars.get_mut(&each).unwrap().written = true;
                                 }
                             }
                             //-- write the faces/triangles
                             for (i, each) in self.stars[&theid].link.iter().enumerate() {
                                 let j = self.stars[&theid].link.next_index(i);
-                                io::stdout().write_all(
-                                    &format!(
-                                        "f {} {} {}\n",
-                                        theid, *each, self.stars[&theid].link[j]
-                                    )
-                                    .as_bytes(),
-                                )?;
+                                let smaj = self.stars[&theid].link[j];
+                                if (self.vertex_exists(*each)) && (self.vertex_exists(smaj)) {
+                                    io::stdout().write_all(
+                                        &format!(
+                                            "f {} {} {}\n",
+                                            self.stars[&theid].smaid,
+                                            self.stars[each].smaid,
+                                            self.stars[&smaj].smaid
+                                        )
+                                        .as_bytes(),
+                                    )?;
+                                }
                             }
-                            io::stdout()
-                                .write_all(&format!("x {} {:?}\n", theid, re).as_bytes())?;
+                            // io::stdout()
+                            //     .write_all(&format!("x {} {:?}\n", theid, re).as_bytes())?;
                         }
 
                         //-- finalise the vertex with its star/link
@@ -606,35 +613,49 @@ impl Triangulation {
                 if self.stars[&v].written == false {
                     let p = self.get_point(v).unwrap();
                     io::stdout()
-                        .write_all(&format!("v {} {} {} {}\n", v, p[0], p[1], p[2]).as_bytes())?;
+                        .write_all(&format!("v {} {} {}\n", p[0], p[1], p[2]).as_bytes())?;
+                    self.stars.get_mut(&v).unwrap().smaid = self.smacount;
+                    self.smacount += 1;
                     self.stars.get_mut(&v).unwrap().written = true;
                 }
                 if self.stars[&tr.v[1]].written == false {
                     let tmpp = self.get_point(tr.v[1]).unwrap();
                     io::stdout().write_all(
-                        &format!("v {} {} {} {}\n", tr.v[1], tmpp[0], tmpp[1], tmpp[2]).as_bytes(),
+                        &format!("v {} {} {}\n", tmpp[0], tmpp[1], tmpp[2]).as_bytes(),
                     )?;
+                    self.stars.get_mut(&tr.v[1]).unwrap().smaid = self.smacount;
+                    self.smacount += 1;
                     self.stars.get_mut(&tr.v[1]).unwrap().written = true;
                 }
                 if self.stars[&tr.v[2]].written == false {
                     let tmpp = self.get_point(tr.v[2]).unwrap();
                     io::stdout().write_all(
-                        &format!("v {} {} {} {}\n", tr.v[2], tmpp[0], tmpp[1], tmpp[2]).as_bytes(),
+                        &format!("v {} {} {}\n", tmpp[0], tmpp[1], tmpp[2]).as_bytes(),
                     )?;
+                    self.stars.get_mut(&tr.v[2]).unwrap().smaid = self.smacount;
+                    self.smacount += 1;
                     self.stars.get_mut(&tr.v[2]).unwrap().written = true;
                 }
-                io::stdout().write_all(&format!("f {} {} {}\n", v, tr.v[1], tr.v[2]).as_bytes())?;
+                io::stdout().write_all(
+                    &format!(
+                        "f {} {} {}\n",
+                        self.stars[&v].smaid,
+                        self.stars[&tr.v[1]].smaid,
+                        self.stars[&tr.v[2]].smaid
+                    )
+                    .as_bytes(),
+                )?;
             }
         }
-        //-- write point (finalised!) with its star
-        io::stdout().write_all(
-            &format!(
-                "x {} {:?}\n",
-                v,
-                self.adjacent_vertices_to_vertex(v).unwrap()
-            )
-            .as_bytes(),
-        )?;
+        // //-- write point (finalised!) with its star
+        // io::stdout().write_all(
+        //     &format!(
+        //         "x {} {:?}\n",
+        //         v,
+        //         self.adjacent_vertices_to_vertex(v).unwrap()
+        //     )
+        //     .as_bytes(),
+        // )?;
         Ok(())
     }
 
