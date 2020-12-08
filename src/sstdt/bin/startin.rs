@@ -533,6 +533,7 @@ impl Triangulation {
                         break;
                     }
                 }
+                re.pop();
                 if fin == true {
                     match self.outputmode {
                         // write triangles
