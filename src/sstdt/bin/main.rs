@@ -39,16 +39,16 @@ fn main() -> io::Result<()> {
     }
 
     //----- reading from stdin -----//
-    // let stdin = std::io::stdin();
-    // for line in stdin.lock().lines() {
-    //     let l = line.unwrap();
-    //----- reading from stdin -----//
+    let stdin = std::io::stdin();
+    for line in stdin.lock().lines() {
+        let l = line.unwrap();
+        //----- reading from stdin -----//
 
-    //----- reading from file -----//
-    let fi = File::open("/Users/hugo/projects/sst/data/s400_50.spa").expect("Unable to open file");
-    let f = BufReader::new(fi);
-    for l in f.lines() {
-        let l = l.expect("Unable to read line");
+        //----- reading from file -----//
+        // let fi = File::open("/Users/hugo/projects/sst/data/s400_50.spa").expect("Unable to open file");
+        // let f = BufReader::new(fi);
+        // for l in f.lines() {
+        //     let l = l.expect("Unable to read line");
         //----- reading from file -----//
 
         if l.is_empty() {
@@ -108,13 +108,11 @@ fn main() -> io::Result<()> {
                 //-- finalise a cell
                 // println!("=>{}", l);
                 let re = parse_2_usize(&l);
-                // if (re.0 == 11) && (re.1 == 2) {
-                //     println!("yo");
+                // if (re.0 == 1) && (re.1 == 0) {
+                //     let fout = format!("/Users/hugo/temp/sstout/c-{}-{}.geojson", re.0, re.1);
+                //     let _re = dt.write_geojson_triangles(fout.to_string());
                 // }
-
                 let _re = dt.finalise_cell(re.0, re.1);
-                // let fout = format!("/Users/hugo/temp/sstout/c-{}-{}.geojson", re.0, re.1);
-                // let _re = dt.write_geojson_triangles(fout.to_string());
             }
             _ => {
                 error!("Wrongly formatted stream. Abort.");
@@ -128,8 +126,8 @@ fn main() -> io::Result<()> {
     // println!("{}", dt.printme(false));
     // std::process::exit(1);
 
-    // info!("Writing GeoJSON file to disk: /Users/hugo/temp/z.grid.geojson");
-    // let _re = dt.write_geojson_grid("/Users/hugo/temp/z.grid.geojson".to_string());
+    // info!("Writing GeoJSON file to disk: /Users/hugo/temp/sstout/z.grid.geojson");
+    // let _re = dt.write_geojson_grid("/Users/hugo/temp/sstout/z.grid.geojson".to_string());
 
     // info!("Writing GeoJSON file to disk before flusing leftover triangles: /Users/hugo/temp/sstout/z_blo.geojson");
     // let _re = dt.write_geojson_triangles("/Users/hugo/temp/sstout/z_blo.geojson".to_string());
