@@ -617,17 +617,36 @@ impl Triangulation {
         }
         info!("Writing the {} vertices left in the DT", total);
         info!("DT # points: {}", self.number_of_vertices());
+
         //-- write the leftovers
         for i in 0..self.qt.griddim {
             for j in 0..self.qt.griddim {
                 let vs = self.qt.gpts[i][j].clone();
                 for v in vs {
-                    let _re = self.write_sma_one_vertex(v);
-                    //-- flush it from QT and the DS
-                    self.flush_star(v);
+                    match self.outputmode {
+                        // write triangles
+                        Outputmode::Sma => {
+                            let _re = self.write_sma_one_vertex(v);
+                            //-- flush it from QT and the DS
+                            self.flush_star(v);
+                        }
+
+                        Outputmode::Stars => {
+                            let mut re = self.adjacent_vertices_to_vertex(v).unwrap();
+                            io::stdout().write_all(&format!("x {} {:?}\n", v, re).as_bytes())?;
+                            //-- flush it from QT and the DS
+                            // self.qt.gpts[c.0][c.1].remove(&v);
+                            self.flush_star(v);
+                        }
+
+                        _ => {
+                            println!("_ output");
+                        }
+                    }
                 }
             }
         }
+
         Ok(())
     }
 
