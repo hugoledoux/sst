@@ -68,12 +68,3 @@ y-extent: 99.999
  512x512      1m            23         87  
 ```
 
-### 4. **sstobj**
-
-  - takes as input (stdin) the .sma output of sstdt and creates an OBJ file    
-
-```bash
-export RUST_LOG=info
-./target/release/sstfin ./data/crop.laz 10 |  ./target/release/sstdt | ./target/release/sstobj > ~/temp/crop.obj
-```
-

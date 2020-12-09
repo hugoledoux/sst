@@ -30,6 +30,3 @@ path = "src/sstfin/bin/main.rs"
 name = "sstdt"
 path = "src/sstdt/bin/main.rs"
 
-[[bin]]
-name = "sstobj"
-path = "src/sstobj/bin/main.rs"
