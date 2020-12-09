@@ -12,11 +12,11 @@ cargo build --release
 `--release` makes the whole pipeline a whoooole lot faster, but you can't debug
 
 
-## Four different binaries
+## Three different binaries
 
 ### 1. **sstfin**
 
-  - equivalent to spfinalise
+  - conceptually equivalent to Isenburg's *spfinalise*
   - finalises a set of points in LAZ or XYZ
   - can read several LAZ files at the same time
   - XYZ file is a CSV without header, space separated (see `/data/s400.xyz` for a simple example with 400 points)
@@ -37,15 +37,59 @@ export RUST_LOG=info
 ./target/release/sstfin ./data/crop_1_2.files 10 > /dev/null/
 ```
 
+__.spa file__
+
+```
+# sstfin
+n 212550
+c 16
+s 10
+b 84600.000 447000.000 84699.998 447099.999
+x 0 10
+x 0 11
+v 84601.790 447091.302 6.554
+v 84660.438 447055.597 0.796
+v 84637.450 447010.511 8.879
+v 84662.152 447009.066 3.018
+v 84669.030 447052.681 0.930
+v 84603.720 447072.709 0.105
+...
+x 2 3
+...
+```
+
 ### 2. **sstdt**
 
-  - equivalent to spdelaunay
+  - conceptually equivalent to Isenburg's *spdelaunay*
   - takes as input (stdin) the .spa output of sstfin and creates a DT of the points
-  - outputs a .sma (**s**treaming **m**esh **a**scii)
+  - outputs a variation of an .obj file where a few vertex finalisers are added. It's simpler than Isenburg's .sma (**s**treaming **m**esh **a**scii) and can be opened as an .obj file by different software (MeshLab just ignores the extra lines, so you can open the file with it)
 
 ```bash
 export RUST_LOG=info
 ./target/release/sstfin ./data/crop.laz 10 |  ./target/release/sstdt > ./data/crop_10.sma
+```
+
+__output file__
+
+```
+# sstdt
+b 84600.000 447000.000 84699.998 447099.999
+v 84693.637 447002.81 1.426
+v 84693.613 447003.032 1.442
+v 84693.468 447002.902 1.451
+v 84693.564 447002.678 1.415
+f 1 2 3
+f 1 3 4
+x 1
+v 84692.714 447003.735 1.768
+v 84692.743 447003.653 1.756
+...
+f 7 8 9
+f 7 11 12
+f 7 12 13
+f 7 13 8
+x 7
+...
 ```
 
 ### 3. **sstats**
