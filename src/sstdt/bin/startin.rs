@@ -538,7 +538,7 @@ impl Triangulation {
                     match self.outputmode {
                         // write triangles
                         Outputmode::Sma => {
-                            let _re = self.write_sma_one_vertex(theid);
+                            self.write_sma_one_vertex(theid, true).expect("Failed to write vertex");
                             //-- flush it from QT and the DS
                             self.qt.gpts[c.0][c.1].remove(&theid);
                             self.flush_star(theid);
@@ -546,8 +546,15 @@ impl Triangulation {
 
                         //-- finalise the vertex with its star/link
                         Outputmode::Stars => {
-                            io::stdout()
-                                .write_all(&format!("x {} {:?}\n", theid, re).as_bytes())?;
+                            io::stdout().write_all(&format!("x {} {:?}\n", theid, re).as_bytes())?;
+                            //-- flush it from QT and the DS
+                            self.qt.gpts[c.0][c.1].remove(&theid);
+                            self.flush_star(theid);
+                        }
+
+                        //-- finalise the vertex, output both vertex info and star data
+                        Outputmode::Both => {
+                            self.write_sma_one_vertex(theid, false).expect("Failed to write vertex");
                             //-- flush it from QT and the DS
                             self.qt.gpts[c.0][c.1].remove(&theid);
                             self.flush_star(theid);
@@ -563,7 +570,7 @@ impl Triangulation {
         Ok(())
     }
 
-    fn write_sma_one_vertex(&mut self, v: usize) -> io::Result<()> {
+    fn write_sma_one_vertex(&mut self, v: usize, write_faces: bool) -> io::Result<()> {
         let vpt = self.get_point(v).unwrap();
         if self.stars[&v].written == false {
             io::stdout().write_all(&format!("v {} {} {}\n", vpt[0], vpt[1], vpt[2]).as_bytes())?;
@@ -587,24 +594,40 @@ impl Triangulation {
             }
         }
         //-- write the faces/triangles
-        for (i, each) in self.stars[&v].link.iter().enumerate() {
-            let j = self.stars[&v].link.next_index(i);
-            let smaj = self.stars[&v].link[j];
-            if (*each != 0) //-- do not write out infinite triangles
-                && (smaj != 0)
-                && (self.vertex_exists(*each))
-                && (self.vertex_exists(smaj))
-            {
-                io::stdout().write_all(
-                    &format!(
-                        "f {} {} {}\n",
-                        self.stars[&v].smaid, self.stars[each].smaid, self.stars[&smaj].smaid
-                    )
-                    .as_bytes(),
-                )?;
+        if write_faces {
+            for (i, each) in self.stars[&v].link.iter().enumerate() {
+                let j = self.stars[&v].link.next_index(i);
+                let smaj = self.stars[&v].link[j];
+                if (*each != 0) //-- do not write out infinite triangles
+                    && (smaj != 0)
+                    && (self.vertex_exists(*each))
+                    && (self.vertex_exists(smaj))
+                {
+                    io::stdout().write_all(
+                        &format!(
+                            "f {} {} {}\n",
+                            self.stars[&v].smaid, self.stars[each].smaid, self.stars[&smaj].smaid
+                        ).as_bytes(),
+                    )?;
+                }
             }
+            io::stdout().write_all(&format!("x {}\n", self.stars[&v].smaid).as_bytes())?;
         }
-        io::stdout().write_all(&format!("x {}\n", self.stars[&v].smaid).as_bytes())?;
+        else {
+            let mut neighbors = Vec::new();
+
+            // info!("{} - {}", v, self.stars[&v].link);
+
+            for i in 0..self.stars[&v].link.len() {
+                let vertex = self.stars[&v].link[i];
+                if self.vertex_exists(vertex) {
+                    let vertex_id = self.stars[&vertex].smaid;
+                    neighbors.push(vertex_id);
+                }
+            }
+
+            io::stdout().write_all(&format!("x {} {:?}\n", self.stars[&v].smaid, neighbors).as_bytes())?;
+        }
         Ok(())
     }
 
@@ -626,16 +649,22 @@ impl Triangulation {
                     match self.outputmode {
                         // write triangles
                         Outputmode::Sma => {
-                            let _re = self.write_sma_one_vertex(v);
+                            self.write_sma_one_vertex(v, true).expect("Failed to write vertex");
                             //-- flush it from QT and the DS
                             self.flush_star(v);
                         }
 
                         Outputmode::Stars => {
-                            let mut re = self.adjacent_vertices_to_vertex(v).unwrap();
+                            let re = self.adjacent_vertices_to_vertex(v).unwrap();
                             io::stdout().write_all(&format!("x {} {:?}\n", v, re).as_bytes())?;
                             //-- flush it from QT and the DS
-                            // self.qt.gpts[c.0][c.1].remove(&v);
+                            self.flush_star(v);
+                        }
+
+                        //-- finalise the vertex, output both vertex info and star data
+                        Outputmode::Both => {
+                            self.write_sma_one_vertex(v, false).expect("Failed to write vertex");
+                            //-- flush it from QT and the DS
                             self.flush_star(v);
                         }
 
