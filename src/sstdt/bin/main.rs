@@ -7,9 +7,7 @@ mod startin;
 #[macro_use]
 extern crate log; //info/debug/error
 
-use std::fs::File;
 use std::io::BufRead;
-use std::io::BufReader;
 use std::io::{self, Write};
 
 use clap::App;
@@ -17,7 +15,8 @@ use clap::App;
 pub enum Outputmode {
     Sma,   //-- streaming mesh ascii
     Smb,   //-- streaming mesh binary
-    Stars, //-- only stars wiht global index
+    Stars, //-- only stars with global index
+    Both,  //-- vertices & stars
 }
 
 fn main() -> io::Result<()> {
@@ -25,6 +24,7 @@ fn main() -> io::Result<()> {
         .version("0.2")
         .about("streaming startin -- Delaunay triangulation")
         .arg("--stars...       'output stars instead of .sma'")
+        .arg("--both...        'output both vertices and stars'")
         .get_matches();
 
     env_logger::init();
@@ -38,18 +38,22 @@ fn main() -> io::Result<()> {
         dt.set_outputmode(Outputmode::Stars);
     }
 
+    if matches.occurrences_of("both") > 0 {
+        dt.set_outputmode(Outputmode::Both);
+    }
+
     //----- reading from stdin -----//
     let stdin = std::io::stdin();
     for line in stdin.lock().lines() {
         let l = line.unwrap();
-        //----- reading from stdin -----//
+    //----- reading from stdin -----//
 
-        //----- reading from file -----//
-        // let fi = File::open("/Users/hugo/projects/sst/data/s400_50.spa").expect("Unable to open file");
-        // let f = BufReader::new(fi);
-        // for l in f.lines() {
-        //     let l = l.expect("Unable to read line");
-        //----- reading from file -----//
+    //----- reading from file -----//
+    // let fi = File::open("/Users/hugo/projects/sst/data/s400_50.spa").expect("Unable to open file");
+    // let f = BufReader::new(fi);
+    // for l in f.lines() {
+    //     let l = l.expect("Unable to read line");
+    //----- reading from file -----//
 
         if l.is_empty() {
             continue;
@@ -122,15 +126,6 @@ fn main() -> io::Result<()> {
     }
     info!("Finished reading the stream");
     info!("dt.number_of_vertices() = {}", dt.number_of_vertices());
-
-    // println!("{}", dt.printme(false));
-    // std::process::exit(1);
-
-    // info!("Writing GeoJSON file to disk: /Users/hugo/temp/sstout/z.grid.geojson");
-    // let _re = dt.write_geojson_grid("/Users/hugo/temp/sstout/z.grid.geojson".to_string());
-
-    // info!("Writing GeoJSON file to disk before flusing leftover triangles: /Users/hugo/temp/sstout/z_blo.geojson");
-    // let _re = dt.write_geojson_triangles("/Users/hugo/temp/sstout/z_blo.geojson".to_string());
 
     info!("max # points in DT during process: {}", dt.max);
     let _x = dt.finalise_leftover_triangles();

@@ -13,7 +13,6 @@ extern crate las;
 
 use las::Read;
 
-#[macro_use]
 extern crate log; //info/debug/error
 
 #[derive(Clone)]
@@ -73,9 +72,9 @@ fn input_las(path: &Path) {
     println!("y-extent: {:>5.3}", bbox[3] - bbox[1]);
     //-- make it a square to have a quadtree
     let size = if (bbox[3] - bbox[1]) > (bbox[2] - bbox[0]) {
-        (bbox[3] - bbox[1])
+        bbox[3] - bbox[1]
     } else {
-        (bbox[2] - bbox[0])
+        bbox[2] - bbox[0]
     };
     println!("| cells | resolution | avg/cell | max/cell |");
     let re = stats_per_cell_las(&path, &bbox, size);
@@ -95,9 +94,9 @@ fn input_csv(path: &Path) {
     println!("y-extent: {:>5.3}", bbox[3] - bbox[1]);
     //-- make it a square to have a quadtree
     let size = if (bbox[3] - bbox[1]) > (bbox[2] - bbox[0]) {
-        (bbox[3] - bbox[1])
+        bbox[3] - bbox[1]
     } else {
-        (bbox[2] - bbox[0])
+        bbox[2] - bbox[0]
     };
     println!("| cells | resolution | avg/cell | max/cell |");
     let re = stats_per_cell_csv(&f, &bbox, size);
