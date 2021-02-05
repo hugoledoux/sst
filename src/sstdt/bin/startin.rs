@@ -185,7 +185,6 @@ impl fmt::Display for Link {
 struct Star {
     pub pt: [f64; 3],
     pub link: Link,
-    pub neighbors: Vec<usize>,
     pub written: bool,
     pub smaid: usize,
 }
@@ -198,7 +197,6 @@ impl Star {
             link: l,
             written: false,
             smaid: 0,
-            neighbors: Vec::new(),
         }
     }
 }
