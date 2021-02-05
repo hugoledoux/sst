@@ -1,6 +1,6 @@
 [package]
 name = "sst"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Hugo Ledoux <h.ledoux@tudelft.nl>"]
 edition = "2018"
 
