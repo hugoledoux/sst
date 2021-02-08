@@ -330,7 +330,7 @@ fn pass_3_las(
             "b {:.3} {:.3} {:.3} {:.3}\n",
             bbox[0], bbox[1], bbox[2], bbox[3]
         )
-            .as_bytes(),
+        .as_bytes(),
     )?;
 
     //-- cells that have no points
@@ -418,7 +418,7 @@ fn pass_3_xyz(
             "b {:.3} {:.3} {:.3} {:.3}\n",
             bbox[0], bbox[1], bbox[2], bbox[3]
         )
-            .as_bytes(),
+        .as_bytes(),
     )?;
 
     //-- cells that have no points
