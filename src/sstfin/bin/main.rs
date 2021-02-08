@@ -14,6 +14,7 @@ use clap::App;
 use num_format::{Locale, ToFormattedString};
 
 extern crate las;
+
 use las::Read;
 
 #[macro_use]
@@ -121,7 +122,7 @@ fn main() {
     info!("Second pass ✅");
 
     // //-- pass #3
-    info!("Thirst pass ➡️");
+    info!("Third pass ➡️");
     let _re = pass_3(&paths, &bbox, cellsize, &mut g, &sprinkled, &inputformat);
     info!("Third pass ✅");
 }

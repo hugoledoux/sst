@@ -449,6 +449,7 @@ pub struct Triangulation {
     theid: usize, //-- to assign id to new vertices, since some are flushed
     outputmode: Outputmode,
     smacount: usize,
+    smaid_mapping: HashMap<usize, usize>,
     pub max: usize,
 }
 
@@ -470,6 +471,7 @@ impl Triangulation {
             robust_predicates: true,
             outputmode: Outputmode::Sma,
             smacount: 1,
+            smaid_mapping: HashMap::new(),
             max: 1,
         }
     }
@@ -538,7 +540,8 @@ impl Triangulation {
                     match self.outputmode {
                         // write triangles
                         Outputmode::Sma => {
-                            let _re = self.write_sma_one_vertex(theid);
+                            self.write_sma_one_vertex(theid)
+                                .expect("Failed to write vertex");
                             //-- flush it from QT and the DS
                             self.qt.gpts[c.0][c.1].remove(&theid);
                             self.flush_star(theid);
@@ -553,6 +556,15 @@ impl Triangulation {
                             self.flush_star(theid);
                         }
 
+                        //-- finalise the vertex, output both vertex info and star data
+                        Outputmode::Both => {
+                            self.write_stars_one_vertex(theid)
+                                .expect("Failed to write vertex");
+                            //-- flush it from QT and the DS
+                            self.qt.gpts[c.0][c.1].remove(&theid);
+                            self.flush_star(theid);
+                        }
+
                         _ => {
                             println!("Option not implemented");
                         }
@@ -560,6 +572,50 @@ impl Triangulation {
                 }
             }
         }
+        Ok(())
+    }
+
+    fn write_stars_one_vertex(&mut self, v: usize) -> io::Result<()> {
+        // Write the own vertex if it has not been written yet
+        if !self.stars[&v].written {
+            let vpt = self.get_point(v).unwrap();
+
+            io::stdout().write_all(&format!("v {} {} {}\n", vpt[0], vpt[1], vpt[2]).as_bytes())?;
+
+            self.smaid_mapping.insert(v, self.smacount);
+
+            self.smacount += 1;
+            self.stars.get_mut(&v).unwrap().written = true;
+        }
+
+        let mut neighbors = Vec::new();
+
+        for neighbor_id in 0..self.stars[&v].link.len() {
+            let vertex_id = self.stars[&v].link[neighbor_id];
+
+            if self.vertex_exists(vertex_id) && !self.stars[&vertex_id].written {
+                let point = self.stars[&vertex_id].pt.to_vec();
+
+                io::stdout()
+                    .write_all(&format!("v {} {} {}\n", point[0], point[1], point[2]).as_bytes())?;
+
+                self.smaid_mapping.insert(vertex_id, self.smacount);
+
+                self.smacount += 1;
+                self.stars.get_mut(&vertex_id).unwrap().written = true;
+            }
+
+            if self.smaid_mapping.contains_key(&vertex_id) {
+                neighbors.push(self.smaid_mapping[&vertex_id]);
+            } else if vertex_id == 0 {
+                // Always write infinite vertex
+                neighbors.push(vertex_id);
+            }
+        }
+
+        io::stdout()
+            .write_all(&format!("x {} {:?}\n", self.smaid_mapping[&v], neighbors).as_bytes())?;
+
         Ok(())
     }
 
@@ -626,16 +682,24 @@ impl Triangulation {
                     match self.outputmode {
                         // write triangles
                         Outputmode::Sma => {
-                            let _re = self.write_sma_one_vertex(v);
+                            self.write_sma_one_vertex(v)
+                                .expect("Failed to write vertex");
                             //-- flush it from QT and the DS
                             self.flush_star(v);
                         }
 
                         Outputmode::Stars => {
-                            let mut re = self.adjacent_vertices_to_vertex(v).unwrap();
+                            let re = self.adjacent_vertices_to_vertex(v).unwrap();
                             io::stdout().write_all(&format!("x {} {:?}\n", v, re).as_bytes())?;
                             //-- flush it from QT and the DS
-                            // self.qt.gpts[c.0][c.1].remove(&v);
+                            self.flush_star(v);
+                        }
+
+                        //-- finalise the vertex, output both vertex info and star data
+                        Outputmode::Both => {
+                            self.write_stars_one_vertex(v)
+                                .expect("Failed to write vertex");
+                            //-- flush it from QT and the DS
                             self.flush_star(v);
                         }
 
@@ -1162,7 +1226,7 @@ impl Triangulation {
 
     fn walk(&self, x: &[f64]) -> Triangle {
         //-- find a starting tr
-        let mut cur = self.cur;
+        let cur = self.cur;
 
         //-- 1. try walk from latest
         let re = self.walk_safe(x, cur);
