@@ -10,11 +10,12 @@ use std::io::{self, Write};
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
-use clap::App;
+use clap::{App, Arg};
 use num_format::{Locale, ToFormattedString};
 
 extern crate las;
 
+use las::point::Classification;
 use las::Read;
 
 #[macro_use]
@@ -53,10 +54,30 @@ fn main() {
     let matches = App::new("sstfin")
         .version("0.1")
         .about("streaming startin -- finalisation")
-        .arg("<INPUT>             'The input LAS/LAZ/XYZ file(s) to use.'")
-        .arg("<RESOLUTION>        'The cell resolution (integer, eg '5' for 5mX5m)'")
-        .arg("-g...               'Use only ground in LAS files'")
-        .arg("--sprinkle...       'Value to use (0.001 is default; totalpts * 0.001)'")
+        .arg(
+            Arg::with_name("INPUT")
+                .about("The input LAS/LAZ/XYZ file(s) to use.")
+                .required(true)
+                .index(1),
+        )
+        .arg(
+            Arg::with_name("RESOLUTION")
+                .about("The cell resolution (integer, eg '5' for 5mX5m)")
+                .required(true)
+                .index(2),
+        )
+        .arg(
+            Arg::with_name("g")
+                .about("Use only ground in LAS files")
+                .short('g')
+                .required(false),
+        )
+        .arg(
+            Arg::with_name("sprinkle")
+                .short('s')
+                .about("Value to use (0.001 is default; totalpts * 0.001)")
+                .required(false),
+        )
         .get_matches();
 
     env_logger::init();
@@ -94,8 +115,18 @@ fn main() {
 
     let cellsize: usize = matches.value_of("RESOLUTION").unwrap().parse().unwrap();
 
+    let no_vegetation: bool;
+    match matches.occurrences_of("g") {
+        0 => no_vegetation = false,
+        1 | _ => no_vegetation = true,
+    }
+
+    if no_vegetation {
+        info!("Excluding points not classified as Ground, Building, or Water");
+    }
+
     let mut sprinkle_param: f64 = 0.001;
-    if matches.occurrences_of("sprinkle") > 0 {
+    if matches.occurrences_of("s") > 0 {
         sprinkle_param = matches.value_of("sprinkle").unwrap().parse().unwrap();
     }
 
@@ -118,12 +149,27 @@ fn main() {
 
     //-- pass #2
     info!("Second pass ➡️");
-    let mut g: Vec<Vec<usize>> = pass_2(&paths, &bbox, cellsize, &mut sprinkled, &inputformat);
+    let mut g: Vec<Vec<usize>> = pass_2(
+        &paths,
+        &bbox,
+        cellsize,
+        &mut sprinkled,
+        &inputformat,
+        no_vegetation,
+    );
     info!("Second pass ✅");
 
     // //-- pass #3
     info!("Third pass ➡️");
-    let _re = pass_3(&paths, &bbox, cellsize, &mut g, &sprinkled, &inputformat);
+    let _re = pass_3(
+        &paths,
+        &bbox,
+        cellsize,
+        &mut g,
+        &sprinkled,
+        &inputformat,
+        no_vegetation,
+    );
     info!("Third pass ✅");
 }
 
@@ -191,9 +237,10 @@ fn pass_2(
     cellsize: usize,
     mut sprinkled: &mut HashMap<usize, Point>,
     it: &InputType,
+    no_vegetation: bool,
 ) -> Vec<Vec<usize>> {
     if *it == InputType::LAS {
-        pass_2_las(&paths, &bbox, cellsize, &mut sprinkled)
+        pass_2_las(&paths, &bbox, cellsize, &mut sprinkled, no_vegetation)
     } else {
         pass_2_xyz(&paths, &bbox, cellsize, &mut sprinkled)
     }
@@ -204,6 +251,7 @@ fn pass_2_las(
     bbox: &Vec<f64>,
     cellsize: usize,
     sprinkled: &mut HashMap<usize, Point>,
+    no_vegetation: bool,
 ) -> Vec<Vec<usize>> {
     let width = (bbox[2] - bbox[0]) / cellsize as f64;
     let height = (bbox[3] - bbox[1]) / cellsize as f64;
@@ -225,18 +273,25 @@ fn pass_2_las(
         let mut reader = las::Reader::from_path(path).expect("Unable to open reader");
         for each in reader.points() {
             let p = each.unwrap();
-            let gxy: (usize, usize) = get_gx_gy(p.x, p.y, bbox[0], bbox[1], cellsize);
-            g[gxy.0][gxy.1] += 1;
-            //-- chunking
-            if sprinkled.contains_key(&count) == true {
-                let pc = sprinkled.entry(count).or_insert(Point::new());
-                *pc = Point {
-                    x: p.x,
-                    y: p.y,
-                    z: p.z,
-                };
+            if no_vegetation
+                && (p.classification == Classification::Building
+                    || p.classification == Classification::Ground
+                    || p.classification == Classification::Water)
+                || !no_vegetation
+            {
+                let gxy: (usize, usize) = get_gx_gy(p.x, p.y, bbox[0], bbox[1], cellsize);
+                g[gxy.0][gxy.1] += 1;
+                //-- chunking
+                if sprinkled.contains_key(&count) == true {
+                    let pc = sprinkled.entry(count).or_insert(Point::new());
+                    *pc = Point {
+                        x: p.x,
+                        y: p.y,
+                        z: p.z,
+                    };
+                }
+                count += 1;
             }
-            count += 1;
         }
     }
     g
@@ -293,9 +348,10 @@ fn pass_3(
     mut g: &mut Vec<Vec<usize>>,
     sprinkled: &HashMap<usize, Point>,
     it: &InputType,
+    no_vegetation: bool,
 ) -> io::Result<()> {
     if *it == InputType::LAS {
-        pass_3_las(&paths, &bbox, cellsize, &mut g, &sprinkled)
+        pass_3_las(&paths, &bbox, cellsize, &mut g, &sprinkled, no_vegetation)
     } else {
         pass_3_xyz(&paths, &bbox, cellsize, &mut g, &sprinkled)
     }
@@ -307,6 +363,7 @@ fn pass_3_las(
     cellsize: usize,
     g: &mut Vec<Vec<usize>>,
     sprinkled: &HashMap<usize, Point>,
+    no_vegetation: bool,
 ) -> io::Result<()> {
     let cellno: usize = g[0].len();
     let mut gpts: Vec<Vec<Vec<Point>>> = vec![vec![Vec::new(); cellno]; cellno];
@@ -350,10 +407,14 @@ fn pass_3_las(
 
     //-- chunker: promote these points at the top of the stream
     for (_, pt) in sprinkled {
-        io::stdout().write_all(
-            &format!("v {0:.3$} {1:.3$} {2:.3$}\n", pt.x, pt.y, pt.z, impdigits).as_bytes(),
-        )?;
+        if pt.x != 0.0 && pt.y != 0.0 && pt.z != 0.0 {
+            io::stdout().write_all(
+                &format!("v {0:.3$} {1:.3$} {2:.3$}\n", pt.x, pt.y, pt.z, impdigits).as_bytes(),
+            )?;
+        }
     }
+
+    io::stdout().write_all(&format!("# endsprinkle\n").as_bytes())?;
 
     //-- read again the files
     let mut count: usize = 0;
@@ -361,27 +422,34 @@ fn pass_3_las(
         let mut reader = las::Reader::from_path(path).expect("Unable to open reader");
         for each in reader.points() {
             let p = each.unwrap();
-            let gxy: (usize, usize) = get_gx_gy(p.x, p.y, bbox[0], bbox[1], cellsize);
-            g[gxy.0][gxy.1] -= 1;
-            if !sprinkled.contains_key(&count) {
-                gpts[gxy.0][gxy.1].push(Point {
-                    x: p.x,
-                    y: p.y,
-                    z: p.z,
-                });
-            }
-            if g[gxy.0][gxy.1] == 0 {
-                for pt in gpts[gxy.0][gxy.1].iter() {
-                    io::stdout().write_all(
-                        &format!("v {0:.3$} {1:.3$} {2:.3$}\n", pt.x, pt.y, pt.z, impdigits)
-                            .as_bytes(),
-                    )?;
+            if no_vegetation
+                && (p.classification == Classification::Building
+                    || p.classification == Classification::Ground
+                    || p.classification == Classification::Water)
+                || !no_vegetation
+            {
+                let gxy: (usize, usize) = get_gx_gy(p.x, p.y, bbox[0], bbox[1], cellsize);
+                g[gxy.0][gxy.1] -= 1;
+                if !sprinkled.contains_key(&count) {
+                    gpts[gxy.0][gxy.1].push(Point {
+                        x: p.x,
+                        y: p.y,
+                        z: p.z,
+                    });
                 }
-                io::stdout().write_all(&format!("x {} {}\n", gxy.0, gxy.1).as_bytes())?;
-                gpts[gxy.0][gxy.1].clear();
-                gpts[gxy.0][gxy.1].shrink_to_fit();
+                if g[gxy.0][gxy.1] == 0 {
+                    for pt in gpts[gxy.0][gxy.1].iter() {
+                        io::stdout().write_all(
+                            &format!("v {0:.3$} {1:.3$} {2:.3$}\n", pt.x, pt.y, pt.z, impdigits)
+                                .as_bytes(),
+                        )?;
+                    }
+                    io::stdout().write_all(&format!("x {} {}\n", gxy.0, gxy.1).as_bytes())?;
+                    gpts[gxy.0][gxy.1].clear();
+                    gpts[gxy.0][gxy.1].shrink_to_fit();
+                }
+                count += 1;
             }
-            count += 1;
         }
     }
     Ok(())
@@ -435,7 +503,8 @@ fn pass_3_xyz(
         io::stdout().write_all(&format!("v {} {} {}\n", pt.x, pt.y, pt.z).as_bytes())?;
     }
 
-    //-- read again the files
+    io::stdout().write_all(&format!("# endsprinkle\n").as_bytes())?;
+
     //-- read again the files
     let mut count: usize = 0;
     for path in paths {
