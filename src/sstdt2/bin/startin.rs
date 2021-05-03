@@ -830,9 +830,11 @@ impl Triangulation {
     //     self.stars[&v].link.contains_infinite_vertex()
     // }
 
-    fn walk(&self, x: &[f64]) -> Triangle {
+    fn walk(&self, x: &[f64]) -> usize {
         //-- find a starting tr
         let tr = self.curt;
+
+        //-- TODO: maybe based on QT size if larger than go to cell first?
 
         //-- 1. try walk from latest
         let re = self.walk_safe(x, tr);
@@ -844,30 +846,20 @@ impl Triangulation {
         warn!("attempt to find one vertex in the grid cell and start from it");
         let g = self.qt.get_cell_gxgy(x[0], x[1]);
         if self.qt.gpts[g.0][g.1].len() > 0 {
-            let mut dmin: f64 = std::f64::MAX;
-            let mut vmin: usize = 0;
-            for i in &self.qt.gpts[g.0][g.1] {
-                if *i != 0 {
-                    let d = geom::distance2d_squared(x, &self.stars.get(&i).unwrap().pt);
-                    if d < dmin {
-                        dmin = d;
-                        vmin = *i;
-                    }
-                }
-            }
-            // cur = *self.qt.gpts[g.0][g.1].iter().next().unwrap();
-            let re = self.walk_safe(x, vmin);
+            let v0 = self.qt.gpts[g.0][g.1].iter().next().unwrap();
+            // let v0 = self.qt.gpts[g.0][g.1].get(a[0]);
+            let re = self.walk_safe(x, *v0);
             if re.is_some() {
                 return re.unwrap();
             }
         }
 
         //-- 3. try brute-force
-        let re2 = self.walk_bruteforce_closest_vertex_then_walksafe(x);
-        if re2.is_some() {
-            return re2.unwrap();
-        }
-
+        //-- TODO: this brute-force too?
+        // let re2 = self.walk_bruteforce_closest_vertex_then_walksafe(x);
+        // if re2.is_some() {
+        //     return re2.unwrap();
+        // }
         let re3 = self.walk_bruteforce_triangles(x);
         if re3.is_some() {
             return re3.unwrap();
@@ -875,10 +867,7 @@ impl Triangulation {
 
         //-- 4. we are outside the CH of the current dataset
         // warn!("point is outside the CH, finding closest point on the CH");
-        let re4 = self.walk_bruteforce_vertices(x);
-        // for key in self.stars.keys() {
-        //     println!("{:?}", key);
-        // }
+        let re4 = self.walk_bruteforce_outside_convex_hull(x);
         if re4.is_some() {
             return re4.unwrap();
         } else {
@@ -925,76 +914,60 @@ impl Triangulation {
         }
     }
 
-    fn walk_bruteforce_vertices(&self, x: &[f64]) -> Option<Triangle> {
-        //-- find closest vertex that is on the CH
-        let mut dmin: f64 = std::f64::MAX;
-        let mut vmin: usize = 0;
-        for i in self.stars.keys() {
-            if (*i != 0) && (self.is_vertex_convex_hull(*i)) {
-                let d = geom::distance2d_squared(x, &self.stars.get(i).unwrap().pt);
-                if d < dmin {
-                    dmin = d;
-                    vmin = *i;
+    fn is_vertex_convex_hull(&self, vi: usize) -> bool {
+        true
+    }
+
+    fn walk_bruteforce_outside_convex_hull(&self, x: &[f64]) -> Option<usize> {
+        info!("brute-force ON CONVEX HULL");
+        let mut amin: f64 = std::f64::MAX;
+        let mut tmin: usize = 0;
+        for (id, t) in self.ts.iter().enumerate() {
+            if self.is_triangle_finite(id) == false {
+                let t = self.ts[id];
+                let a: f64;
+                if t[0] == 0 {
+                    a = geom::area_triangle(&x, &self.vs[t[1]], &self.vs[t[2]]);
+                } else if t[1] == 0 {
+                    a = geom::area_triangle(&self.vs[t[0]], &x, &self.vs[t[2]]);
+                } else {
+                    a = geom::area_triangle(&self.vs[t[0]], &self.vs[t[1]], &x);
+                }
+                if a > 0.0 && a < amin {
+                    amin = a;
+                    tmin = id;
                 }
             }
         }
-        // info!("brute-force ON CONVEX HULL");
-        let mut tr = Triangle { v: [0, 0, 0] };
-        let l = &self.stars.get(&vmin).unwrap().link;
-        let mut v2: usize = l.get_prev_vertex(0).unwrap();
-        if geom::orient2d(
-            &self.stars[&vmin].pt,
-            &self.stars[&v2].pt,
-            &x,
-            self.robust_predicates,
-        ) == 1
-        {
-            tr.v[0] = vmin;
-            tr.v[1] = v2;
-            tr.v[2] = 0;
-        } else {
-            v2 = l.get_next_vertex(0).unwrap();
-            tr.v[0] = v2;
-            tr.v[1] = vmin;
-            tr.v[2] = 0;
-        }
-        return Some(tr);
-        // self.walk_safe(x, vmin)
+        Some(tmin)
     }
 
-    fn walk_bruteforce_triangles(&self, x: &[f64]) -> Option<Triangle> {
-        for (i, star) in &self.stars {
-            for (j, value) in star.link.iter().enumerate() {
-                if (i < value) && (self.stars.contains_key(&value) == true) {
-                    let k = star.link[star.link.next_index(j)];
-                    if (i < &k) && (self.stars.contains_key(&k) == true) {
-                        let tr = Triangle { v: [*i, *value, k] };
-                        if tr.is_infinite() == false {
-                            if geom::intriangle(
-                                &self.stars.get(&tr.v[0]).unwrap().pt,
-                                &self.stars.get(&tr.v[1]).unwrap().pt,
-                                &self.stars.get(&tr.v[2]).unwrap().pt,
-                                &x,
-                                self.robust_predicates,
-                            ) == 1
-                            {
-                                return Some(tr);
-                            }
-                        }
-                    }
+    fn walk_bruteforce_triangles(&self, x: &[f64]) -> Option<usize> {
+        warn!("walk_bruteforce_triangles()");
+        for (id, t) in self.ts.iter().enumerate() {
+            if self.is_triangle_finite(id) == true {
+                if geom::intriangle(
+                    &self.vs[t[0]],
+                    &self.vs[t[1]],
+                    &self.vs[t[2]],
+                    &x,
+                    self.robust_predicates,
+                ) == 1
+                {
+                    return Some(id);
                 }
             }
         }
         return None;
     }
 
-    fn walk_bruteforce_closest_vertex_then_walksafe(&self, x: &[f64]) -> Option<Triangle> {
+    fn walk_bruteforce_closest_vertex_then_walksafe(&self, x: &[f64]) -> Option<usize> {
         //-- find closest vertex that is on the CH
         let mut dmin: f64 = std::f64::MAX;
         let mut vmin: usize = 0;
         for i in self.stars.keys() {
             if *i != 0 {
-                let d = geom::distance2d_squared(x, &self.stars.get(i).unwrap().pt);
+                let d = geom::distance2d_squared(x, &self.vs[i]);
                 if d < dmin {
                     dmin = d;
                     vmin = *i;
@@ -1002,111 +975,6 @@ impl Triangulation {
             }
         }
         self.walk_safe(x, vmin)
-    }
-
-    fn walk_old(&self, x: &[f64]) -> Triangle {
-        let g = self.qt.get_cell_gxgy(x[0], x[1]);
-        //-- find the starting tr
-        let mut cur = self.cur;
-        if !self.stars.contains_key(&cur) {
-            error!("walk(): cur={} doesn't exist", cur);
-            //-- fetch one from the cell
-            if self.qt.gpts[g.0][g.1].len() > 0 {
-                cur = *self.qt.gpts[g.0][g.1].iter().next().unwrap();
-            } else {
-                // cur = *self.stars.keys().next().unwrap();
-                info!("Cell has no vertex in it.");
-                cur = *self.stars.keys().next().unwrap();
-            }
-        }
-        let mut tr = Triangle { v: [0, 0, 0] };
-        // println!("cur: {}", cur);
-
-        //-- 1. find a finite triangle
-        tr.v[0] = cur;
-        let l = &self.stars.get(&cur).unwrap().link;
-        let mut b = false;
-        for i in 0..(l.len() - 1) {
-            if (l[i] != 0)
-                && (l[i + 1] != 0)
-                && (self.stars.contains_key(&l[i]) == true)
-                && (self.stars.contains_key(&l[i + 1]) == true)
-            {
-                tr.v[1] = l[i];
-                tr.v[2] = l[i + 1];
-                b = true;
-                break;
-            }
-        }
-        if b == false {
-            info!("Cannot find a starting triangle.");
-        }
-
-        //-- 2. order it such that tr0-tr1-x is CCW
-        if geom::orient2d(
-            &self.stars[&tr.v[0]].pt,
-            &self.stars[&tr.v[1]].pt,
-            &x,
-            self.robust_predicates,
-        ) == -1
-        {
-            if geom::orient2d(
-                &self.stars[&tr.v[1]].pt,
-                &self.stars[&tr.v[2]].pt,
-                &x,
-                self.robust_predicates,
-            ) != -1
-            {
-                let tmp: usize = tr.v[0];
-                tr.v[0] = tr.v[1];
-                tr.v[1] = tr.v[2];
-                tr.v[2] = tmp;
-            } else {
-                let tmp: usize = tr.v[1];
-                tr.v[0] = tr.v[2];
-                tr.v[1] = tr.v[0];
-                tr.v[2] = tmp;
-            }
-        }
-
-        info!("here");
-        //-- 3. start the walk
-        //-- we know that tr0-tr1-x is CCW
-        loop {
-            if tr.is_infinite() == true {
-                break;
-            }
-            if geom::orient2d(
-                &self.stars[&tr.v[1]].pt,
-                &self.stars[&tr.v[2]].pt,
-                &x,
-                self.robust_predicates,
-            ) != -1
-            {
-                if geom::orient2d(
-                    &self.stars[&tr.v[2]].pt,
-                    &self.stars[&tr.v[0]].pt,
-                    &x,
-                    self.robust_predicates,
-                ) != -1
-                {
-                    break;
-                } else {
-                    //-- walk to incident to tr1,tr2
-                    // println!("here");
-                    let prev = self.stars[&tr.v[2]].link.get_prev_vertex(tr.v[0]).unwrap();
-                    tr.v[1] = tr.v[2];
-                    tr.v[2] = prev;
-                }
-            } else {
-                //-- walk to incident to tr1,tr2
-                // a.iter().position(|&x| x == 2), Some(1)
-                let prev = self.stars[&tr.v[1]].link.get_prev_vertex(tr.v[2]).unwrap();
-                tr.v[0] = tr.v[2];
-                tr.v[2] = prev;
-            }
-        }
-        return tr;
     }
 
     fn flip22(&mut self, t0i: usize, t1i: usize) {
@@ -1181,27 +1049,6 @@ impl Triangulation {
                 self.ts[id][5]
             );
         }
-    }
-
-    fn is_valid_ch_convex(&self) -> bool {
-        let mut re = true;
-        let ch = self.convex_hull();
-        for i in 0..ch.len() {
-            if geom::orient2d(
-                &self.stars[&ch[i % ch.len()]].pt,
-                &self.stars[&ch[(i + 1) % ch.len()]].pt,
-                &self.stars[&ch[(i + 2) % ch.len()]].pt,
-                self.robust_predicates,
-            ) == -1
-            {
-                re = false;
-                break;
-            }
-        }
-        // if re == false {
-        //     println!("CONVEX NOT CONVEX");
-        // }
-        return re;
     }
 
     /// write a GeoJSON file of the quadtree/grid to disk
