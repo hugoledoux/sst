@@ -127,7 +127,7 @@ fn main() -> io::Result<()> {
     info!("Finished reading the stream");
     info!("dt.number_of_vertices() = {}", dt.number_of_vertices());
 
-    info!("max # points in DT during process: {}", dt.max);
+    // info!("max # points in DT during process: {}", dt.max);
     let _x = dt.finalise_leftover_triangles();
 
     info!("✅");
