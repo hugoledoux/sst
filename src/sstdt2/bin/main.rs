@@ -43,16 +43,16 @@ fn main() -> io::Result<()> {
     }
 
     //----- reading from stdin -----//
-    let stdin = std::io::stdin();
-    for line in stdin.lock().lines() {
-        let l = line.unwrap();
-        //----- reading from stdin -----//
+    // let stdin = std::io::stdin();
+    // for line in stdin.lock().lines() {
+    //     let l = line.unwrap();
+    //----- reading from stdin -----//
 
-        //----- reading from file -----//
-        // let fi = File::open("/Users/hugo/projects/sst/data/s400_50.spa").expect("Unable to open file");
-        // let f = BufReader::new(fi);
-        // for l in f.lines() {
-        //     let l = l.expect("Unable to read line");
+    //----- reading from file -----//
+    let fi = File::open("/Users/hugo/projects/sst/data/s400_50.spa").expect("Unable to open file");
+    let f = BufReader::new(fi);
+    for l in f.lines() {
+        let l = l.expect("Unable to read line");
         //----- reading from file -----//
 
         if l.is_empty() {

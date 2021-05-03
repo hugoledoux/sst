@@ -16,191 +16,6 @@ use std::collections::HashSet;
 
 extern crate rand;
 
-/// A Triangle is a triplet of indices
-pub struct Triangle {
-    pub v: [usize; 3],
-}
-
-impl Triangle {
-    /// Checks whether a Triangle is "infinite",
-    /// ie if one its vertices is the infinite vertex
-    fn is_infinite(&self) -> bool {
-        if self.v[0] == 0 || self.v[1] == 0 || self.v[2] == 0 {
-            return true;
-        }
-        return false;
-    }
-}
-
-impl fmt::Display for Triangle {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "({}, {}, {})", self.v[0], self.v[1], self.v[2])
-    }
-}
-
-//----------------------
-struct Link(Vec<usize>);
-
-impl Link {
-    fn new() -> Link {
-        // Link(Vec::new())
-        Link(Vec::with_capacity(8))
-    }
-    fn len(&self) -> usize {
-        self.0.len()
-    }
-    fn is_empty(&self) -> bool {
-        if self.0.len() == 0 {
-            true
-        } else {
-            false
-        }
-    }
-    fn add(&mut self, v: usize) {
-        self.0.push(v);
-    }
-    fn insert_after_v(&mut self, v: usize, after: usize) {
-        let pos = self.0.iter().position(|&x| x == after).unwrap();
-        self.0.insert(pos + 1, v);
-    }
-    fn delete(&mut self, v: usize) {
-        let re = self.0.iter().position(|&x| x == v);
-        if re != None {
-            self.0.remove(re.unwrap());
-        }
-    }
-    fn replace(&mut self, v: usize, newv: usize) {
-        let re = self.0.iter().position(|&x| x == v);
-        if re != None {
-            self.0[re.unwrap()] = newv;
-            // self.0.remove(re.unwrap());
-        }
-    }
-    fn infinite_first(&mut self) {
-        let re = self.0.iter().position(|&x| x == 0);
-        if re != None {
-            let posinf = re.unwrap();
-            if posinf == 0 {
-                return;
-            }
-            let mut newstar: Vec<usize> = Vec::new();
-            for j in posinf..self.0.len() {
-                newstar.push(self.0[j]);
-            }
-            for j in 0..posinf {
-                newstar.push(self.0[j]);
-            }
-            // println!("newstar: {:?}", newstar);
-            self.0 = newstar;
-        }
-    }
-    fn clear(&mut self) {
-        self.0.clear();
-    }
-
-    fn contains_infinite_vertex(&self) -> bool {
-        let pos = self.0.iter().position(|&x| x == 0);
-        return if pos == None { false } else { true };
-    }
-
-    fn next_index(&self, i: usize) -> usize {
-        if i == (self.0.len() - 1) {
-            0
-        } else {
-            i + 1
-        }
-    }
-
-    fn prev_index(&self, i: usize) -> usize {
-        if i == 0 {
-            self.0.len() - 1
-        } else {
-            i - 1
-        }
-    }
-
-    fn get_index(&self, v: usize) -> Option<usize> {
-        return self.0.iter().position(|&x| x == v);
-    }
-
-    fn get_next_vertex(&self, v: usize) -> Option<usize> {
-        let re = self.get_index(v);
-        if re.is_none() {
-            return None;
-        }
-        let pos = re.unwrap();
-        if pos == (self.0.len() - 1) {
-            return Some(self.0[0]);
-        } else {
-            return Some(self.0[(pos + 1)]);
-        }
-    }
-
-    fn get_prev_vertex(&self, v: usize) -> Option<usize> {
-        let re = self.get_index(v);
-        if re.is_none() {
-            return None;
-        }
-        let pos = re.unwrap();
-        if pos == 0 {
-            return Some(self.0[(self.0.len() - 1)]);
-        } else {
-            return Some(self.0[(pos - 1)]);
-        }
-    }
-
-    fn iter(&self) -> Iter {
-        Iter(Box::new(self.0.iter()))
-    }
-}
-
-//-- taken from https://stackoverflow.com/questions/40668074/am-i-incorrectly-implementing-intoiterator-for-a-reference-or-is-this-a-rust-bug
-struct Iter<'a>(Box<dyn Iterator<Item = &'a usize> + 'a>);
-
-impl<'a> Iterator for Iter<'a> {
-    type Item = &'a usize;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0.next()
-    }
-}
-
-impl std::ops::Index<usize> for Link {
-    type Output = usize;
-    fn index(&self, idx: usize) -> &usize {
-        &self.0[idx as usize]
-    }
-}
-
-impl fmt::Display for Link {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        // fmt.write_str("pt: {}\n", self.pt)?;
-        fmt.write_str(&format!("link: {:?}\n", self.0))?;
-        Ok(())
-    }
-}
-
-/// A triangulation is a collection of Stars, each Star has its (x,y,z)
-/// and a Link (an array of adjacent vertices, ordered CCW)
-struct Star {
-    pub pt: [f64; 3],
-    pub link: Link,
-    pub written: bool,
-    pub smaid: usize,
-}
-
-impl Star {
-    pub fn new(x: f64, y: f64, z: f64) -> Star {
-        let l = Link::new();
-        Star {
-            pt: [x, y, z],
-            link: l,
-            written: false,
-            smaid: 0,
-        }
-    }
-}
-
 //----------------------
 struct Quadtree {
     pub gpts: Vec<Vec<HashSet<usize>>>,
@@ -440,39 +255,45 @@ impl Quadtree {
 
 //----------------------
 pub struct Triangulation {
-    stars: HashMap<usize, Star>,
+    vs: Vec<[f64; 3]>,
+    ts: Vec<[usize; 6]>,
     qt: Quadtree,
     snaptol: f64,
-    cur: usize,
+    curt: usize,
     is_init: bool,
     robust_predicates: bool,
     theid: usize, //-- to assign id to new vertices, since some are flushed
+    freelist_t: Vec<usize>,
+    freelist_v: Vec<usize>,
     outputmode: Outputmode,
     smacount: usize,
     smaid_mapping: HashMap<usize, usize>,
-    pub max: usize,
 }
 
 impl Triangulation {
     //-- new
     pub fn new() -> Triangulation {
-        let mut s: HashMap<usize, Star> = HashMap::new();
-        let mut mystar = Star::new(-99999.99999, -99999.99999, -99999.99999);
-        mystar.written = true;
-        s.insert(0, mystar);
+        let p: [f64; 3] = [-99999.9, -99999.9, -99999.9];
+        let mut thevs: Vec<[f64; 3]> = Vec::new();
+        thevs.push(p);
+        let thets: Vec<[usize; 6]> = Vec::new();
+        let theflt: Vec<usize> = Vec::new();
+        let theflv: Vec<usize> = Vec::new();
         let q = Quadtree::new();
         Triangulation {
+            vs: thevs,
+            ts: thets,
             qt: q,
-            theid: 1,
             stars: s,
             snaptol: 0.001,
-            cur: 0,
+            curt: 0,
             is_init: false,
             robust_predicates: true,
+            freelist_v: theflv,
+            freelist_t: theflt,
             outputmode: Outputmode::Sma,
             smacount: 1,
             smaid_mapping: HashMap::new(),
-            max: 1,
         }
     }
 
@@ -575,50 +396,6 @@ impl Triangulation {
         Ok(())
     }
 
-    fn write_stars_one_vertex(&mut self, v: usize) -> io::Result<()> {
-        // Write the own vertex if it has not been written yet
-        if !self.stars[&v].written {
-            let vpt = self.get_point(v).unwrap();
-
-            io::stdout().write_all(&format!("v {} {} {}\n", vpt[0], vpt[1], vpt[2]).as_bytes())?;
-
-            self.smaid_mapping.insert(v, self.smacount);
-
-            self.smacount += 1;
-            self.stars.get_mut(&v).unwrap().written = true;
-        }
-
-        let mut neighbors = Vec::new();
-
-        for neighbor_id in 0..self.stars[&v].link.len() {
-            let vertex_id = self.stars[&v].link[neighbor_id];
-
-            if self.vertex_exists(vertex_id) && !self.stars[&vertex_id].written {
-                let point = self.stars[&vertex_id].pt.to_vec();
-
-                io::stdout()
-                    .write_all(&format!("v {} {} {}\n", point[0], point[1], point[2]).as_bytes())?;
-
-                self.smaid_mapping.insert(vertex_id, self.smacount);
-
-                self.smacount += 1;
-                self.stars.get_mut(&vertex_id).unwrap().written = true;
-            }
-
-            if self.smaid_mapping.contains_key(&vertex_id) {
-                neighbors.push(self.smaid_mapping[&vertex_id]);
-            } else if vertex_id == 0 {
-                // Always write infinite vertex
-                neighbors.push(vertex_id);
-            }
-        }
-
-        io::stdout()
-            .write_all(&format!("x {} {:?}\n", self.smaid_mapping[&v], neighbors).as_bytes())?;
-
-        Ok(())
-    }
-
     fn write_sma_one_vertex(&mut self, v: usize) -> io::Result<()> {
         let vpt = self.get_point(v).unwrap();
         if self.stars[&v].written == false {
@@ -714,17 +491,17 @@ impl Triangulation {
         Ok(())
     }
 
-    fn flush_star(&mut self, v: usize) -> bool {
-        // self.stars.get_mut(&v).unwrap().active = false;
-        // true
-        let re = self.stars.remove(&v);
-        if re.is_some() {
-            true
-        } else {
-            println!("=== OH NO ===");
-            false
-        }
-    }
+    // fn flush_star(&mut self, v: usize) -> bool {
+    //     // self.stars.get_mut(&v).unwrap().active = false;
+    //     // true
+    //     let re = self.stars.remove(&v);
+    //     if re.is_some() {
+    //         true
+    //     } else {
+    //         println!("=== OH NO ===");
+    //         false
+    //     }
+    // }
 
     pub fn set_cellsize(&mut self, c: usize) {
         self.qt.cellsize = c;
@@ -747,69 +524,54 @@ impl Triangulation {
 
     fn insert_one_pt_init_phase(&mut self, x: f64, y: f64, z: f64) -> Result<usize, usize> {
         let p: [f64; 3] = [x, y, z];
-        for i in 1..self.stars.len() {
-            if geom::distance2d_squared(&self.stars[&i].pt, &p) <= (self.snaptol * self.snaptol) {
+        for i in 0..self.vs.len() {
+            if geom::distance2d_squared(&self.vs[i], &p) <= (self.snaptol * self.snaptol) {
                 return Err(i);
             }
         }
-        //-- add point to Triangulation and create its empty star
-        self.stars.insert(self.theid, Star::new(x, y, z));
-        self.theid += 1;
-        //-- form the first triangles (finite + infinite)
-        let l = self.stars.len();
+        //-- add point to Triangulation
+        let p = [x, y, z];
+        // let c = self.vs.len();
+        self.vs.push(p);
+        let l = self.vs.len();
         if l >= 4 {
             let a = l - 3;
             let b = l - 2;
             let c = l - 1;
             let re = geom::orient2d(
-                &self.stars[&a].pt,
-                &self.stars[&b].pt,
-                &self.stars[&c].pt,
+                &self.vs[a],
+                &self.vs[b],
+                &self.vs[c],
                 self.robust_predicates,
             );
             if re == 1 {
                 // println!("init: ({},{},{})", a, b, c);
-                self.stars.get_mut(&0).unwrap().link.add(a);
-                self.stars.get_mut(&0).unwrap().link.add(c);
-                self.stars.get_mut(&0).unwrap().link.add(b);
-                self.stars.get_mut(&a).unwrap().link.add(0);
-                self.stars.get_mut(&a).unwrap().link.add(b);
-                self.stars.get_mut(&a).unwrap().link.add(c);
-                self.stars.get_mut(&b).unwrap().link.add(0);
-                self.stars.get_mut(&b).unwrap().link.add(c);
-                self.stars.get_mut(&b).unwrap().link.add(a);
-                self.stars.get_mut(&c).unwrap().link.add(0);
-                self.stars.get_mut(&c).unwrap().link.add(a);
-                self.stars.get_mut(&c).unwrap().link.add(b);
+                self.ts.push([a, b, c, 2, 3, 1]);
+                self.ts.push([a, 0, b, 2, 0, 3]);
+                self.ts.push([b, 0, c, 3, 0, 1]);
+                self.ts.push([c, 0, a, 1, 0, 2]);
                 self.is_init = true;
             } else if re == -1 {
                 // println!("init: ({},{},{})", a, c, b);
-                self.stars.get_mut(&0).unwrap().link.add(a);
-                self.stars.get_mut(&0).unwrap().link.add(b);
-                self.stars.get_mut(&0).unwrap().link.add(c);
-                self.stars.get_mut(&a).unwrap().link.add(0);
-                self.stars.get_mut(&a).unwrap().link.add(c);
-                self.stars.get_mut(&a).unwrap().link.add(b);
-                self.stars.get_mut(&b).unwrap().link.add(0);
-                self.stars.get_mut(&b).unwrap().link.add(a);
-                self.stars.get_mut(&b).unwrap().link.add(c);
-                self.stars.get_mut(&c).unwrap().link.add(0);
-                self.stars.get_mut(&c).unwrap().link.add(b);
-                self.stars.get_mut(&c).unwrap().link.add(a);
+                self.ts.push([a, c, b, 2, 3, 1]);
+                self.ts.push([a, 0, c, 2, 0, 3]);
+                self.ts.push([c, 0, b, 3, 0, 1]);
+                self.ts.push([b, 0, a, 1, 0, 2]);
                 self.is_init = true;
             }
         }
-        self.cur = l - 1;
-        if self.is_init == true {
-            //-- insert the previous vertices in the dt
-            for j in 1..(l - 3) {
-                let tr = self.walk(&self.stars[&j].pt);
-                // println!("found tr: {}", tr);
-                self.flip13(j, &tr);
-                self.update_dt(j);
-            }
-        }
-        Ok(self.cur)
+        self.curt = 0;
+        // TODO: add those lines
+        // if self.is_init == true {
+        //     //-- insert the previous vertices in the dt
+        //     for j in 1..(l - 3) {
+        //         let tr = self.walk(&self.stars[&j].pt);
+        //         // println!("found tr: {}", tr);
+        //         self.flip13(j, &tr);
+        //         self.update_dt(j);
+        //     }
+        // }
+        Ok(self.curt)
     }
 
     /// Set a snap tolerance when inserting new points: if the newly inserted
@@ -835,30 +597,6 @@ impl Triangulation {
         self.robust_predicates = b;
     }
 
-    pub fn insert(&mut self, pts: &Vec<Vec<f64>>) {
-        let mut duplicates = 0;
-        for each in pts {
-            if (each.len() < 2) || (each.len() > 3) {
-                panic!(
-                    "Point {:?} should be 2D or 3D (and is now {}D).",
-                    each,
-                    each.len()
-                );
-            } else {
-                let re;
-                if each.len() == 2 {
-                    re = self.insert_one_pt(each[0], each[1], 0.0);
-                } else {
-                    re = self.insert_one_pt(each[0], each[1], each[2]);
-                }
-                match re {
-                    Ok(_x) => continue,
-                    Err(_e) => duplicates = duplicates + 1,
-                }
-            }
-        }
-    }
-
     pub fn insert_one_pt_with_grid(&mut self, px: f64, py: f64, pz: f64) -> Result<usize, usize> {
         let re = self.insert_one_pt(px, py, pz);
         if re.is_ok() {
@@ -866,219 +604,159 @@ impl Triangulation {
             let g = self.qt.get_cell_gxgy(px, py);
             self.qt.gpts[g.0][g.1].insert(x);
         };
-        if self.stars.len() > self.max {
-            self.max = self.stars.len();
-        }
         re
     }
 
     //-- insert_one_pt
     fn insert_one_pt(&mut self, px: f64, py: f64, pz: f64) -> Result<usize, usize> {
-        // println!("-->{}", p);
+        // println!("==>insertion ({}, {}, {})", px, py, pz);
         if self.is_init == false {
             return self.insert_one_pt_init_phase(px, py, pz);
         }
         //-- walk
         let p: [f64; 3] = [px, py, pz];
-        let tr = self.walk(&p);
-        // println!("STARTING TR: {}", tr);
-        if geom::distance2d_squared(&self.stars[&tr.v[0]].pt, &p) <= (self.snaptol * self.snaptol) {
-            return Err(tr.v[0]);
-        }
-        if geom::distance2d_squared(&self.stars[&tr.v[1]].pt, &p) <= (self.snaptol * self.snaptol) {
-            return Err(tr.v[1]);
-        }
-        if geom::distance2d_squared(&self.stars[&tr.v[2]].pt, &p) <= (self.snaptol * self.snaptol) {
-            return Err(tr.v[2]);
+        let ti = self.walk(&p);
+        // println!("Starting Ti: {}", ti);
+        //-- checking if within snap_tol of one vertex, then no insert
+        for i in 0..3 {
+            if geom::distance2d_squared(&self.vs[self.ts[ti][i]], &p)
+                <= (self.snaptol * self.snaptol)
+            {
+                return Err(self.ts[ti][i]);
+            }
         }
         //-- ok we now insert the point in the data structure
-        //-- TODO: remove this for delete when hash is used
-        let pi: usize = self.theid;
-        self.stars.insert(self.theid, Star::new(px, py, pz));
-        self.theid += 1;
-        //-- flip13()
-        self.flip13(pi, &tr);
-        //-- update_dt()
-        self.update_dt(pi);
-        self.cur = pi;
-        Ok(pi)
-    }
+        let pi: usize = self.vs.len();
+        self.vs.push([px, py, pz]);
 
-    fn update_dt(&mut self, pi: usize) {
-        // println!("--> Update DT");
-        let mut mystack: Vec<Triangle> = Vec::new();
-        let l = &self.stars.get_mut(&pi).unwrap().link;
-        mystack.push(Triangle {
-            v: [pi, l[0], l[1]],
-        });
-        mystack.push(Triangle {
-            v: [pi, l[1], l[2]],
-        });
-        mystack.push(Triangle {
-            v: [pi, l[2], l[0]],
-        });
+        //-- flip13()
+        // self.print_ds();
+        let incidents = self.flip13(pi, ti);
+        // self.print_ds();
+
+        //-- update_dt()
+        let mut mystack: Vec<usize> = Vec::new();
+        mystack.push(incidents.0);
+        mystack.push(incidents.1);
+        mystack.push(incidents.2);
 
         loop {
-            let tr = match mystack.pop() {
+            // self.print_ds();
+            let ti = match mystack.pop() {
                 None => break,
                 Some(x) => x,
             };
-            let opposite = self.get_opposite_vertex(&tr);
-            //-- TODO: danger danger
-            if self.stars.contains_key(&opposite) == false {
+            //-- fetch opposite
+            let t = self.ts[ti];
+            let k = &t[0..3].iter().position(|&x| x == pi).unwrap();
+            let oppti = t[k + 3];
+            if oppti == 0 {
                 continue;
             }
-            //----------------------
-            // println!("stacked: {} {}", tr, opposite);
-
-            if tr.is_infinite() == true {
+            let oppt = self.ts[oppti];
+            let ko = &oppt[3..6].iter().position(|&x| x == ti).unwrap();
+            let oppvi = oppt[*ko];
+            // assert_ne!(oppvi, 0);
+            if oppvi == 0 {
+                // println!("yo");
+                continue;
+            }
+            if self.is_triangle_finite(ti) == false {
                 let mut a: i8 = 0;
-                if tr.v[0] == 0 {
+                if t[0] == 0 {
                     a = geom::orient2d(
-                        &self.stars[&opposite].pt,
-                        &self.stars[&tr.v[1]].pt,
-                        &self.stars[&tr.v[2]].pt,
+                        &self.vs[oppvi],
+                        &self.vs[t[1]],
+                        &self.vs[t[2]],
                         self.robust_predicates,
                     );
-                } else if tr.v[1] == 0 {
+                } else if t[1] == 0 {
                     a = geom::orient2d(
-                        &self.stars[&tr.v[0]].pt,
-                        &self.stars[&opposite].pt,
-                        &self.stars[&tr.v[2]].pt,
+                        &self.vs[t[0]],
+                        &self.vs[oppvi],
+                        &self.vs[t[2]],
                         self.robust_predicates,
                     );
-                } else if tr.v[2] == 0 {
+                } else if t[2] == 0 {
                     a = geom::orient2d(
-                        &self.stars[&tr.v[0]].pt,
-                        &self.stars[&tr.v[1]].pt,
-                        &self.stars[&opposite].pt,
+                        &self.vs[t[0]],
+                        &self.vs[t[1]],
+                        &self.vs[oppvi],
                         self.robust_predicates,
                     );
                 }
-                // println!("TODO: INCIRCLE FOR INFINITY {}", a);
                 if a > 0 {
-                    // println!("FLIPPED0 {} {}", tr, opposite);
-                    let (ret0, ret1) = self.flip22(&tr, opposite);
-                    mystack.push(ret0);
-                    mystack.push(ret1);
+                    self.flip22(ti, oppti);
+                    mystack.push(ti);
+                    mystack.push(oppti);
                 }
             } else {
-                if opposite == 0 {
-                    //- if insertion on CH then break the edge, otherwise do nothing
-                    //-- TODO sure the flips are okay here?
-                    if geom::orient2d(
-                        &self.stars[&tr.v[0]].pt,
-                        &self.stars[&tr.v[1]].pt,
-                        &self.stars[&tr.v[2]].pt,
-                        self.robust_predicates,
-                    ) == 0
-                    {
-                        // println!("FLIPPED1 {} {}", tr, 0);
-                        let (ret0, ret1) = self.flip22(&tr, 0);
-                        mystack.push(ret0);
-                        mystack.push(ret1);
-                    }
-                } else {
-                    if geom::incircle(
-                        &self.stars[&tr.v[0]].pt,
-                        &self.stars[&tr.v[1]].pt,
-                        &self.stars[&tr.v[2]].pt,
-                        &self.stars[&opposite].pt,
-                        self.robust_predicates,
-                    ) > 0
-                    {
-                        // println!("FLIPPED2 {} {}", tr, opposite);
-                        let (ret0, ret1) = self.flip22(&tr, opposite);
-                        mystack.push(ret0);
-                        mystack.push(ret1);
-                    }
+                if geom::incircle(
+                    &self.vs[t[0]],
+                    &self.vs[t[1]],
+                    &self.vs[t[2]],
+                    &self.vs[oppvi],
+                    self.robust_predicates,
+                ) > 0
+                {
+                    self.flip22(ti, oppti);
+                    mystack.push(ti);
+                    mystack.push(oppti);
                 }
             }
         }
+        let mut newcurt = self.ts.len() - 1;
+        if self.is_triangle_finite(newcurt) == false {
+            let it = self.ts[newcurt];
+            let k = &it[0..3].iter().position(|&x| x == 0).unwrap();
+            newcurt = it[k + 3];
+        }
+        Ok(newcurt)
     }
 
-    fn flip13(&mut self, pi: usize, tr: &Triangle) {
-        let l = &mut self.stars.get_mut(&pi).unwrap().link;
-        l.add(tr.v[0]);
-        l.add(tr.v[1]);
-        l.add(tr.v[2]);
-        self.stars
-            .get_mut(&tr.v[0])
-            .unwrap()
-            .link
-            .insert_after_v(pi, tr.v[1]);
-        self.stars
-            .get_mut(&tr.v[1])
-            .unwrap()
-            .link
-            .insert_after_v(pi, tr.v[2]);
-        self.stars
-            .get_mut(&tr.v[2])
-            .unwrap()
-            .link
-            .insert_after_v(pi, tr.v[0]);
-        //-- put infinite vertex first in list
-        // self.stars[pi].link.infinite_first();
+    fn flip13(&mut self, vi: usize, ti: usize) -> (usize, usize, usize) {
+        let newi = self.ts.len();
+        let t = self.ts[ti];
+        let t0 = [vi, t[0], t[1], t[5], newi, newi + 1];
+        let t1 = [vi, t[1], t[2], t[3], newi + 1, ti];
+        let t2 = [vi, t[2], t[0], t[4], ti, newi];
+        //-- update neighbours
+        let mut n = t[3];
+        let a = self.ts[n];
+        let a1 = &a[3..6].iter().position(|&x| x == ti).unwrap();
+        if let Some(x) = self.ts.get_mut(n) {
+            (*x)[*a1 + 3] = newi;
+        }
+
+        n = t[4];
+        let a = self.ts[n];
+        let a1 = &a[3..6].iter().position(|&x| x == ti).unwrap();
+        if let Some(x) = self.ts.get_mut(n) {
+            (*x)[*a1 + 3] = newi + 1;
+        }
+        n = t[5];
+        let a = self.ts[n];
+        let a1 = &a[3..6].iter().position(|&x| x == ti).unwrap();
+        if let Some(x) = self.ts.get_mut(n) {
+            (*x)[*a1 + 3] = ti;
+        }
+
+        if let Some(x) = self.ts.get_mut(ti) {
+            (*x) = t0;
+        }
+        self.ts.insert(newi, t1);
+        self.ts.insert(newi + 1, t2);
+        (ti, newi, newi + 1)
     }
 
-    /// Returns the coordinates of the vertex v in a Vec [x,y,z]
-    pub fn get_point(&self, v: usize) -> Option<Vec<f64>> {
-        if self.vertex_exists(v) == false {
-            None
-        } else {
-            Some(self.stars[&v].pt.to_vec())
-        }
-    }
-
-    pub fn adjacent_triangles_to_triangle(&self, tr: &Triangle) -> Option<Vec<Triangle>> {
-        if self.is_triangle(&tr) == false || tr.is_infinite() == true {
-            return None;
-        }
-        let mut trs: Vec<Triangle> = Vec::new();
-        let mut opp = self.stars[&tr.v[2]].link.get_next_vertex(tr.v[1]).unwrap();
-        if opp != 0 {
-            trs.push(Triangle {
-                v: [tr.v[1], opp, tr.v[2]],
-            });
-        }
-        opp = self.stars[&tr.v[0]].link.get_next_vertex(tr.v[2]).unwrap();
-        if opp != 0 {
-            trs.push(Triangle {
-                v: [tr.v[2], opp, tr.v[0]],
-            });
-        }
-        opp = self.stars[&tr.v[1]].link.get_next_vertex(tr.v[0]).unwrap();
-        if opp != 0 {
-            trs.push(Triangle {
-                v: [tr.v[0], opp, tr.v[1]],
-            });
-        }
-        Some(trs)
-    }
-
-    /// Returns a Vec of Triangles (finite + infinite) to the vertex v.
-    /// If v doesn't exist, then [`None`] is returned.
-    pub fn incident_triangles_to_vertex(&self, v: usize) -> Option<Vec<Triangle>> {
-        if self.vertex_exists(v) == false {
-            return None;
-        }
-        let mut trs: Vec<Triangle> = Vec::new();
-        for (i, each) in self.stars[&v].link.iter().enumerate() {
-            let j = self.stars[&v].link.next_index(i);
-            trs.push(Triangle {
-                v: [v, *each, self.stars[&v].link[j]],
-            });
-        }
-        Some(trs)
-    }
-
-    /// Returns the degree of a vertex, [`None`] is it doesn't exist.
-    pub fn degree(&self, v: usize) -> Option<usize> {
-        if self.vertex_exists(v) == false {
-            return None;
-        }
-        Some(self.stars[&v].link.len())
-    }
+    // /// Returns the coordinates of the vertex v in a Vec [x,y,z]
+    // pub fn get_point(&self, v: usize) -> Option<Vec<f64>> {
+    //     if self.vertex_exists(v) == false {
+    //         None
+    //     } else {
+    //         Some(self.stars[&v].pt.to_vec())
+    //     }
+    // }
 
     /// Returns a list (`Vec<usize>`) (ordered CCW) of the adjacent vertices.
     /// [`None`] if the vertex is not part of the triangulation.
@@ -1093,149 +771,77 @@ impl Triangulation {
         Some(adjs)
     }
 
-    /// Returns whether a triplet of indices is a Triangle in the triangulation.
-    pub fn is_triangle(&self, tr: &Triangle) -> bool {
-        // TODO: what about infinite triangles?
-        let re = self.stars[&tr.v[0]].link.get_next_vertex(tr.v[1]);
-        if re.is_none() {
-            return false;
+    fn is_triangle_finite(&self, t: usize) -> bool {
+        let t = self.ts[t];
+        if t[0] == 0 || t[1] == 0 || t[2] == 0 {
+            false
         } else {
-            if re.unwrap() == tr.v[2] {
-                return true;
-            } else {
-                return false;
-            }
+            true
         }
-    }
-
-    pub fn statistics_degree(&self) -> (f64, usize, usize) {
-        let mut total: f64 = 0.0;
-        let mut min: usize = usize::max_value();
-        let mut max: usize = usize::min_value();
-        for i in 1..self.stars.len() {
-            total = total + self.stars[&i].link.len() as f64;
-            if self.stars[&i].link.len() > max {
-                max = self.stars[&i].link.len();
-            }
-            if self.stars[&i].link.len() < min {
-                min = self.stars[&i].link.len();
-            }
-        }
-        total = total / (self.stars.len() - 2) as f64;
-        return (total, min, max);
     }
 
     /// Returns number of finite vertices in the triangulation.
     pub fn number_of_vertices(&self) -> usize {
         //-- number of finite vertices
-        self.stars.len() - 1
+        self.vs.len() - 1
     }
 
     /// Returns number of finite triangles in the triangulation.
-    pub fn number_of_triangles(&self) -> usize {
-        //-- number of finite triangles
-        let mut count: usize = 0;
-        for (i, star) in &self.stars {
-            for (j, value) in star.link.iter().enumerate() {
-                if i < value {
-                    let k = star.link[star.link.next_index(j)];
-                    if i < &k {
-                        let tr = Triangle { v: [*i, *value, k] };
-                        if tr.is_infinite() == false {
-                            count = count + 1;
-                        }
-                    }
-                }
+    fn number_of_triangles(&self) -> usize {
+        //-- number of finite vertices
+        let mut total: usize = 0;
+        for (i, t) in self.ts.iter().enumerate() {
+            if self.is_triangle_finite(i) == true {
+                total += 1;
             }
         }
-        count
+        total
     }
 
-    /// Returns the convex hull of the dataset, oriented CCW.
-    /// It is a list of vertex indices (first != last)
-    pub fn convex_hull(&self) -> Vec<usize> {
-        let mut re: Vec<usize> = Vec::new();
-        for x in self.stars[&0].link.iter() {
-            re.push(*x);
-        }
-        re.reverse();
-        re
-    }
+    // /// Returns the convex hull of the dataset, oriented CCW.
+    // /// It is a list of vertex indices (first != last)
+    // pub fn convex_hull(&self) -> Vec<usize> {
+    //     let mut re: Vec<usize> = Vec::new();
+    //     for x in self.stars[&0].link.iter() {
+    //         re.push(*x);
+    //     }
+    //     re.reverse();
+    //     re
+    // }
 
-    /// Returns the size (ie the number of vertices) of the convex hull of the dataset
-    pub fn number_of_vertices_on_convex_hull(&self) -> usize {
-        //-- number of finite vertices on the boundary of the convex hull
-        if self.is_init == false {
-            return 0;
-        }
-        return self.stars[&0].link.len();
-    }
+    // /// Returns the size (ie the number of vertices) of the convex hull of the dataset
+    // pub fn number_of_vertices_on_convex_hull(&self) -> usize {
+    //     //-- number of finite vertices on the boundary of the convex hull
+    //     if self.is_init == false {
+    //         return 0;
+    //     }
+    //     return self.stars[&0].link.len();
+    // }
 
-    /// Returns true if the vertex v is part of the boundary of the convex
-    /// hull of the dataset. False otherwise.
-    pub fn is_vertex_convex_hull(&self, v: usize) -> bool {
-        if v == 0 {
-            return false;
-        }
-        if self.vertex_exists(v) == false {
-            return false;
-        }
-        self.stars[&v].link.contains_infinite_vertex()
-    }
-
-    /// Returns, if it exists, the Triangle containing (px,py).
-    /// If it is direction on a vertex/edge, then one is randomly chosen.
-    pub fn locate(&self, px: f64, py: f64) -> Option<Triangle> {
-        let p: [f64; 3] = [px, py, 0.0];
-        let re = self.walk(&p);
-        match re.is_infinite() {
-            true => None,
-            false => Some(re),
-        }
-    }
-
-    // Returns closest point (in 2D) to a query point (x,y).
-    // if (x,y) is outside the convex hull [`None`]
-    pub fn closest_point(&self, px: f64, py: f64) -> Option<usize> {
-        let re = self.locate(px, py);
-        if re.is_none() == true {
-            return None;
-        }
-        let p: [f64; 3] = [px, py, 0.0];
-        let tr = re.unwrap();
-        let mut d = std::f64::MAX;
-        let mut closest: usize = 0;
-        //-- 1. find triangle and closest vertex from the 3
-        for each in tr.v.iter() {
-            // println!("{}", each);
-            let dtmp = geom::distance2d_squared(&self.stars[each].pt, &p);
-            if dtmp < d {
-                d = dtmp;
-                closest = *each;
-            }
-        }
-        for each in self.stars[&closest].link.iter() {
-            let dtmp = geom::distance2d_squared(&self.stars[each].pt, &p);
-            if dtmp < d {
-                d = dtmp;
-                closest = *each;
-            }
-        }
-        Some(closest)
-    }
+    // /// Returns true if the vertex v is part of the boundary of the convex
+    // /// hull of the dataset. False otherwise.
+    // pub fn is_vertex_convex_hull(&self, v: usize) -> bool {
+    //     if v == 0 {
+    //         return false;
+    //     }
+    //     if self.vertex_exists(v) == false {
+    //         return false;
+    //     }
+    //     self.stars[&v].link.contains_infinite_vertex()
+    // }
 
     fn walk(&self, x: &[f64]) -> Triangle {
         //-- find a starting tr
-        let cur = self.cur;
+        let tr = self.curt;
 
         //-- 1. try walk from latest
-        let re = self.walk_safe(x, cur);
+        let re = self.walk_safe(x, tr);
         if re.is_some() {
             return re.unwrap();
         }
 
         //-- 2. try walk from one in the same cell
-        // warn!("attempt to find one vertex in the grid cell and start from it");
+        warn!("attempt to find one vertex in the grid cell and start from it");
         let g = self.qt.get_cell_gxgy(x[0], x[1]);
         if self.qt.gpts[g.0][g.1].len() > 0 {
             let mut dmin: f64 = std::f64::MAX;
@@ -1283,131 +889,40 @@ impl Triangulation {
         return tr;
     }
 
-    fn walk_safe(&self, x: &[f64], cur: usize) -> Option<Triangle> {
-        let mut tr = Triangle { v: [0, 0, 0] };
-        let re = &self.stars.get(&cur);
-        if re.is_none() {
-            return None;
-        }
-
-        //--
-        // println!(
-        //     "walk_safe: ({}) -- {}",
-        //     cur,
-        //     self.stars.get(&cur).unwrap().link
-        // );
-        // let a: Vec<&usize> = self.stars.keys().collect();
-        // println!("{:?}", a);
-        //--
-
-        tr.v[0] = cur;
-        let l = &re.unwrap().link;
-        let mut b = false;
-        for i in 0..(l.len() - 1) {
-            if (l[i] != 0)
-                && (l[i + 1] != 0)
-                && (self.stars.contains_key(&l[i]) == true)
-                && (self.stars.contains_key(&l[i + 1]) == true)
-            {
-                tr.v[1] = l[i];
-                tr.v[2] = l[i + 1];
-                b = true;
-                break;
-            }
-        }
-        if b == false {
-            info!("Cannot find a starting finite triangle.");
-            return None;
-        }
-
-        //-- 2. order it such that tr0-tr1-x is CCW
-        if geom::orient2d(
-            &self.stars[&tr.v[0]].pt,
-            &self.stars[&tr.v[1]].pt,
-            &x,
-            self.robust_predicates,
-        ) == -1
-        {
-            if geom::orient2d(
-                &self.stars[&tr.v[1]].pt,
-                &self.stars[&tr.v[2]].pt,
-                &x,
-                self.robust_predicates,
-            ) != -1
-            {
-                let tmp: usize = tr.v[0];
-                tr.v[0] = tr.v[1];
-                tr.v[1] = tr.v[2];
-                tr.v[2] = tmp;
-            } else {
-                let tmp: usize = tr.v[1];
-                tr.v[1] = tr.v[0];
-                tr.v[0] = tr.v[2];
-                tr.v[2] = tmp;
-            }
-        }
-
-        //-- 3. start the walk
-        //-- we know that tr0-tr1-x is CCW
+    fn walk_safe(&self, x: &[f64], tr: usize) -> Option<usize> {
         loop {
-            if tr.is_infinite() == true {
-                break;
+            if self.is_triangle_finite(tr) == false {
+                return Some(tr);
             }
-            let a = &self.stars.get(&tr.v[0]);
-            if a.is_none() {
-                return None;
-            }
-            let b = &self.stars.get(&tr.v[1]);
-            if b.is_none() {
-                return None;
-            }
-            let c = &self.stars.get(&tr.v[2]);
-            if c.is_none() {
-                return None;
-            }
-            if geom::orient2d(
-                &self.stars.get(&tr.v[1]).unwrap().pt,
-                &self.stars.get(&tr.v[2]).unwrap().pt,
-                &x,
-                self.robust_predicates,
-            ) != -1
-            {
-                if geom::orient2d(
-                    &self.stars.get(&tr.v[2]).unwrap().pt,
-                    &self.stars.get(&tr.v[0]).unwrap().pt,
-                    &x,
-                    self.robust_predicates,
-                ) != -1
+            let t = self.ts[tr];
+            if geom::orient2d(&self.vs[t[0]], &self.vs[t[1]], &x, self.robust_predicates) != -1 {
+                if geom::orient2d(&self.vs[t[1]], &self.vs[t[2]], &x, self.robust_predicates) != -1
                 {
-                    break;
+                    if geom::orient2d(&self.vs[t[2]], &self.vs[t[0]], &x, self.robust_predicates)
+                        != -1
+                    {
+                        // println!("found it! {}", tr);
+                        return Some(tr);
+                    } else {
+                        if t[4] == 0 {
+                            //-- if about to fall off then return None
+                            return None;
+                        }
+                        tr = t[4];
+                    }
                 } else {
-                    //-- walk to incident to tr1,tr2
-                    // println!("here");
-                    let prev = self
-                        .stars
-                        .get(&tr.v[2])
-                        .unwrap()
-                        .link
-                        .get_prev_vertex(tr.v[0])
-                        .unwrap();
-                    tr.v[1] = tr.v[2];
-                    tr.v[2] = prev;
+                    if t[3] == 0 {
+                        return None;
+                    }
+                    tr = t[3];
                 }
             } else {
-                //-- walk to incident to tr1,tr2
-                // a.iter().position(|&x| x == 2), Some(1)
-                let prev = self
-                    .stars
-                    .get(&tr.v[1])
-                    .unwrap()
-                    .link
-                    .get_prev_vertex(tr.v[2])
-                    .unwrap();
-                tr.v[0] = tr.v[2];
-                tr.v[2] = prev;
+                if t[5] == 0 {
+                    return None;
+                }
+                tr = t[5];
             }
         }
-        return Some(tr);
     }
 
     fn walk_bruteforce_vertices(&self, x: &[f64]) -> Option<Triangle> {
@@ -1594,109 +1109,78 @@ impl Triangulation {
         return tr;
     }
 
-    fn flip22(&mut self, tr: &Triangle, opposite: usize) -> (Triangle, Triangle) {
-        //-- step 1.
-        self.stars
-            .get_mut(&tr.v[0])
-            .unwrap()
-            .link
-            .insert_after_v(opposite, tr.v[1]);
-        //-- step 2.
-        self.stars.get_mut(&tr.v[1]).unwrap().link.delete(tr.v[2]);
-        //-- step 3.
-        self.stars
-            .get_mut(&opposite)
-            .unwrap()
-            .link
-            .insert_after_v(tr.v[0], tr.v[2]);
-        //-- step 4.
-        self.stars.get_mut(&tr.v[2]).unwrap().link.delete(tr.v[1]);
-        //-- make 2 triangles to return (to stack)
-        let ret0 = Triangle {
-            v: [tr.v[0], tr.v[1], opposite],
-        };
-        let ret1 = Triangle {
-            v: [tr.v[0], opposite, tr.v[2]],
-        };
-        (ret0, ret1)
-    }
+    fn flip22(&mut self, t0i: usize, t1i: usize) {
+        // println!("flip22");
+        // self.print_ds();
+        let t0 = self.ts[t0i];
+        let t1 = self.ts[t1i];
+        let k0 = &t0[3..6].iter().position(|&x| x == t1i).unwrap();
+        let k1 = &t1[3..6].iter().position(|&x| x == t0i).unwrap();
 
-    fn get_opposite_vertex(&self, tr: &Triangle) -> usize {
-        self.stars[&tr.v[2]].link.get_next_vertex(tr.v[1]).unwrap()
-    }
+        let nt0 = [
+            t0[*k0],
+            t0[(*k0 + 1) % 3],
+            t1[*k1],
+            t1[((*k1 + 1) % 3) + 3],
+            t1i,
+            t0[((*k0 + 2) % 3) + 3],
+        ];
+        let nt1 = [
+            t0[*k0],
+            t1[*k1],
+            t0[(*k0 + 2) % 3],
+            t1[((*k1 + 2) % 3) + 3],
+            t0[((*k0 + 1) % 3) + 3],
+            t0i,
+        ];
 
-    /// Returns a Vec<Vec<f64>> of all the vertices (including the infinite one)
-    pub fn all_vertices(&self) -> Vec<Vec<f64>> {
-        let mut pts: Vec<Vec<f64>> = Vec::with_capacity(self.stars.len() - 1);
-        for i in 0..self.stars.len() {
-            pts.push(self.stars.get(&i).unwrap().pt.to_vec());
+        //-- update 2 neighbouring triangles
+        //-- because 2 stay the same since the indices are not changed
+        let mut n0 = t0[((*k0 + 1) % 3) + 3];
+        let a = self.ts[n0];
+        let a1 = &a[3..6].iter().position(|&x| x == t0i).unwrap();
+        if let Some(x) = self.ts.get_mut(n0) {
+            (*x)[*a1 + 3] = t1i;
         }
-        pts
-    }
-
-    /// Returns a <Vec<usize> of all the finite edges (implicitly grouped by 2)
-    pub fn all_edges(&self) -> Vec<usize> {
-        let mut edges: Vec<usize> = Vec::new();
-        for i in 1..self.stars.len() {
-            for value in self.stars[&i].link.iter() {
-                if (*value != 0) && (i < *value) {
-                    edges.push(i);
-                    edges.push(*value);
-                }
-            }
+        n0 = t1[((k1 + 1) % 3) + 3];
+        let a = self.ts[n0];
+        let a1 = &a[3..6].iter().position(|&x| x == t1i).unwrap();
+        if let Some(x) = self.ts.get_mut(n0) {
+            (*x)[*a1 + 3] = t0i;
         }
-        edges
-    }
-
-    /// Returns a <Vec<Triangle> of all the finite triangles (including the infinite one)
-    pub fn all_triangles(&self) -> Vec<Triangle> {
-        let mut trs: Vec<Triangle> = Vec::new();
-        for (i, star) in &self.stars {
-            //-- reconstruct triangles
-            for (j, value) in star.link.iter().enumerate() {
-                if i < value {
-                    // let k = star.l[self.nexti(star.link.len(), j)];
-                    let k = star.link[star.link.next_index(j)];
-                    if i < &k {
-                        let tr = Triangle { v: [*i, *value, k] };
-                        if tr.is_infinite() == false {
-                            // println!("{}", tr);
-                            trs.push(tr);
-                        }
-                    }
-                }
-            }
+        if let Some(x) = self.ts.get_mut(t0i) {
+            (*x) = nt0;
         }
-        trs
-    }
-
-    /// Validates the Delaunay triangulation:
-    /// (1) checks each triangle against each vertex (circumcircle tests); very slow
-    /// (2) checks whether the convex hull is really convex
-    pub fn is_valid(&self) -> bool {
-        self.is_valid_ch_convex() && self.is_valid_circumcircle()
-    }
-
-    fn is_valid_circumcircle(&self) -> bool {
-        let mut re = true;
-        let trs = self.all_triangles();
-        for tr in trs.iter() {
-            for i in 1..self.stars.len() {
-                if geom::incircle(
-                    &self.stars[&tr.v[0]].pt,
-                    &self.stars[&tr.v[1]].pt,
-                    &self.stars[&tr.v[2]].pt,
-                    &self.stars[&i].pt,
-                    self.robust_predicates,
-                ) > 0
-                {
-                    println!("NOT DELAUNAY FFS!");
-                    println!("{} with {}", tr, i);
-                    re = false
-                }
-            }
+        if let Some(x) = self.ts.get_mut(t1i) {
+            (*x) = nt1;
         }
-        re
+    }
+
+    fn print_ds(&self) {
+        println!("=== vertices ===");
+        // let mut ids = self.vs.keys().copied().collect::<Vec<_>>();
+        // ids.sort();
+        for (id, v) in self.vs.iter().enumerate() {
+            println!(
+                "{} -- ({}, {}, {})",
+                id, self.vs[id][0], self.vs[id][1], self.vs[id][2]
+            );
+        }
+        println!("=== triangles ===");
+        // ids = self.ts.keys().copied().collect::<Vec<_>>();
+        // ids.sort();
+        for (id, t) in self.ts.iter().enumerate() {
+            println!(
+                "{} -- [{}, {}, {}, {}, {}, {}]",
+                id,
+                self.ts[id][0],
+                self.ts[id][1],
+                self.ts[id][2],
+                self.ts[id][3],
+                self.ts[id][4],
+                self.ts[id][5]
+            );
+        }
     }
 
     fn is_valid_ch_convex(&self) -> bool {
@@ -1718,109 +1202,6 @@ impl Triangulation {
         //     println!("CONVEX NOT CONVEX");
         // }
         return re;
-    }
-
-    pub fn printme(&self, withxyz: bool) -> String {
-        let mut s = String::from("**********\n");
-        // s.push_str(&format!("#pts: {}\n", self.number_pts()));
-
-        let mut allkeys: Vec<&usize> = self.stars.keys().collect();
-        allkeys.sort();
-        for each in allkeys {
-            let v = self.stars.get(each).unwrap();
-            s.push_str(&format!("{}: [", *each));
-            for each2 in v.link.iter() {
-                s.push_str(&format!("{} - ", each2));
-            }
-            s.push_str(&format!("]\n"));
-        }
-
-        // for (i, p) in &self.stars {
-        //     // for (i, p) in self.stars.iter().enumerate() {
-        //     // s.push_str(&format!("{}: {}\n", i, self.stars[i].link));
-        //     s.push_str(&format!("{}: [", i));
-        //     for each in p.link.iter() {
-        //         s.push_str(&format!("{} - ", each));
-        //     }
-        //     s.push_str(&format!("]\n"));
-        //     if withxyz == true {
-        //         s.push_str(&format!("\t{:?}\n", self.stars[&i].pt));
-        //     }
-        // }
-        s.push_str("**********\n");
-        s
-    }
-
-    fn vertex_exists(&self, v: usize) -> bool {
-        self.stars.contains_key(&v)
-    }
-
-    /// write a GeoJSON file of the triangles/vertices to disk
-    pub fn write_geojson_triangles(&self, path: String) -> std::io::Result<()> {
-        let mut fc = FeatureCollection {
-            bbox: None,
-            features: vec![],
-            foreign_members: None,
-        };
-        //-- vertices
-        for (i, star) in &self.stars {
-            if *i == 0 {
-                continue;
-            }
-            let pt = Geometry::new(Value::Point(vec![star.pt[0], star.pt[1]]));
-            let mut attributes = Map::new();
-            attributes.insert(String::from("id"), to_value(i.to_string()).unwrap());
-            attributes.insert(
-                String::from("written"),
-                serde_json::value::Value::Bool(star.written),
-            );
-            let f = Feature {
-                bbox: None,
-                geometry: Some(pt),
-                id: None,
-                properties: Some(attributes),
-                foreign_members: None,
-            };
-            fc.features.push(f);
-        }
-        //-- triangles
-        for (i, star) in &self.stars {
-            for (j, value) in star.link.iter().enumerate() {
-                if (i < value) && (self.stars.contains_key(&value) == true) {
-                    let k = star.link[star.link.next_index(j)];
-                    if (i < &k) && (self.stars.contains_key(&k) == true) {
-                        let tr = Triangle { v: [*i, *value, k] };
-                        if tr.is_infinite() == false {
-                            let mut l: Vec<Vec<Vec<f64>>> = vec![vec![Vec::with_capacity(1); 4]];
-                            l[0][0].push(self.stars[i].pt[0]);
-                            l[0][0].push(self.stars[i].pt[1]);
-                            l[0][1].push(self.stars[value].pt[0]);
-                            l[0][1].push(self.stars[value].pt[1]);
-                            l[0][2].push(self.stars[&k].pt[0]);
-                            l[0][2].push(self.stars[&k].pt[1]);
-                            l[0][3].push(self.stars[i].pt[0]);
-                            l[0][3].push(self.stars[i].pt[1]);
-                            let gtr = Geometry::new(Value::Polygon(l));
-                            // let mut attributes = Map::new();
-                            // if self.stars[]
-                            // attributes.insert(String::from("active"), to_value();
-                            let f = Feature {
-                                bbox: None,
-                                geometry: Some(gtr),
-                                id: None,
-                                properties: None, //Some(attributes),
-                                foreign_members: None,
-                            };
-                            fc.features.push(f);
-                        }
-                    }
-                }
-            }
-        }
-        //-- write the file to disk
-        let mut fo = File::create(path)?;
-        write!(fo, "{}", fc.to_string()).unwrap();
-        Ok(())
     }
 
     /// write a GeoJSON file of the quadtree/grid to disk
