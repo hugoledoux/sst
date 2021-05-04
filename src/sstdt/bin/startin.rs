@@ -453,17 +453,14 @@ pub struct Triangulation {
     smacount: usize,
     smaid_mapping: HashMap<usize, usize>,
     pub max: usize,
-    pub w1: usize,
-    pub w2: usize,
-    pub w3: usize,
-    pub w4: usize,
-    pub w5: usize,
+    pub walks: HashMap<usize, usize>,
 }
 
 impl Triangulation {
     //-- new
     pub fn new() -> Triangulation {
         let mut s: HashMap<usize, Star> = HashMap::new();
+        let thewalks: HashMap<usize, usize> = HashMap::new();
         let mut mystar = Star::new(-99999.99999, -99999.99999, -99999.99999);
         mystar.written = true;
         s.insert(0, mystar);
@@ -480,11 +477,7 @@ impl Triangulation {
             smacount: 1,
             smaid_mapping: HashMap::new(),
             max: 1,
-            w1: 0,
-            w2: 0,
-            w3: 0,
-            w4: 0,
-            w5: 0,
+            walks: thewalks,
         }
     }
 
@@ -893,20 +886,12 @@ impl Triangulation {
         //-- walk
         let p: [f64; 3] = [px, py, pz];
         let (tr, w) = self.walk(&p);
-        if w == 1 {
-            self.w1 += 1;
-        }
-        if w == 2 {
-            self.w2 += 1;
-        }
-        if w == 3 {
-            self.w3 += 1;
-        }
-        if w == 4 {
-            self.w4 += 1;
-        }
-        if w == 5 {
-            self.w5 += 1;
+        if self.walks.contains_key(&w) == false {
+            self.walks.insert(w, 1);
+        } else {
+            if let Some(x) = self.walks.get_mut(&w) {
+                *x += 1;
+            }
         }
 
         // println!("STARTING TR: {}", tr);
@@ -1252,7 +1237,7 @@ impl Triangulation {
         Some(closest)
     }
 
-    fn walk(&self, x: &[f64]) -> (Triangle, i32) {
+    fn walk(&self, x: &[f64]) -> (Triangle, usize) {
         //-- find a starting tr
         let cur = self.cur;
 
@@ -1261,39 +1246,87 @@ impl Triangulation {
         if re.is_some() {
             let r = re.unwrap();
             // self.cur = r.v[0];
-            return (r, 1);
+            return (r, 10);
         }
 
         //-- 2. try walk from one in the same cell
         // warn!("walk in grid");
         let g = self.qt.get_cell_gxgy(x[0], x[1]);
-        let v: Vec<_> = self.qt.gpts[g.0][g.1].iter().collect();
-        let samples: Vec<_> = v.choose_multiple(&mut rand::thread_rng(), 10).collect();
-        let mut dmin: f64 = std::f64::MAX;
-        let mut vmin: usize = 0;
-        for each in samples {
-            let dtemp = geom::distance2d_squared(&self.stars.get(&each).unwrap().pt, &x);
-            if dtemp < dmin {
-                dmin = dtemp;
-                vmin = **each;
+        // let v: Vec<_> = self.qt.gpts[g.0][g.1].iter().collect();
+        // let samples: Vec<_> = v.choose_multiple(&mut rand::thread_rng(), 10).collect();
+        // let mut dmin: f64 = std::f64::MAX;
+        // let mut vmin: usize = 0;
+        // for each in samples {
+        //     let dtemp = geom::distance2d_squared(&self.stars.get(&each).unwrap().pt, &x);
+        //     if dtemp < dmin {
+        //         dmin = dtemp;
+        //         vmin = **each;
+        //     }
+        // }
+        //-- pick the first one
+        if self.qt.gpts[g.0][g.1].is_empty() == false {
+            let o = self.qt.gpts[g.0][g.1].iter().next().unwrap();
+            let re = self.walk_safe(x, *o);
+            if re.is_some() {
+                return (re.unwrap(), 20);
             }
         }
-        let re = self.walk_safe(x, vmin);
-        if re.is_some() {
-            return (re.unwrap(), 2);
+        //-- try neighbouring cells
+        // if gnext.0 >= 0 && gnext.0 < self.qt.gpts.len() {
+        let mut gnext: (usize, usize);
+        if g.0 != 0 {
+            gnext = (g.0 - 1, g.1);
+            if self.qt.gpts[gnext.0][gnext.1].is_empty() == false {
+                let o = self.qt.gpts[gnext.0][gnext.1].iter().next().unwrap();
+                let re = self.walk_safe(x, *o);
+                if re.is_some() {
+                    return (re.unwrap(), 21);
+                }
+            }
+        }
+        if g.1 != 0 {
+            gnext = (g.0, g.1 - 1);
+            if self.qt.gpts[gnext.0][gnext.1].is_empty() == false {
+                let o = self.qt.gpts[gnext.0][gnext.1].iter().next().unwrap();
+                let re = self.walk_safe(x, *o);
+                if re.is_some() {
+                    return (re.unwrap(), 22);
+                }
+            }
+        }
+        // info!("{:?} {}", self.qt.gpts.len(), g.0);
+        if g.0 < self.qt.gpts.len() - 1 {
+            gnext = (g.0 + 1, g.1);
+            if self.qt.gpts[gnext.0][gnext.1].is_empty() == false {
+                let o = self.qt.gpts[gnext.0][gnext.1].iter().next().unwrap();
+                let re = self.walk_safe(x, *o);
+                if re.is_some() {
+                    return (re.unwrap(), 23);
+                }
+            }
+        }
+        if g.1 < self.qt.gpts[g.0].len() - 1 {
+            gnext = (g.0, g.1 + 1);
+            if self.qt.gpts[gnext.0][gnext.1].is_empty() == false {
+                let o = self.qt.gpts[gnext.0][gnext.1].iter().next().unwrap();
+                let re = self.walk_safe(x, *o);
+                if re.is_some() {
+                    return (re.unwrap(), 24);
+                }
+            }
         }
 
         //-- 3. try brute-force
         // warn!("brute-force walk :(");
         let re2 = self.walk_bruteforce_closest_vertex_then_walksafe(x);
         if re2.is_some() {
-            return (re2.unwrap(), 3);
+            return (re2.unwrap(), 30);
         }
 
         // warn!("ouch :(");
         let re3 = self.walk_bruteforce_triangles(x);
         if re3.is_some() {
-            return (re3.unwrap(), 4);
+            return (re3.unwrap(), 31);
         }
 
         //-- 4. we are outside the CH of the current dataset
@@ -1304,7 +1337,7 @@ impl Triangulation {
         //     println!("{:?}", key);
         // }
         if re4.is_some() {
-            return (re4.unwrap(), 5);
+            return (re4.unwrap(), 4);
         } else {
             error!("WALK FAILED MISERABLY :'(");
         }

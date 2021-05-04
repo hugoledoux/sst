@@ -127,11 +127,12 @@ fn main() -> io::Result<()> {
     info!("Finished reading the stream");
     info!("dt.number_of_vertices() = {}", dt.number_of_vertices());
     info!("max # points in DT during process: {}", dt.max);
-    info!("w1: {}", dt.w1);
-    info!("w2: {}", dt.w2);
-    info!("w3: {}", dt.w3);
-    info!("w4: {}", dt.w4);
-    info!("w4: {}", dt.w5);
+    let mut tmp: Vec<&usize> = dt.walks.keys().collect();
+    tmp.sort();
+    for key in tmp {
+        info!("w{}: {}", key, dt.walks[&key]);
+    }
+
     let _x = dt.finalise_leftover_triangles();
 
     info!("✅");
