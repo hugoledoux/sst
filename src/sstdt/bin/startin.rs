@@ -1379,7 +1379,7 @@ impl Triangulation {
             }
         }
         if b == false {
-            info!("Cannot find a starting finite triangle.");
+            // info!("Cannot find a starting finite triangle.");
             return None;
         }
 
