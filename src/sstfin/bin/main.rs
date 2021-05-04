@@ -55,25 +55,25 @@ fn main() {
         .version("0.1")
         .about("streaming startin -- finalisation")
         .arg(
-            Arg::with_name("INPUT")
+            Arg::new("INPUT")
                 .about("The input LAS/LAZ/XYZ file(s) to use.")
                 .required(true)
                 .index(1),
         )
         .arg(
-            Arg::with_name("RESOLUTION")
+            Arg::new("RESOLUTION")
                 .about("The cell resolution (integer, eg '5' for 5mX5m)")
                 .required(true)
                 .index(2),
         )
         .arg(
-            Arg::with_name("g")
+            Arg::new("g")
                 .about("Use only ground in LAS files")
                 .short('g')
                 .required(false),
         )
         .arg(
-            Arg::with_name("sprinkle")
+            Arg::new("sprinkle")
                 .short('s')
                 .about("Value to use (0.001 is default; totalpts * 0.001)")
                 .required(false),
