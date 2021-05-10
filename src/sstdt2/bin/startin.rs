@@ -316,10 +316,12 @@ pub struct Triangulation {
 impl Triangulation {
     //-- new
     pub fn new() -> Triangulation {
-        let p: [f64; 3] = [-99999.9, -99999.9, -99999.9];
         let mut thevs: Vec<[f64; 3]> = Vec::new();
-        thevs.push(p);
-        let thets: Vec<[usize; 6]> = Vec::new();
+        let p: [f64; 3] = [-99999.9, -99999.9, -99999.9];
+        thevs.push(p); //-- add the infinity point
+        let mut thets: Vec<[usize; 6]> = Vec::new();
+        let t: [usize; 6] = [0, 0, 0, 0, 0, 0]; //-- add a dummy triangle to simulate missing triangles (null pointers)
+        thets.push(t);
         let q = Quadtree::new();
         let theflt: Vec<usize> = Vec::new();
         let theflv: Vec<usize> = Vec::new();
@@ -586,21 +588,22 @@ impl Triangulation {
             );
             if re == 1 {
                 // println!("init: ({},{},{})", a, b, c);
-                self.ts.push([a, b, c, 2, 3, 1]);
-                self.ts.push([a, 0, b, 2, 0, 3]);
-                self.ts.push([b, 0, c, 3, 0, 1]);
-                self.ts.push([c, 0, a, 1, 0, 2]);
+
+                self.ts.push([a, b, c, 3, 4, 2]);
+                self.ts.push([a, 0, b, 3, 1, 4]);
+                self.ts.push([b, 0, c, 4, 1, 2]);
+                self.ts.push([c, 0, a, 2, 1, 3]);
                 self.is_init = true;
             } else if re == -1 {
                 // println!("init: ({},{},{})", a, c, b);
-                self.ts.push([a, c, b, 2, 3, 1]);
-                self.ts.push([a, 0, c, 2, 0, 3]);
-                self.ts.push([c, 0, b, 3, 0, 1]);
-                self.ts.push([b, 0, a, 1, 0, 2]);
+                self.ts.push([a, c, b, 3, 4, 2]);
+                self.ts.push([a, 0, c, 3, 1, 4]);
+                self.ts.push([c, 0, b, 4, 1, 2]);
+                self.ts.push([b, 0, a, 2, 1, 3]);
                 self.is_init = true;
             }
         }
-        self.curt = 0;
+        self.curt = 1;
         // TODO: add those lines
         // if self.is_init == true {
         //     //-- insert the previous vertices in the dt
