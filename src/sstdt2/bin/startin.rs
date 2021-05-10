@@ -25,8 +25,8 @@ struct Qtcell {
 
 impl Qtcell {
     pub fn new() -> Qtcell {
-        let mut p: HashSet<usize> = HashSet::new();
-        let mut t: HashSet<usize> = HashSet::new();
+        let p: HashSet<usize> = HashSet::new();
+        let t: HashSet<usize> = HashSet::new();
         Qtcell {
             pts: p,
             ts: t,
@@ -65,7 +65,7 @@ struct Quadtree {
 
 impl Quadtree {
     pub fn new() -> Quadtree {
-        let mut cs: HashMap<Vec<u8>, Qtcell> = HashMap::new();
+        let cs: HashMap<Vec<u8>, Qtcell> = HashMap::new();
         Quadtree {
             cells: cs,
             cellsize: 0,
@@ -611,7 +611,7 @@ impl Triangulation {
         //         self.update_dt(j);
         //     }
         // }
-        Ok(self.curt)
+        Ok(self.vs.len() - 1)
     }
 
     /// Set a snap tolerance when inserting new points: if the newly inserted
@@ -750,7 +750,8 @@ impl Triangulation {
             let k = &it[0..3].iter().position(|&x| x == 0).unwrap();
             newcurt = it[k + 3];
         }
-        Ok(newcurt)
+        self.curt = newcurt;
+        Ok(pi)
     }
 
     fn flip13(&mut self, vi: usize, ti: usize) -> (usize, usize, usize) {
@@ -1109,8 +1110,67 @@ impl Triangulation {
             l[0][3].push(self.qt.miny + (((g.1 + 1) * self.qt.cellsize) as f64));
             l[0][4].push(self.qt.minx + ((g.0 * self.qt.cellsize) as f64));
             l[0][4].push(self.qt.miny + ((g.1 * self.qt.cellsize) as f64));
-
+            let mut attributes = Map::new();
+            let n = self.qt.cells[key].number_pts();
+            attributes.insert(String::from("no_pts"), to_value(n).unwrap());
             let gtr = Geometry::new(Value::Polygon(l));
+            let f = Feature {
+                bbox: None,
+                geometry: Some(gtr),
+                id: None,
+                properties: Some(attributes),
+                foreign_members: None,
+            };
+            fc.features.push(f);
+        }
+        //-- write the file to disk
+        let mut fo = File::create(path)?;
+        write!(fo, "{}", fc.to_string()).unwrap();
+        Ok(())
+    }
+
+    /// write a GeoJSON file of the triangles/vertices to disk
+    pub fn write_geojson_triangles(&self, path: String) -> std::io::Result<()> {
+        let mut fc = FeatureCollection {
+            bbox: None,
+            features: vec![],
+            foreign_members: None,
+        };
+        //-- vertices
+        for (i, v) in self.vs.iter().enumerate() {
+            if i == 0 {
+                continue;
+            }
+            let pt = Geometry::new(Value::Point(vec![v[0], v[1]]));
+            let mut attributes = Map::new();
+            attributes.insert(String::from("id"), to_value(i.to_string()).unwrap());
+            let f = Feature {
+                bbox: None,
+                geometry: Some(pt),
+                id: None,
+                properties: Some(attributes),
+                foreign_members: None,
+            };
+            fc.features.push(f);
+        }
+        //-- triangles
+        for (i, t) in self.ts.iter().enumerate() {
+            if self.is_triangle_finite(i) == false {
+                continue;
+            }
+            let mut l: Vec<Vec<Vec<f64>>> = vec![vec![Vec::with_capacity(1); 4]];
+            l[0][0].push(self.vs[t[0]][0]);
+            l[0][0].push(self.vs[t[0]][1]);
+            l[0][1].push(self.vs[t[1]][0]);
+            l[0][1].push(self.vs[t[1]][1]);
+            l[0][2].push(self.vs[t[2]][0]);
+            l[0][2].push(self.vs[t[2]][1]);
+            l[0][3].push(self.vs[t[0]][0]);
+            l[0][3].push(self.vs[t[0]][1]);
+            let gtr = Geometry::new(Value::Polygon(l));
+            // let mut attributes = Map::new();
+            // if self.stars[]
+            // attributes.insert(String::from("active"), to_value();
             let f = Feature {
                 bbox: None,
                 geometry: Some(gtr),

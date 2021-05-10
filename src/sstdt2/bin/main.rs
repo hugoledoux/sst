@@ -22,7 +22,7 @@ pub enum Outputmode {
 }
 
 fn main() -> io::Result<()> {
-    let matches = App::new("sstdt")
+    let _matches = App::new("sstdt")
         .version("0.2")
         .about("streaming startin -- Delaunay triangulation")
         .arg("--stars...       'output stars instead of .sma'")
@@ -99,9 +99,6 @@ fn main() -> io::Result<()> {
                 io::stdout().write_all(
                     &format!("b {:.3} {:.3} {:.3} {:.3}\n", re.0, re.1, re.2, re.3).as_bytes(),
                 )?;
-                info!("Writing GeoJSON file to disk: /Users/hugo/temp/sstout/z.grid.geojson");
-                let _re =
-                    dt.write_geojson_grid("/Users/hugo/temp/sstout/z.grid.geojson".to_string());
             }
             'v' => {
                 //-- vertex
@@ -126,6 +123,11 @@ fn main() -> io::Result<()> {
             }
         }
     }
+    info!("Writing GeoJSON file to disk: /Users/hugo/temp/sstout/z.grid.geojson");
+    let _re = dt.write_geojson_grid("/Users/hugo/temp/sstout/z.grid.geojson".to_string());
+
+    let _re = dt.write_geojson_triangles("/Users/hugo/temp/sstout/tr.geojson".to_string());
+
     info!("Finished reading the stream");
     info!("dt.number_of_vertices() = {}", dt.number_of_vertices());
 
