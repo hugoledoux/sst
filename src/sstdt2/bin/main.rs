@@ -7,7 +7,9 @@ mod startin;
 #[macro_use]
 extern crate log; //info/debug/error
 
+use std::fs::File;
 use std::io::BufRead;
+use std::io::BufReader;
 use std::io::{self, Write};
 
 use clap::App;
@@ -34,13 +36,13 @@ fn main() -> io::Result<()> {
     info!("Init DT");
     let mut dt = startin::Triangulation::new();
 
-    if matches.occurrences_of("stars") > 0 {
-        dt.set_outputmode(Outputmode::Stars);
-    }
+    // if matches.occurrences_of("stars") > 0 {
+    //     dt.set_outputmode(Outputmode::Stars);
+    // }
 
-    if matches.occurrences_of("both") > 0 {
-        dt.set_outputmode(Outputmode::Both);
-    }
+    // if matches.occurrences_of("both") > 0 {
+    //     dt.set_outputmode(Outputmode::Both);
+    // }
 
     //----- reading from stdin -----//
     // let stdin = std::io::stdin();
@@ -97,9 +99,9 @@ fn main() -> io::Result<()> {
                 io::stdout().write_all(
                     &format!("b {:.3} {:.3} {:.3} {:.3}\n", re.0, re.1, re.2, re.3).as_bytes(),
                 )?;
-                // info!("Writing GeoJSON file to disk: /Users/hugo/temp/sstout/z.grid.geojson");
-                // let _re =
-                //     dt.write_geojson_grid("/Users/hugo/temp/sstout/z.grid.geojson".to_string());
+                info!("Writing GeoJSON file to disk: /Users/hugo/temp/sstout/z.grid.geojson");
+                let _re =
+                    dt.write_geojson_grid("/Users/hugo/temp/sstout/z.grid.geojson".to_string());
             }
             'v' => {
                 //-- vertex
@@ -128,7 +130,7 @@ fn main() -> io::Result<()> {
     info!("dt.number_of_vertices() = {}", dt.number_of_vertices());
 
     // info!("max # points in DT during process: {}", dt.max);
-    let _x = dt.finalise_leftover_triangles();
+    // let _x = dt.finalise_leftover_triangles();
 
     info!("✅");
     Ok(())
