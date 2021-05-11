@@ -1270,18 +1270,21 @@ impl Triangulation {
             foreign_members: None,
         };
         for (key, cell) in &self.qt.cells {
-            let g = self.qt.qtc2gxgy(&key);
+            println!("key:{:?}", key);
+            let mut bbox: [f64; 4] = [0.0, 0.0, 0.0, 0.0];
+            self.qt.get_cell_bbox_qtc(key, &mut bbox);
+            // println!("bbox: {:?}", bbox);
             let mut l: Vec<Vec<Vec<f64>>> = vec![vec![Vec::with_capacity(1); 5]];
-            l[0][0].push(self.qt.minx + ((g.0 * self.qt.cellsize) as f64));
-            l[0][0].push(self.qt.miny + ((g.1 * self.qt.cellsize) as f64));
-            l[0][1].push(self.qt.minx + (((g.0 + 1) * self.qt.cellsize) as f64));
-            l[0][1].push(self.qt.miny + ((g.1 * self.qt.cellsize) as f64));
-            l[0][2].push(self.qt.minx + (((g.0 + 1) * self.qt.cellsize) as f64));
-            l[0][2].push(self.qt.miny + (((g.1 + 1) * self.qt.cellsize) as f64));
-            l[0][3].push(self.qt.minx + ((g.0 * self.qt.cellsize) as f64));
-            l[0][3].push(self.qt.miny + (((g.1 + 1) * self.qt.cellsize) as f64));
-            l[0][4].push(self.qt.minx + ((g.0 * self.qt.cellsize) as f64));
-            l[0][4].push(self.qt.miny + ((g.1 * self.qt.cellsize) as f64));
+            l[0][0].push(bbox[0]);
+            l[0][0].push(bbox[1]);
+            l[0][1].push(bbox[2]);
+            l[0][1].push(bbox[1]);
+            l[0][2].push(bbox[2]);
+            l[0][2].push(bbox[3]);
+            l[0][3].push(bbox[0]);
+            l[0][3].push(bbox[3]);
+            l[0][4].push(bbox[0]);
+            l[0][4].push(bbox[1]);
             let mut attributes = Map::new();
             let n = self.qt.cells[key].number_pts();
             attributes.insert(String::from("no_pts"), to_value(n).unwrap());
