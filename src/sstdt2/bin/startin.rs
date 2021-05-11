@@ -49,8 +49,18 @@ impl Qtcell {
     pub fn add_ts(&mut self, ti: usize) {
         self.ts.insert(ti);
     }
+
+    // pub fn get_pts(&self) -> HashSet<usize> {
+    //     self.pts
+    // }
 }
 
+//----------------------
+// ┌────┬────┐
+// │  1 │  3 │
+// ├────┼────┤
+// │  0 │  2 │
+// └────┴────┘
 //----------------------
 struct Quadtree {
     cells: HashMap<Vec<u8>, Qtcell>,
@@ -104,13 +114,14 @@ impl Quadtree {
         self.cells.get_mut(&q).unwrap().add_pt(vi);
     }
 
-    // pub fn get_cell_pts(&self, gx: usize, gy: usize) -> Vec<usize> {
-    //     let mut l: Vec<usize> = Vec::new();
-    //     for each in self.gpts[gx][gy].iter() {
-    //         l.push(*each);
-    //     }
-    //     l
-    // }
+    pub fn get_cell_pts(&self, gx: usize, gy: usize) -> Vec<usize> {
+        let q = self.get_qtc_from_gxgy(gx, gy);
+        let mut r: Vec<usize> = Vec::new();
+        for vi in &self.cells[&q].pts {
+            r.push(*vi);
+        }
+        r
+    }
 
     // pub fn get_cell_pts_qtc(&self, qtc: &Vec<u8>) -> Vec<usize> {
     //     let (gx, gy) = self.qtc2gxgy(qtc);
@@ -308,8 +319,8 @@ pub struct Triangulation {
     curt: usize,
     is_init: bool,
     robust_predicates: bool,
-    freelist_t: Vec<usize>, // TODO: use the freelist for insertion
-    freelist_v: Vec<usize>,
+    freelist_ts: Vec<usize>, // TODO: use the freelist for insertion
+    freelist_vs: Vec<usize>,
     outputmode: Outputmode,
 }
 
@@ -333,8 +344,8 @@ impl Triangulation {
             curt: 0,
             is_init: false,
             robust_predicates: true,
-            freelist_v: theflv,
-            freelist_t: theflt,
+            freelist_vs: theflv,
+            freelist_ts: theflt,
             outputmode: Outputmode::Sma,
         }
     }
@@ -362,96 +373,213 @@ impl Triangulation {
             self.qt.get_cell_count(gx, gy).unwrap()
         );
 
-        // let qtc = self.qt.finalise_cell(gx, gy);
+        // TODO: REMOVE THESE LINES
+        if gx != 1 || gy != 0 {
+            return Ok(());
+        }
 
-        // if (qtc.is_empty() == true) || (self.number_of_vertices() <= 3) {
-        //     return Ok(());
-        // }
-        // //-- nothing to do if single cell finalised and it's empty
-        // if (qtc.len() as u32 == self.qt.depth) && (self.qt.get_cell_count(gx, gy).unwrap() == 0) {
-        //     return Ok(());
-        // }
-
-        // let allfcells = self.qt.get_all_gxgy_from_qtc(&qtc);
-
-        // let mut gbbox: [f64; 4] = [0.0, 0.0, 0.0, 0.0];
-        // self.qt.get_cell_bbox_qtc(&qtc, &mut gbbox);
-        // for c in allfcells {
-        //     let allvinc = self.qt.gpts[c.0][c.1].clone();
-        //     for theid in allvinc {
-        //         let mut re = self.adjacent_vertices_to_vertex(theid).unwrap();
-        //         let mut repts: Vec<Option<Vec<f64>>> = Vec::with_capacity(re.len());
-
-        //         for each in &re {
-        //             repts.push(self.get_point(*each));
-        //         }
-        //         //-- check if edge on CH
-        //         let mut onch = 0;
-        //         for (i, _p) in re.iter().enumerate() {
-        //             if repts[i].is_some() && self.stars[&re[i]].link.contains_infinite_vertex() {
-        //                 onch += 1;
-        //             }
-        //         }
-        //         if onch >= 2 {
-        //             continue;
-        //         }
-        //         let theidpt = self.get_point(theid).unwrap();
-        //         let mut fin: bool = true;
-        //         re.push(re[0]);
-        //         repts.push(repts[0].clone());
-        //         for i in 0..(re.len() - 1) {
-        //             if repts[i].is_some() == true
-        //                 && repts[i + 1].is_some() == true
-        //                 && geom::circumcentre_encroach_bbox(
-        //                     &theidpt,
-        //                     &repts[i].as_ref().unwrap(),
-        //                     &repts[i + 1].as_ref().unwrap(),
-        //                     &gbbox,
-        //                 ) == true
-        //             {
-        //                 fin = false;
-        //                 break;
-        //             }
-        //         }
-        //         re.pop();
-        //         if fin == true {
-        //             match self.outputmode {
-        //                 // write triangles
-        //                 Outputmode::Sma => {
-        //                     self.write_sma_one_vertex(theid)
-        //                         .expect("Failed to write vertex");
-        //                     //-- flush it from QT and the DS
-        //                     self.qt.gpts[c.0][c.1].remove(&theid);
-        //                     self.flush_star(theid);
-        //                 }
-
-        //                 //-- finalise the vertex with its star/link
-        //                 Outputmode::Stars => {
-        //                     io::stdout()
-        //                         .write_all(&format!("x {} {:?}\n", theid, re).as_bytes())?;
-        //                     //-- flush it from QT and the DS
-        //                     self.qt.gpts[c.0][c.1].remove(&theid);
-        //                     self.flush_star(theid);
-        //                 }
-
-        //                 //-- finalise the vertex, output both vertex info and star data
-        //                 Outputmode::Both => {
-        //                     self.write_stars_one_vertex(theid)
-        //                         .expect("Failed to write vertex");
-        //                     //-- flush it from QT and the DS
-        //                     self.qt.gpts[c.0][c.1].remove(&theid);
-        //                     self.flush_star(theid);
-        //                 }
-
-        //                 _ => {
-        //                     println!("Option not implemented");
-        //                 }
+        // if gx == 1 && gy == 0 {
+        //     let mut allts: HashSet<usize> = HashSet::new();
+        //     let allpts: Vec<usize> = self.qt.get_cell_pts(gx, gy);
+        //     for vi in &allpts {
+        //         if *vi == 3 {
+        //             println!("===v: {}", *vi);
+        //             // self.print_ds();
+        //             let l: Vec<usize> = self.incident_triangles_to_vertex(*vi).unwrap();
+        //             println!("l: {:?}", l);
+        //             for each in &l {
+        //                 allts.insert(*each);
         //             }
         //         }
         //     }
+        //     let mut ggg: Vec<usize> = allts.into_iter().collect::<Vec<_>>();
+        //     ggg.sort();
+        //     println!("ggg: {:?}", ggg);
         // }
+
+        let mut gbbox: [f64; 4] = [0.0, 0.0, 0.0, 0.0];
+        self.qt.get_cell_bbox(gx, gy, &mut gbbox);
+
+        //-- 1. collect all triangles
+        // let mut allts: HashSet<usize> = HashSet::new();
+        let mut allts: HashMap<usize, bool> = HashMap::new();
+        let allpts: Vec<usize> = self.qt.get_cell_pts(gx, gy);
+        for vi in &allpts {
+            let l: Vec<usize> = self.incident_triangles_to_vertex(*vi).unwrap();
+
+            let mut finv: bool = true;
+            for ti in &l {
+                if allts.contains_key(ti) {
+                    if allts[ti] == false {
+                        finv = false;
+                    }
+                } else if self.is_triangle_final(*ti, &gbbox) == false {
+                    finv = false;
+                    allts.insert(*ti, false);
+                } else {
+                    allts.insert(*ti, true);
+                }
+            }
+            if finv == true {
+                println!("vertex final {:?}", *vi);
+            }
+        }
+        // println!("allts: {:?}", allts);
+
+        //-- remove from the ds
+        for (ti, finalised) in &allts {
+            // println!("{}: \"{}\"", ti, finalised);
+            self.finalise_triangle(*ti);
+        }
+
+        //-- 2. encroachment?
+        // let mut gbbox: [f64; 4] = [0.0, 0.0, 0.0, 0.0];
+        // self.qt.get_cell_bbox(gx, gy, &mut gbbox);
+        // for ti in allts.iter() {
+        //     // println!("{}", t);
+        //     let t0 = self.ts[*ti];
+        //     //-- all 3 points inside the qt cell bbox?
+        //     if geom::point_in_box(&self.vs[t0[0]], &gbbox) == false
+        //         || geom::point_in_box(&self.vs[t0[1]], &gbbox) == false
+        //         || geom::point_in_box(&self.vs[t0[2]], &gbbox) == false
+        //     {
+        //         continue;
+        //     }
+        //     if geom::circumcircle_encroach_bbox(
+        //         &self.vs[t0[0]],
+        //         &self.vs[t0[1]],
+        //         &self.vs[t0[2]],
+        //         &gbbox,
+        //     ) == false
+        //     {
+        //         println!("FLUSH {:?}", ti);
+        //     }
+        // }
+
         Ok(())
     }
+
+    fn finalise_triangle(&mut self, ti: usize) {
+        // self.ts[ti]
+        self.freelist_ts.push(ti);
+        println!("{:?}", self.ts[ti]);
+        for i in 3..6 {
+            let tadj = self.ts[ti][i];
+            let k = &self.ts[tadj][3..6].iter().position(|&x| x == ti).unwrap();
+            self.ts[tadj][k + 3] = 0;
+        }
+        println!("flush triangle: {:?}", ti);
+    }
+
+    fn is_triangle_final(&self, ti: usize, bbox: &[f64]) -> bool {
+        let t0 = self.ts[ti];
+        //-- all 3 points inside the qt cell bbox?
+        if geom::point_in_box(&self.vs[t0[0]], &bbox) == false
+            || geom::point_in_box(&self.vs[t0[1]], &bbox) == false
+            || geom::point_in_box(&self.vs[t0[2]], &bbox) == false
+        {
+            return false;
+        }
+        if geom::circumcircle_encroach_bbox(
+            &self.vs[t0[0]],
+            &self.vs[t0[1]],
+            &self.vs[t0[2]],
+            &bbox,
+        ) == true
+        {
+            return false;
+        }
+        true
+    }
+
+    // let qtc = self.qt.finalise_cell(gx, gy);
+
+    // if (qtc.is_empty() == true) || (self.number_of_vertices() <= 3) {
+    //     return Ok(());
+    // }
+    // //-- nothing to do if single cell finalised and it's empty
+    // if (qtc.len() as u32 == self.qt.depth) && (self.qt.get_cell_count(gx, gy).unwrap() == 0) {
+    //     return Ok(());
+    // }
+
+    // let allfcells = self.qt.get_all_gxgy_from_qtc(&qtc);
+
+    // let mut gbbox: [f64; 4] = [0.0, 0.0, 0.0, 0.0];
+    // self.qt.get_cell_bbox_qtc(&qtc, &mut gbbox);
+    // for c in allfcells {
+    //     let allvinc = self.qt.gpts[c.0][c.1].clone();
+    //     for theid in allvinc {
+    //         let mut re = self.adjacent_vertices_to_vertex(theid).unwrap();
+    //         let mut repts: Vec<Option<Vec<f64>>> = Vec::with_capacity(re.len());
+
+    //         for each in &re {
+    //             repts.push(self.get_point(*each));
+    //         }
+    //         //-- check if edge on CH
+    //         let mut onch = 0;
+    //         for (i, _p) in re.iter().enumerate() {
+    //             if repts[i].is_some() && self.stars[&re[i]].link.contains_infinite_vertex() {
+    //                 onch += 1;
+    //             }
+    //         }
+    //         if onch >= 2 {
+    //             continue;
+    //         }
+    //         let theidpt = self.get_point(theid).unwrap();
+    //         let mut fin: bool = true;
+    //         re.push(re[0]);
+    //         repts.push(repts[0].clone());
+    //         for i in 0..(re.len() - 1) {
+    //             if repts[i].is_some() == true
+    //                 && repts[i + 1].is_some() == true
+    //                 && geom::circumcentre_encroach_bbox(
+    //                     &theidpt,
+    //                     &repts[i].as_ref().unwrap(),
+    //                     &repts[i + 1].as_ref().unwrap(),
+    //                     &gbbox,
+    //                 ) == true
+    //             {
+    //                 fin = false;
+    //                 break;
+    //             }
+    //         }
+    //         re.pop();
+    //         if fin == true {
+    //             match self.outputmode {
+    //                 // write triangles
+    //                 Outputmode::Sma => {
+    //                     self.write_sma_one_vertex(theid)
+    //                         .expect("Failed to write vertex");
+    //                     //-- flush it from QT and the DS
+    //                     self.qt.gpts[c.0][c.1].remove(&theid);
+    //                     self.flush_star(theid);
+    //                 }
+
+    //                 //-- finalise the vertex with its star/link
+    //                 Outputmode::Stars => {
+    //                     io::stdout()
+    //                         .write_all(&format!("x {} {:?}\n", theid, re).as_bytes())?;
+    //                     //-- flush it from QT and the DS
+    //                     self.qt.gpts[c.0][c.1].remove(&theid);
+    //                     self.flush_star(theid);
+    //                 }
+
+    //                 //-- finalise the vertex, output both vertex info and star data
+    //                 Outputmode::Both => {
+    //                     self.write_stars_one_vertex(theid)
+    //                         .expect("Failed to write vertex");
+    //                     //-- flush it from QT and the DS
+    //                     self.qt.gpts[c.0][c.1].remove(&theid);
+    //                     self.flush_star(theid);
+    //                 }
+
+    //                 _ => {
+    //                     println!("Option not implemented");
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
     // fn write_sma_one_vertex(&mut self, v: usize) -> io::Result<()> {
     //     let vpt = self.get_point(v).unwrap();
@@ -641,6 +769,7 @@ impl Triangulation {
     }
 
     pub fn insert_one_pt_with_grid(&mut self, px: f64, py: f64, pz: f64) -> Result<usize, usize> {
+        // println!("v: {}-{}", px, py);
         let re = self.insert_one_pt(px, py, pz);
         if re.is_ok() {
             let x = re.unwrap();
@@ -813,6 +942,28 @@ impl Triangulation {
     //     }
     //     Some(adjs)
     // }
+
+    pub fn incident_triangles_to_vertex(&self, vi: usize) -> Option<Vec<usize>> {
+        let mut l: Vec<usize> = Vec::new();
+        let t0 = self.walk(&[self.vs[vi][0], self.vs[vi][1]]);
+        // println!("{}--{:?}", t0, self.ts[t0]);
+        l.push(t0);
+        let mut curt = t0;
+        loop {
+            let tt = self.ts[curt];
+            let k0 = &tt[0..3].iter().position(|&x| x == vi).unwrap();
+            let nextt = tt[((*k0 + 1) % 3) + 3];
+            // println!("cur: {}", nextt);
+            if nextt != t0 {
+                l.push(nextt);
+                curt = nextt;
+            } else {
+                break;
+            }
+        }
+        // println!("{:?}", l);
+        Some(l)
+    }
 
     fn is_triangle_finite(&self, t: usize) -> bool {
         let t = self.ts[t];
@@ -1066,7 +1217,7 @@ impl Triangulation {
         }
     }
 
-    fn print_ds(&self) {
+    pub fn print_ds(&self) {
         println!("=== vertices ===");
         // let mut ids = self.vs.keys().copied().collect::<Vec<_>>();
         // ids.sort();
@@ -1116,6 +1267,7 @@ impl Triangulation {
             let mut attributes = Map::new();
             let n = self.qt.cells[key].number_pts();
             attributes.insert(String::from("no_pts"), to_value(n).unwrap());
+            attributes.insert(String::from("qtc"), to_value(key).unwrap());
             let gtr = Geometry::new(Value::Polygon(l));
             let f = Feature {
                 bbox: None,
@@ -1171,14 +1323,13 @@ impl Triangulation {
             l[0][3].push(self.vs[t[0]][0]);
             l[0][3].push(self.vs[t[0]][1]);
             let gtr = Geometry::new(Value::Polygon(l));
-            // let mut attributes = Map::new();
-            // if self.stars[]
-            // attributes.insert(String::from("active"), to_value();
+            let mut attributes = Map::new();
+            attributes.insert(String::from("tid"), to_value(i.to_string()).unwrap());
             let f = Feature {
                 bbox: None,
                 geometry: Some(gtr),
                 id: None,
-                properties: None, //Some(attributes),
+                properties: Some(attributes),
                 foreign_members: None,
             };
             fc.features.push(f);
