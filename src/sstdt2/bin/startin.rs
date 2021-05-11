@@ -374,27 +374,8 @@ impl Triangulation {
         );
 
         // TODO: REMOVE THESE LINES
-        if gx != 1 || gy != 0 {
-            return Ok(());
-        }
-
-        // if gx == 1 && gy == 0 {
-        //     let mut allts: HashSet<usize> = HashSet::new();
-        //     let allpts: Vec<usize> = self.qt.get_cell_pts(gx, gy);
-        //     for vi in &allpts {
-        //         if *vi == 3 {
-        //             println!("===v: {}", *vi);
-        //             // self.print_ds();
-        //             let l: Vec<usize> = self.incident_triangles_to_vertex(*vi).unwrap();
-        //             println!("l: {:?}", l);
-        //             for each in &l {
-        //                 allts.insert(*each);
-        //             }
-        //         }
-        //     }
-        //     let mut ggg: Vec<usize> = allts.into_iter().collect::<Vec<_>>();
-        //     ggg.sort();
-        //     println!("ggg: {:?}", ggg);
+        // if gx != 1 || gy != 0 {
+        //     return Ok(());
         // }
 
         let mut gbbox: [f64; 4] = [0.0, 0.0, 0.0, 0.0];
@@ -420,16 +401,18 @@ impl Triangulation {
                     allts.insert(*ti, true);
                 }
             }
-            if finv == true {
-                println!("vertex final {:?}", *vi);
-            }
+            // if finv == true {
+            //     println!("vertex final {:?}", *vi);
+            // }
         }
         // println!("allts: {:?}", allts);
 
         //-- remove from the ds
         for (ti, finalised) in &allts {
             // println!("{}: \"{}\"", ti, finalised);
-            self.finalise_triangle(*ti);
+            if *finalised == true {
+                self.finalise_triangle(*ti);
+            }
         }
 
         //-- 2. encroachment?
@@ -462,17 +445,25 @@ impl Triangulation {
     fn finalise_triangle(&mut self, ti: usize) {
         // self.ts[ti]
         self.freelist_ts.push(ti);
-        println!("{:?}", self.ts[ti]);
+        // println!("{:?}", self.ts[ti]);
         for i in 3..6 {
             let tadj = self.ts[ti][i];
-            let k = &self.ts[tadj][3..6].iter().position(|&x| x == ti).unwrap();
-            self.ts[tadj][k + 3] = 0;
+            let k = &self.ts[tadj][3..6].iter().position(|&x| x == ti);
+            if k.is_none() == false {
+                self.ts[tadj][k.unwrap() + 3] = 0;
+            }
         }
-        println!("flush triangle: {:?}", ti);
+        // println!("flush triangle: {:?}", ti);
     }
 
     fn is_triangle_final(&self, ti: usize, bbox: &[f64]) -> bool {
         let t0 = self.ts[ti];
+        //-- cannot remove triangles adjacent to boundary convexhull
+        for i in 3..6 {
+            if self.is_triangle_finite(t0[i]) == false {
+                return false;
+            }
+        }
         //-- all 3 points inside the qt cell bbox?
         if geom::point_in_box(&self.vs[t0[0]], &bbox) == false
             || geom::point_in_box(&self.vs[t0[1]], &bbox) == false
@@ -1042,16 +1033,17 @@ impl Triangulation {
         }
 
         //-- 2. try walk from one in the same cell
-        warn!("attempt to find one vertex in the grid cell and start from it");
-        let qtc = self.qt.get_qtc_from_xy(x[0], x[1]);
-        if self.qt.cells[&qtc].number_pts() > 0 {
-            let v0 = self.qt.cells[&qtc].pts.iter().next().unwrap();
-            // let v0 = self.qt.gpts[g.0][g.1].get(a[0]);
-            let re = self.walk_safe(x, *v0);
-            if re.is_some() {
-                return re.unwrap();
-            }
-        }
+        // TODO: try walk from one in the same cell BROKEN
+        // warn!("attempt to find one vertex in the grid cell and start from it");
+        // let qtc = self.qt.get_qtc_from_xy(x[0], x[1]);
+        // if self.qt.cells[&qtc].number_pts() > 0 {
+        //     let v0 = self.qt.cells[&qtc].pts.iter().next().unwrap();
+        //     // let v0 = self.qt.gpts[g.0][g.1].get(a[0]);
+        //     let re = self.walk_safe(x, *v0);
+        //     if re.is_some() {
+        //         return re.unwrap();
+        //     }
+        // }
 
         //-- 3. try brute-force
         //-- TODO: this brute-force too?
@@ -1117,7 +1109,7 @@ impl Triangulation {
     }
 
     fn walk_bruteforce_outside_convex_hull(&self, x: &[f64]) -> Option<usize> {
-        info!("brute-force ON CONVEX HULL");
+        // warn!("walk brute-force ON CONVEX HULL");
         let mut amin: f64 = std::f64::MAX;
         let mut tmin: usize = 0;
         for (id, t) in self.ts.iter().enumerate() {
@@ -1141,7 +1133,7 @@ impl Triangulation {
     }
 
     fn walk_bruteforce_triangles(&self, x: &[f64]) -> Option<usize> {
-        warn!("walk_bruteforce_triangles()");
+        // warn!("walk_bruteforce_triangles()");
         for (id, t) in self.ts.iter().enumerate() {
             if self.is_triangle_finite(id) == true {
                 if geom::intriangle(
@@ -1320,6 +1312,9 @@ impl Triangulation {
         //-- triangles
         for (i, t) in self.ts.iter().enumerate() {
             if self.is_triangle_finite(i) == false {
+                continue;
+            }
+            if self.freelist_ts.contains(&i) {
                 continue;
             }
             let mut l: Vec<Vec<Vec<f64>>> = vec![vec![Vec::with_capacity(1); 4]];

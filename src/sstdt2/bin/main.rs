@@ -51,7 +51,9 @@ fn main() -> io::Result<()> {
     //----- reading from stdin -----//
 
     //----- reading from file -----//
-    let fi = File::open("/Users/hugo/projects/sst/data/s400_50.spa").expect("Unable to open file");
+    // let fi = File::open("/Users/hugo/projects/sst/data/s400_50.spa").expect("Unable to open file");
+    let fi = File::open("/Users/hugo/projects/sst/data/rect1_50.spa").expect("Unable to open file");
+    // let fi = File::open("/Users/hugo/projects/sst/data/test1.spa").expect("Unable to open file");
     let f = BufReader::new(fi);
     for l in f.lines() {
         let l = l.expect("Unable to read line");
@@ -96,26 +98,40 @@ fn main() -> io::Result<()> {
                 //-- bbox
                 let re = parse_4_f64(&l);
                 dt.set_bbox(re.0, re.1, re.2, re.3);
-                io::stdout().write_all(
-                    &format!("b {:.3} {:.3} {:.3} {:.3}\n", re.0, re.1, re.2, re.3).as_bytes(),
-                )?;
+                // io::stdout().write_all(
+                //     &format!("b {:.3} {:.3} {:.3} {:.3}\n", re.0, re.1, re.2, re.3).as_bytes(),
+                // )?;
             }
             'v' => {
                 //-- vertex
-                // println!("=>{}", l);
+                println!("=>{}", l);
                 // count += 1;
                 let v = parse_3_f64(&l);
                 let _re = dt.insert_one_pt_with_grid(v.0, v.1, v.2);
+                if v.0 > 195.0 && v.0 < 196.0 && v.1 > 2.0 && v.1 < 3.0 {
+                    //     // println!("that one");
+                    let fout = format!("/Users/hugo/temp/sstout/tmp.geojson");
+                    let _re = dt.write_geojson_triangles(fout.to_string());
+                    //     dt.print_ds();
+                }
             }
             'x' => {
                 //-- finalise a cell
                 // println!("=>{}", l);
                 let re = parse_2_usize(&l);
-                // if (re.0 == 1) && (re.1 == 0) {
-                //     let fout = format!("/Users/hugo/temp/sstout/c-{}-{}.geojson", re.0, re.1);
-                //     let _re = dt.write_geojson_triangles(fout.to_string());
+                if (re.0 == 3) && (re.1 == 1) {
+                    println!("oyoosdf");
+                }
+                let fout = format!("/Users/hugo/temp/sstout/c-{}-{}-b.geojson", re.0, re.1);
+                let _re = dt.write_geojson_triangles(fout.to_string());
+                // println!("write before");
                 // }
                 let _re = dt.finalise_cell(re.0, re.1);
+                // if (re.0 == 2) && (re.1 == 0) {
+                let fout = format!("/Users/hugo/temp/sstout/c-{}-{}.geojson", re.0, re.1);
+                let _re = dt.write_geojson_triangles(fout.to_string());
+                // println!("write after");
+                // }
             }
             _ => {
                 error!("Wrongly formatted stream. Abort.");
@@ -123,10 +139,15 @@ fn main() -> io::Result<()> {
             }
         }
     }
-    info!("Writing GeoJSON file to disk: /Users/hugo/temp/sstout/z.grid.geojson");
-    let _re = dt.write_geojson_grid("/Users/hugo/temp/sstout/z.grid.geojson".to_string());
+
+    // println!("==> {:?}", dt.incident_triangles_to_vertex(3));
+
+    // info!("Writing GeoJSON file to disk: /Users/hugo/temp/sstout/z.grid.geojson");
+    // let _re = dt.write_geojson_grid("/Users/hugo/temp/sstout/z.grid.geojson".to_string());
 
     let _re = dt.write_geojson_triangles("/Users/hugo/temp/sstout/tr.geojson".to_string());
+
+    // dt.print_ds();
 
     info!("Finished reading the stream");
     info!("dt.number_of_vertices() = {}", dt.number_of_vertices());
