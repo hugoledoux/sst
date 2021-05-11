@@ -894,23 +894,28 @@ impl Triangulation {
         let t2 = [vi, t[2], t[0], t[4], ti, newi];
         //-- update neighbours
         let mut n = t[3];
-        let a = self.ts[n];
-        let a1 = &a[3..6].iter().position(|&x| x == ti).unwrap();
-        if let Some(x) = self.ts.get_mut(n) {
-            (*x)[*a1 + 3] = newi;
+        if n != 0 {
+            let a = self.ts[n];
+            let a1 = &a[3..6].iter().position(|&x| x == ti).unwrap();
+            if let Some(x) = self.ts.get_mut(n) {
+                (*x)[*a1 + 3] = newi;
+            }
         }
-
         n = t[4];
-        let a = self.ts[n];
-        let a1 = &a[3..6].iter().position(|&x| x == ti).unwrap();
-        if let Some(x) = self.ts.get_mut(n) {
-            (*x)[*a1 + 3] = newi + 1;
+        if n != 0 {
+            let a = self.ts[n];
+            let a1 = &a[3..6].iter().position(|&x| x == ti).unwrap();
+            if let Some(x) = self.ts.get_mut(n) {
+                (*x)[*a1 + 3] = newi + 1;
+            }
         }
         n = t[5];
-        let a = self.ts[n];
-        let a1 = &a[3..6].iter().position(|&x| x == ti).unwrap();
-        if let Some(x) = self.ts.get_mut(n) {
-            (*x)[*a1 + 3] = ti;
+        if n != 0 {
+            let a = self.ts[n];
+            let a1 = &a[3..6].iter().position(|&x| x == ti).unwrap();
+            if let Some(x) = self.ts.get_mut(n) {
+                (*x)[*a1 + 3] = ti;
+            }
         }
 
         if let Some(x) = self.ts.get_mut(ti) {
@@ -1198,16 +1203,20 @@ impl Triangulation {
         //-- update 2 neighbouring triangles
         //-- because 2 stay the same since the indices are not changed
         let mut n0 = t0[((*k0 + 1) % 3) + 3];
-        let a = self.ts[n0];
-        let a1 = &a[3..6].iter().position(|&x| x == t0i).unwrap();
-        if let Some(x) = self.ts.get_mut(n0) {
-            (*x)[*a1 + 3] = t1i;
+        if n0 != 0 {
+            let a = self.ts[n0];
+            let a1 = &a[3..6].iter().position(|&x| x == t0i).unwrap();
+            if let Some(x) = self.ts.get_mut(n0) {
+                (*x)[*a1 + 3] = t1i;
+            }
         }
         n0 = t1[((k1 + 1) % 3) + 3];
-        let a = self.ts[n0];
-        let a1 = &a[3..6].iter().position(|&x| x == t1i).unwrap();
-        if let Some(x) = self.ts.get_mut(n0) {
-            (*x)[*a1 + 3] = t0i;
+        if n0 != 0 {
+            let a = self.ts[n0];
+            let a1 = &a[3..6].iter().position(|&x| x == t1i).unwrap();
+            if let Some(x) = self.ts.get_mut(n0) {
+                (*x)[*a1 + 3] = t0i;
+            }
         }
         if let Some(x) = self.ts.get_mut(t0i) {
             (*x) = nt0;
