@@ -50,9 +50,9 @@ impl Qtcell {
         self.ts.insert(ti);
     }
 
-    // pub fn get_pts(&self) -> HashSet<usize> {
-    //     self.pts
-    // }
+    pub fn finalise(&mut self) {
+        self.finalised = true
+    }
 }
 
 //----------------------
@@ -155,30 +155,69 @@ impl Quadtree {
     //     re
     // }
 
-    /// Returns the qtc of the cell/s that is/are finalised, it can be only the
-    /// current one or its parent (or parent of that one; check recursively)
-    // pub fn finalise_cell(&mut self, gx: usize, gy: usize) -> Vec<u8> {
-    //     let qtc = self.get_cell_qtc(gx, gy);
-    //     let mut q2 = vec![0; qtc.len()];
-    //     q2.clone_from_slice(&qtc);
-    //     //-- add to the hashset
-    //     self.gfinal.insert(qtc);
-    //     //-- check parents recursively and add them to gfinals
-    //     let mut done = false;
-    //     while !done {
-    //         if q2.is_empty() == true {
-    //             // done = true;
-    //             break;
-    //         }
-    //         if self.finalise_parent(&q2) == true {
-    //             q2.pop();
-    //         } else {
-    //             done = true;
-    //         }
-    //     }
-    //     // println!("{:?}", q2);
-    //     q2
-    // }
+    pub fn finalise_cell(&mut self, gx: usize, gy: usize) {
+        let qtc = self.get_qtc_from_gxgy(gx, gy);
+        self.cells.get_mut(&qtc).unwrap().finalise();
+
+        //-- check parent and merge if all finalised
+        let mut q2 = vec![0; qtc.len() - 1];
+        q2.clone_from_slice(&qtc[..qtc.len() - 1]);
+        let mut f = false;
+        q2.push(0);
+        if self.cells[&q2].finalised == true {
+            q2.pop();
+            q2.push(1);
+            if self.cells[&q2].finalised == true {
+                q2.pop();
+                q2.push(2);
+                if self.cells[&q2].finalised == true {
+                    q2.pop();
+                    q2.push(3);
+                    if self.cells[&q2].finalised == true {
+                        f = true
+                    }
+                }
+            }
+        }
+        if f == true {
+            q2.pop();
+            //-- create parent cell
+            let mut nc = Qtcell::new();
+            //-- copy from 4 children
+            q2.push(0);
+            for i in 0..4 {
+                q2.pop();
+                q2.push(i);
+                for vi in &self.cells[&q2].pts {
+                    nc.add_pt(*vi);
+                }
+                for ti in &self.cells[&q2].ts {
+                    nc.add_ts(*ti);
+                }
+                self.cells.remove(&q2);
+            }
+            self.cells.insert(q2, nc);
+        }
+
+        // q2.clone_from_slice(&qtc);
+        // //-- add to the hashset
+        // self.gfinal.insert(qtc);
+        // //-- check parents recursively and add them to gfinals
+        // let mut done = false;
+        // while !done {
+        //     if q2.is_empty() == true {
+        //         // done = true;
+        //         break;
+        //     }
+        //     if self.finalise_parent(&q2) == true {
+        //         q2.pop();
+        //     } else {
+        //         done = true;
+        //     }
+        // }
+        // // println!("{:?}", q2);
+        // q2
+    }
 
     // fn finalise_parent(&mut self, qtc: &Vec<u8>) -> bool {
     //     let mut q2 = vec![0; qtc.len() - 1];
@@ -218,15 +257,15 @@ impl Quadtree {
         gbbox[3] = self.miny + ((gy + 1) * self.cellsize) as f64;
     }
 
-    // fn get_cell_bbox_qtc(&self, qtc: &Vec<u8>, gbbox: &mut [f64]) {
-    //     let (mingx, mingy) = self.qtc2gxgy(qtc);
-    //     let a: usize = (self.depth as usize) - qtc.len();
-    //     let shift = 2_usize.pow(a as u32);
-    //     gbbox[0] = self.minx + (mingx * self.cellsize) as f64;
-    //     gbbox[1] = self.miny + (mingy * self.cellsize) as f64;
-    //     gbbox[2] = self.minx + ((mingx + shift) * self.cellsize) as f64;
-    //     gbbox[3] = self.miny + ((mingy + shift) * self.cellsize) as f64;
-    // }
+    fn get_cell_bbox_qtc(&self, qtc: &Vec<u8>, gbbox: &mut [f64]) {
+        let (mingx, mingy) = self.qtc2gxgy(qtc);
+        let a: usize = (self.depth as usize) - qtc.len();
+        let shift = 2_usize.pow(a as u32);
+        gbbox[0] = self.minx + (mingx * self.cellsize) as f64;
+        gbbox[1] = self.miny + (mingy * self.cellsize) as f64;
+        gbbox[2] = self.minx + ((mingx + shift) * self.cellsize) as f64;
+        gbbox[3] = self.miny + ((mingy + shift) * self.cellsize) as f64;
+    }
 
     fn get_gxgy(&self, x: f64, y: f64) -> (usize, usize) {
         (
@@ -365,7 +404,7 @@ impl Triangulation {
         self.qt.init(s);
     }
 
-    pub fn finalise_cell(&mut self, gx: usize, gy: usize) -> io::Result<()> {
+    pub fn finalise_qtcell(&mut self, gx: usize, gy: usize) -> io::Result<()> {
         info!(
             "Cell {}--{} finalised ({} vertices)",
             gx,
@@ -386,8 +425,8 @@ impl Triangulation {
         let mut allts: HashMap<usize, bool> = HashMap::new();
         let allpts: Vec<usize> = self.qt.get_cell_pts(gx, gy);
         for vi in &allpts {
+            //-- 2. encroachment?
             let l: Vec<usize> = self.incident_triangles_to_vertex(*vi).unwrap();
-
             let mut finv: bool = true;
             for ti in &l {
                 if allts.contains_key(ti) {
@@ -402,7 +441,7 @@ impl Triangulation {
                 }
             }
             // if finv == true {
-            //     println!("vertex final {:?}", *vi);
+            //     println!("vertex final {:?}", *vi); TODO: write triangle finaliser to stream
             // }
         }
         // println!("allts: {:?}", allts);
@@ -415,29 +454,7 @@ impl Triangulation {
             }
         }
 
-        //-- 2. encroachment?
-        // let mut gbbox: [f64; 4] = [0.0, 0.0, 0.0, 0.0];
-        // self.qt.get_cell_bbox(gx, gy, &mut gbbox);
-        // for ti in allts.iter() {
-        //     // println!("{}", t);
-        //     let t0 = self.ts[*ti];
-        //     //-- all 3 points inside the qt cell bbox?
-        //     if geom::point_in_box(&self.vs[t0[0]], &gbbox) == false
-        //         || geom::point_in_box(&self.vs[t0[1]], &gbbox) == false
-        //         || geom::point_in_box(&self.vs[t0[2]], &gbbox) == false
-        //     {
-        //         continue;
-        //     }
-        //     if geom::circumcircle_encroach_bbox(
-        //         &self.vs[t0[0]],
-        //         &self.vs[t0[1]],
-        //         &self.vs[t0[2]],
-        //         &gbbox,
-        //     ) == false
-        //     {
-        //         println!("FLUSH {:?}", ti);
-        //     }
-        // }
+        self.qt.finalise_cell(gx, gy);
 
         Ok(())
     }
