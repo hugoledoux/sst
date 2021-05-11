@@ -196,6 +196,7 @@ impl Quadtree {
                 }
                 self.cells.remove(&q2);
             }
+            q2.pop();
             self.cells.insert(q2, nc);
         }
 
