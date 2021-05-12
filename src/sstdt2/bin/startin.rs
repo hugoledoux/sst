@@ -155,31 +155,31 @@ impl Quadtree {
     //     re
     // }
 
-    pub fn finalise_cell(&mut self, gx: usize, gy: usize) {
-        let qtc = self.get_qtc_from_gxgy(gx, gy);
-        self.cells.get_mut(&qtc).unwrap().finalise();
-
+    /// return true if cell was finalised and merged with parent
+    pub fn finalise_cell(&mut self, qtc: &Vec<u8>) -> Option<Vec<u8>> {
+        let mut re = false;
+        self.cells.get_mut(qtc).unwrap().finalise();
         //-- check parent and merge if all finalised
         let mut q2 = vec![0; qtc.len() - 1];
         q2.clone_from_slice(&qtc[..qtc.len() - 1]);
-        let mut f = false;
         q2.push(0);
-        if self.cells[&q2].finalised == true {
+        // println!("q2: {:?}", q2);
+        if self.cells.contains_key(&q2) && self.cells[&q2].finalised == true {
             q2.pop();
             q2.push(1);
-            if self.cells[&q2].finalised == true {
+            if self.cells.contains_key(&q2) && self.cells[&q2].finalised == true {
                 q2.pop();
                 q2.push(2);
-                if self.cells[&q2].finalised == true {
+                if self.cells.contains_key(&q2) && self.cells[&q2].finalised == true {
                     q2.pop();
                     q2.push(3);
-                    if self.cells[&q2].finalised == true {
-                        f = true
+                    if self.cells.contains_key(&q2) && self.cells[&q2].finalised == true {
+                        re = true
                     }
                 }
             }
         }
-        if f == true {
+        if re == true {
             q2.pop();
             //-- create parent cell
             let mut nc = Qtcell::new();
@@ -197,28 +197,33 @@ impl Quadtree {
                 self.cells.remove(&q2);
             }
             q2.pop();
+            let mut req = vec![0; q2.len()];
+            req.clone_from_slice(&q2);
             self.cells.insert(q2, nc);
+            Some(req)
+        } else {
+            None
         }
-
-        // q2.clone_from_slice(&qtc);
-        // //-- add to the hashset
-        // self.gfinal.insert(qtc);
-        // //-- check parents recursively and add them to gfinals
-        // let mut done = false;
-        // while !done {
-        //     if q2.is_empty() == true {
-        //         // done = true;
-        //         break;
-        //     }
-        //     if self.finalise_parent(&q2) == true {
-        //         q2.pop();
-        //     } else {
-        //         done = true;
-        //     }
-        // }
-        // // println!("{:?}", q2);
-        // q2
     }
+
+    // q2.clone_from_slice(&qtc);
+    // //-- add to the hashset
+    // self.gfinal.insert(qtc);
+    // //-- check parents recursively and add them to gfinals
+    // let mut done = false;
+    // while !done {
+    //     if q2.is_empty() == true {
+    //         // done = true;
+    //         break;
+    //     }
+    //     if self.finalise_parent(&q2) == true {
+    //         q2.pop();
+    //     } else {
+    //         done = true;
+    //     }
+    // }
+    // // println!("{:?}", q2);
+    // q2
 
     // fn finalise_parent(&mut self, qtc: &Vec<u8>) -> bool {
     //     let mut q2 = vec![0; qtc.len() - 1];
@@ -338,7 +343,7 @@ impl Quadtree {
                 return self.gtc2gxgy_recursion(&c[1..], curdepth + 1, gx + shift, gy + shift);
             }
         }
-        if c[0] == 0 {
+        if c.is_empty() || c[0] == 0 {
             (gx, gy)
         } else if c[0] == 1 {
             (gx, gy + shift)
@@ -405,7 +410,7 @@ impl Triangulation {
         self.qt.init(s);
     }
 
-    pub fn finalise_qtcell(&mut self, gx: usize, gy: usize) -> io::Result<()> {
+    pub fn finalise_qtcell(&mut self, gx: usize, gy: usize) {
         info!(
             "Cell {}--{} finalised ({} vertices)",
             gx,
@@ -417,6 +422,8 @@ impl Triangulation {
         // if gx != 1 || gy != 0 {
         //     return Ok(());
         // }
+
+        let mut qtc = self.qt.get_qtc_from_gxgy(gx, gy);
 
         let mut gbbox: [f64; 4] = [0.0, 0.0, 0.0, 0.0];
         self.qt.get_cell_bbox(gx, gy, &mut gbbox);
@@ -455,9 +462,35 @@ impl Triangulation {
             }
         }
 
-        self.qt.finalise_cell(gx, gy);
+        // let mut qq = &qtc;
+        // loop {
+        //     let re = self.qt.finalise_cell(&qq);
+        //     match re {
+        //         Some(q) => {
+        //             if q.is_empty() {
+        //                 break;
+        //             }
+        //             qq&q= q;
+        //         }
+        //         None => (),
+        //     }
+        // }
+        //-- merge cell with parent, and continue until impossible
+        //-- or only one cell left
+        let mut re = self.qt.finalise_cell(&qtc);
+        while re.is_some() {
+            let q2 = re.unwrap();
+            if q2.is_empty() {
+                break;
+            }
+            re = self.qt.finalise_cell(&q2);
+        }
+        if self.qt.cells.len() == 1 {
+            println!("===> ONLY ONE CELL LEFT!!!");
+        }
 
-        Ok(())
+        // Ok(())
+        // Some(true)
     }
 
     fn finalise_triangle(&mut self, ti: usize) {

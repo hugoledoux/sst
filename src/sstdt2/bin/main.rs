@@ -104,7 +104,7 @@ fn main() -> io::Result<()> {
             }
             'v' => {
                 //-- vertex
-                println!("=>{}", l);
+                // println!("=>{}", l);
                 // count += 1;
                 let v = parse_3_f64(&l);
                 let _re = dt.insert_one_pt_with_grid(v.0, v.1, v.2);
@@ -119,14 +119,14 @@ fn main() -> io::Result<()> {
                 //-- finalise a cell
                 // println!("=>{}", l);
                 let re = parse_2_usize(&l);
-                if (re.0 == 3) && (re.1 == 1) {
-                    println!("oyoosdf");
-                }
+                // if (re.0 == 3) && (re.1 == 1) {
+                //     println!("oyoosdf");
+                // }
                 let fout = format!("/Users/hugo/temp/sstout/c-{}-{}-b.geojson", re.0, re.1);
                 let _re = dt.write_geojson_triangles(fout.to_string());
                 // println!("write before");
                 // }
-                let _re = dt.finalise_cell(re.0, re.1);
+                dt.finalise_qtcell(re.0, re.1);
                 // if (re.0 == 2) && (re.1 == 0) {
                 let fout = format!("/Users/hugo/temp/sstout/c-{}-{}.geojson", re.0, re.1);
                 let _re = dt.write_geojson_triangles(fout.to_string());
@@ -142,8 +142,8 @@ fn main() -> io::Result<()> {
 
     // println!("==> {:?}", dt.incident_triangles_to_vertex(3));
 
-    // info!("Writing GeoJSON file to disk: /Users/hugo/temp/sstout/z.grid.geojson");
-    // let _re = dt.write_geojson_grid("/Users/hugo/temp/sstout/z.grid.geojson".to_string());
+    info!("Writing GeoJSON file to disk: /Users/hugo/temp/sstout/z.grid.geojson");
+    let _re = dt.write_geojson_grid("/Users/hugo/temp/sstout/z.grid.geojson".to_string());
 
     let _re = dt.write_geojson_triangles("/Users/hugo/temp/sstout/tr.geojson".to_string());
 
