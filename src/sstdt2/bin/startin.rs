@@ -50,8 +50,8 @@ impl Qtcell {
         self.ts.insert(ti);
     }
 
-    pub fn finalise(&mut self) {
-        self.finalised = true
+    pub fn set_final(&mut self, b: bool) {
+        self.finalised = b
     }
 }
 
@@ -123,15 +123,10 @@ impl Quadtree {
         r
     }
 
-    /// return true if cell was finalised and merged with parent
-    pub fn finalise_cell(&mut self, qtc: &Vec<u8>) -> Option<Vec<u8>> {
-        let mut re = false;
-        self.cells.get_mut(qtc).unwrap().finalise();
-        //-- check parent and merge if all finalised
+    fn are_sibling_final(&self, qtc: &Vec<u8>) -> bool {
         let mut q2 = vec![0; qtc.len() - 1];
         q2.clone_from_slice(&qtc[..qtc.len() - 1]);
         q2.push(0);
-        // println!("q2: {:?}", q2);
         if self.cells.contains_key(&q2) && self.cells[&q2].finalised == true {
             q2.pop();
             q2.push(1);
@@ -142,36 +137,42 @@ impl Quadtree {
                     q2.pop();
                     q2.push(3);
                     if self.cells.contains_key(&q2) && self.cells[&q2].finalised == true {
-                        re = true
+                        return true;
                     }
                 }
             }
         }
-        if re == true {
+        false
+    }
+
+    fn set_final_qtc(&mut self, qtc: &Vec<u8>, b: bool) {
+        self.cells.get_mut(qtc).unwrap().set_final(true);
+    }
+
+    pub fn finalise_cell_and_merge(&mut self, qtc: &Vec<u8>) {
+        let mut q2 = vec![0; qtc.len() - 1];
+        q2.clone_from_slice(&qtc[..qtc.len() - 1]);
+        // q2.pop();
+        info!("Cell qtc{:?} finalised", q2);
+        q2.push(0);
+        //-- create parent cell
+        let mut nc = Qtcell::new();
+        //-- copy from 4 children
+        for i in 0..4 {
             q2.pop();
-            //-- create parent cell
-            let mut nc = Qtcell::new();
-            //-- copy from 4 children
-            q2.push(0);
-            for i in 0..4 {
-                q2.pop();
-                q2.push(i);
-                for vi in &self.cells[&q2].pts {
-                    nc.add_pt(*vi);
-                }
-                for ti in &self.cells[&q2].ts {
-                    nc.add_ts(*ti);
-                }
-                self.cells.remove(&q2);
+            q2.push(i);
+            for vi in &self.cells[&q2].pts {
+                nc.add_pt(*vi);
             }
-            q2.pop();
-            let mut req = vec![0; q2.len()];
-            req.clone_from_slice(&q2);
-            self.cells.insert(q2, nc);
-            Some(req)
-        } else {
-            None
+            for ti in &self.cells[&q2].ts {
+                nc.add_ts(*ti);
+            }
+            self.cells.remove(&q2);
         }
+        q2.pop();
+        let mut req = vec![0; q2.len()];
+        req.clone_from_slice(&q2);
+        self.cells.insert(q2, nc);
     }
 
     fn get_cell_bbox(&self, gx: usize, gy: usize, gbbox: &mut [f64]) {
@@ -371,32 +372,30 @@ impl Triangulation {
             }
         }
 
-        // let mut qq = &qtc;
-        // loop {
-        //     let re = self.qt.finalise_cell(&qq);
-        //     match re {
-        //         Some(q) => {
-        //             if q.is_empty() {
-        //                 break;
-        //             }
-        //             qq&q= q;
-        //         }
-        //         None => (),
-        //     }
-        // }
         //-- merge cell with parent, and continue until impossible
         //-- or only one cell left
-        let mut re = self.qt.finalise_cell(&qtc);
-        while re.is_some() {
-            let q2 = re.unwrap();
-            if q2.is_empty() {
+        self.qt.set_final_qtc(&qtc, true);
+
+        loop {
+            if self.qt.are_sibling_final(&qtc) == true {
+                self.qt.finalise_cell_and_merge(&qtc);
+                qtc.pop();
+            } else {
                 break;
             }
-            re = self.qt.finalise_cell(&q2);
         }
-        if self.qt.cells.len() == 1 {
-            println!("===> ONLY ONE CELL LEFT!!!");
-        }
+
+        // let mut re = self.qt.finalise_cell(&qtc);
+        // while re.is_some() {
+        //     let q2 = re.unwrap();
+        //     if q2.is_empty() {
+        //         break;
+        //     }
+        //     re = self.qt.finalise_cell(&q2);
+        // }
+        // if self.qt.cells.len() == 1 {
+        //     println!("===> ONLY ONE CELL LEFT!!!");
+        // }
 
         // Ok(())
         // Some(true)
