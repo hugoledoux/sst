@@ -150,13 +150,17 @@ impl Quadtree {
     }
 
     pub fn finalise_cell_and_merge(&mut self, qtc: &Vec<u8>) {
+        // //-- if only 4 cells left then flush everything
+        // if qtc.len() == 1 {
+
+        // }
         let mut q2 = vec![0; qtc.len() - 1];
         q2.clone_from_slice(&qtc[..qtc.len() - 1]);
-        // q2.pop();
         info!("Cell qtc{:?} finalised", q2);
         q2.push(0);
         //-- create parent cell
         let mut nc = Qtcell::new();
+        nc.set_final(true);
         //-- copy from 4 children
         for i in 0..4 {
             q2.pop();
@@ -375,11 +379,14 @@ impl Triangulation {
         //-- merge cell with parent, and continue until impossible
         //-- or only one cell left
         self.qt.set_final_qtc(&qtc, true);
-
         loop {
             if self.qt.are_sibling_final(&qtc) == true {
                 self.qt.finalise_cell_and_merge(&qtc);
                 qtc.pop();
+                if qtc.is_empty() {
+                    self.finalise_qt_root();
+                    break;
+                }
             } else {
                 break;
             }
@@ -575,6 +582,18 @@ impl Triangulation {
     //     io::stdout().write_all(&format!("x {}\n", self.stars[&v].smaid).as_bytes())?;
     //     Ok(())
     // }
+
+    fn finalise_qt_root(&mut self) {
+        info!("Finalise the quadtree root cell");
+        let q2: Vec<u8> = Vec::new();
+        for vi in &self.qt.cells[&q2].pts {
+            println!("flush vi: {}", vi);
+        }
+        for ti in &self.qt.cells[&q2].ts {
+            println!("flush ti: {}", ti);
+        }
+        println!("finalise all points too");
+    }
 
     // pub fn finalise_leftover_triangles(&mut self) -> io::Result<()> {
     //     let mut total: usize = 0;
