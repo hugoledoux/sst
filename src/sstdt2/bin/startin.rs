@@ -345,15 +345,15 @@ impl Triangulation {
             self.qt.cells.remove(&q2);
         }
         //-- keep only the active vertices and add them to nc
-        info!("all_vs: {:?}", all_vs)
+        info!("all_vs: {:?}", all_vs);
         info!("active_vs_in_ts: {:?}", active_vs_in_ts);
         let intersect: HashSet<_> = all_vs.intersection(&active_vs_in_ts).collect();
-        info!("still active: {:?}", intersect);
+        info!("still active (intersection): {:?}", intersect);
         for vi in &intersect {
             nc.add_pt(**vi);
         }
         let difference: HashSet<_> = all_vs.difference(&active_vs_in_ts).collect();
-        info!("finalised: {:?}", difference);
+        info!("finalised (difference): {:?}", difference);
         for vi in &difference {
             io::stdout().write_all(&format!("x {}\n", self.sma_ids[*vi]).as_bytes())?;
         }

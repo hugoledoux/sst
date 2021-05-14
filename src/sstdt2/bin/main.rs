@@ -113,16 +113,19 @@ fn main() -> io::Result<()> {
                 //-- finalise a cell
                 // println!("=>{}", l);
                 let re = parse_2_usize(&l);
-                // if (re.0 == 1) && (re.1 == 0) {
-                //     let fout = format!("/Users/hugo/temp/sstout/c-{}-{}-b.geojson", re.0, re.1);
-                //     let _re = dt.write_geojson_triangles(fout.to_string());
-                // }
+                let gx = 0;
+                let gy = 1;
+
+                if (re.0 == gx) && (re.1 == gy) {
+                    let fout = format!("/Users/hugo/temp/sstout/c-{}-{}-b.geojson", re.0, re.1);
+                    let _re = dt.write_geojson_triangles(fout.to_string());
+                }
 
                 let _re = dt.finalise_qtcell(re.0, re.1);
-                // if (re.0 == 1) && (re.1 == 0) {
-                //     let fout = format!("/Users/hugo/temp/sstout/c-{}-{}.geojson", re.0, re.1);
-                //     let _re = dt.write_geojson_triangles(fout.to_string());
-                // }
+                if (re.0 == gx) && (re.1 == gy) {
+                    let fout = format!("/Users/hugo/temp/sstout/c-{}-{}.geojson", re.0, re.1);
+                    let _re = dt.write_geojson_triangles(fout.to_string());
+                }
             }
             _ => {
                 error!("Wrongly formatted stream. Abort.");
