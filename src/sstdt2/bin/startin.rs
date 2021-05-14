@@ -345,9 +345,13 @@ impl Triangulation {
             self.qt.cells.remove(&q2);
         }
         //-- keep only the active vertices and add them to nc
-        let intersect: HashSet<_> = active_vs_in_ts.intersection(&all_vs).collect();
+        let intersect: HashSet<_> = all_vs.intersection(&active_vs_in_ts).collect();
         for vi in &intersect {
             nc.add_pt(**vi);
+        }
+        let difference: HashSet<_> = all_vs.difference(&active_vs_in_ts).collect();
+        for vi in &difference {
+            io::stdout().write_all(&format!("x {}\n", self.sma_ids[*vi]).as_bytes())?;
         }
         //-- insert the new parent cell in the QT
         q2.pop();
@@ -391,6 +395,7 @@ impl Triangulation {
         //-- check the star of each vertex and collect triangles
         //-- and finalise the vertices whose star is filled with triangles
         //-- that can be finalised
+        let mut fin_vs: Vec<usize> = Vec::new();
         for vi in &allpts {
             //-- 2. encroachment?
             let l: Vec<usize> = self.incident_triangles_to_vertex(*vi).unwrap();
@@ -418,17 +423,18 @@ impl Triangulation {
                 }
             }
             if finv == true {
+                fin_vs.push(*vi);
                 // println!("vertex final {:?}", *vi);
                 //-- TODO: remove the point from the DS!
                 //-- finalise the vertices in the stream
-                io::stdout().write_all(&format!("x {}\n", self.sma_ids[vi]).as_bytes())?;
-            } else {
-                self.qt.cells.get_mut(&qtc).unwrap().add_pt(*vi);
+                // io::stdout().write_all(&format!("x {}\n", self.sma_ids[vi]).as_bytes())?;
+                // self.qt.cells.get_mut(&qtc).unwrap().pts.remove(vi);
             }
         }
         // println!("allts: {:?}", allts);
 
-        //-- remove from the ds
+        //-- finalise the triangles (write to stream)
+        //-- and remove from the ds
         for (ti, finalised) in &allts {
             // println!("{}: \"{}\"", ti, finalised);
             if *finalised == true {
@@ -436,6 +442,14 @@ impl Triangulation {
             } else {
                 self.qt.cells.get_mut(&qtc).unwrap().add_ts(*ti);
             }
+        }
+
+        //-- finalise the vertices that will never be used again
+        for vi in &fin_vs {
+            //-- TODO: remove the point from the DS!
+            //-- finalise the vertices in the stream
+            io::stdout().write_all(&format!("x {}\n", self.sma_ids[vi]).as_bytes())?;
+            self.qt.cells.get_mut(&qtc).unwrap().pts.remove(vi);
         }
 
         //-- merge cell with parent, and continue until impossible
