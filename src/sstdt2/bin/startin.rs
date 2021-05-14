@@ -334,7 +334,7 @@ impl Triangulation {
                     let _re = self.finalise_triangle(*ti);
                 } else {
                     nc.add_ts(*ti);
-                    for i in 3..6 {
+                    for i in 0..3 {
                         active_vs_in_ts.insert(self.ts[*ti][i]);
                     }
                 }
@@ -345,11 +345,15 @@ impl Triangulation {
             self.qt.cells.remove(&q2);
         }
         //-- keep only the active vertices and add them to nc
+        info!("all_vs: {:?}", all_vs)
+        info!("active_vs_in_ts: {:?}", active_vs_in_ts);
         let intersect: HashSet<_> = all_vs.intersection(&active_vs_in_ts).collect();
+        info!("still active: {:?}", intersect);
         for vi in &intersect {
             nc.add_pt(**vi);
         }
         let difference: HashSet<_> = all_vs.difference(&active_vs_in_ts).collect();
+        info!("finalised: {:?}", difference);
         for vi in &difference {
             io::stdout().write_all(&format!("x {}\n", self.sma_ids[*vi]).as_bytes())?;
         }
