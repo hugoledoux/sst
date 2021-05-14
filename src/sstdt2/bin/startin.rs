@@ -52,6 +52,21 @@ impl Qtcell {
     pub fn set_final(&mut self, b: bool) {
         self.finalised = b
     }
+
+    pub fn get_vec_vs(&self) -> Vec<usize> {
+        let mut r: Vec<usize> = Vec::new();
+        for vi in &self.pts {
+            r.push(*vi);
+        }
+        r
+    }
+    pub fn get_vec_ts(&self) -> Vec<usize> {
+        let mut r: Vec<usize> = Vec::new();
+        for ti in &self.ts {
+            r.push(*ti);
+        }
+        r
+    }
 }
 
 //----------------------
@@ -146,36 +161,6 @@ impl Quadtree {
 
     fn set_final_qtc(&mut self, qtc: &Vec<u8>, b: bool) {
         self.cells.get_mut(qtc).unwrap().set_final(true);
-    }
-
-    pub fn finalise_cell_and_merge(&mut self, qtc: &Vec<u8>) {
-        // //-- if only 4 cells left then flush everything
-        // if qtc.len() == 1 {
-
-        // }
-        let mut q2 = vec![0; qtc.len() - 1];
-        q2.clone_from_slice(&qtc[..qtc.len() - 1]);
-        info!("Cell qtc{:?} finalised", q2);
-        q2.push(0);
-        //-- create parent cell
-        let mut nc = Qtcell::new();
-        nc.set_final(true);
-        //-- copy from 4 children
-        for i in 0..4 {
-            q2.pop();
-            q2.push(i);
-            for vi in &self.cells[&q2].pts {
-                nc.add_pt(*vi);
-            }
-            for ti in &self.cells[&q2].ts {
-                nc.add_ts(*ti);
-            }
-            self.cells.remove(&q2);
-        }
-        q2.pop();
-        let mut req = vec![0; q2.len()];
-        req.clone_from_slice(&q2);
-        self.cells.insert(q2, nc);
     }
 
     fn get_cell_bbox(&self, gx: usize, gy: usize, gbbox: &mut [f64]) {
@@ -326,6 +311,52 @@ impl Triangulation {
         self.qt.init(s);
     }
 
+    fn finalise_cell_and_merge(&mut self, qtc: &Vec<u8>) -> io::Result<()> {
+        let mut q2 = vec![0; qtc.len() - 1];
+        q2.clone_from_slice(&qtc[..qtc.len() - 1]);
+        info!("Cell qtc{:?} finalised", q2);
+        //-- get bbox of parent cell
+        let mut gbbox: [f64; 4] = [0.0, 0.0, 0.0, 0.0];
+        self.qt.get_cell_bbox_qtc(&q2, &mut gbbox);
+        q2.push(0);
+        //-- create parent cell
+        let mut nc = Qtcell::new();
+        nc.set_final(true);
+        //-- copy from 4 children the vertices/triangles that remain active
+        let mut active_vs_in_ts: HashSet<usize> = HashSet::new();
+        let mut all_vs: HashSet<usize> = HashSet::new();
+        for i in 0..4 {
+            q2.pop();
+            q2.push(i);
+            let allts: Vec<usize> = self.qt.cells[&q2].get_vec_ts();
+            for ti in &allts {
+                if self.is_triangle_final(*ti, &gbbox) == true {
+                    let _re = self.finalise_triangle(*ti);
+                } else {
+                    nc.add_ts(*ti);
+                    for i in 3..6 {
+                        active_vs_in_ts.insert(self.ts[*ti][i]);
+                    }
+                }
+            }
+            for vi in &self.qt.cells[&q2].pts {
+                all_vs.insert(*vi);
+            }
+            self.qt.cells.remove(&q2);
+        }
+        //-- keep only the active vertices and add them to nc
+        let intersect: HashSet<_> = active_vs_in_ts.intersection(&all_vs).collect();
+        for vi in &intersect {
+            nc.add_pt(**vi);
+        }
+        //-- insert the new parent cell in the QT
+        q2.pop();
+        let mut req = vec![0; q2.len()];
+        req.clone_from_slice(&q2);
+        self.qt.cells.insert(q2, nc);
+        Ok(())
+    }
+
     pub fn finalise_qtcell(&mut self, gx: usize, gy: usize) -> io::Result<()> {
         info!(
             "Cell {}--{} finalised ({} vertices)",
@@ -333,11 +364,6 @@ impl Triangulation {
             gy,
             self.qt.get_cell_count(gx, gy).unwrap()
         );
-
-        // TODO: REMOVE THESE LINES
-        // if gx != 1 || gy != 0 {
-        //     return Ok(());
-        // }
 
         let mut qtc = self.qt.get_qtc_from_gxgy(gx, gy);
 
@@ -348,6 +374,7 @@ impl Triangulation {
         // let mut allts: HashSet<usize> = HashSet::new();
         let mut allts: HashMap<usize, bool> = HashMap::new();
         let allpts: Vec<usize> = self.qt.get_cell_pts(gx, gy);
+
         //-- active all the vertices of the leaf cell
         //-- TODO: maybe make this better (benchmark?)
         for (i, vi) in allpts.iter().enumerate() {
@@ -361,6 +388,9 @@ impl Triangulation {
                 .as_bytes(),
             )?;
         }
+        //-- check the star of each vertex and collect triangles
+        //-- and finalise the vertices whose star is filled with triangles
+        //-- that can be finalised
         for vi in &allpts {
             //-- 2. encroachment?
             let l: Vec<usize> = self.incident_triangles_to_vertex(*vi).unwrap();
@@ -374,21 +404,26 @@ impl Triangulation {
                     finv = false;
                     allts.insert(*ti, false);
                 } else {
-                    io::stdout().write_all(
-                        &format!(
-                            "f {} {} {}\n",
-                            self.sma_ids[&self.ts[*ti][0]],
-                            self.sma_ids[&self.ts[*ti][1]],
-                            self.sma_ids[&self.ts[*ti][2]],
-                        )
-                        .as_bytes(),
-                    )?;
+                    // //-- write to stream final triangles
+                    // io::stdout().write_all(
+                    //     &format!(
+                    //         "f {} {} {}\n",
+                    //         self.sma_ids[&self.ts[*ti][0]],
+                    //         self.sma_ids[&self.ts[*ti][1]],
+                    //         self.sma_ids[&self.ts[*ti][2]],
+                    //     )
+                    //     .as_bytes(),
+                    // )?;
                     allts.insert(*ti, true);
                 }
             }
             if finv == true {
-                // println!("vertex final {:?}", *vi); //TODO: write triangle finaliser to stream
-                io::stdout().write_all(&format!("x {}\n", *vi).as_bytes())?;
+                // println!("vertex final {:?}", *vi);
+                //-- TODO: remove the point from the DS!
+                //-- finalise the vertices in the stream
+                io::stdout().write_all(&format!("x {}\n", self.sma_ids[vi]).as_bytes())?;
+            } else {
+                self.qt.cells.get_mut(&qtc).unwrap().add_pt(*vi);
             }
         }
         // println!("allts: {:?}", allts);
@@ -397,7 +432,9 @@ impl Triangulation {
         for (ti, finalised) in &allts {
             // println!("{}: \"{}\"", ti, finalised);
             if *finalised == true {
-                self.finalise_triangle(*ti);
+                let _re = self.finalise_triangle(*ti);
+            } else {
+                self.qt.cells.get_mut(&qtc).unwrap().add_ts(*ti);
             }
         }
 
@@ -406,7 +443,7 @@ impl Triangulation {
         self.qt.set_final_qtc(&qtc, true);
         loop {
             if self.qt.are_sibling_final(&qtc) == true {
-                self.qt.finalise_cell_and_merge(&qtc);
+                self.finalise_cell_and_merge(&qtc);
                 qtc.pop();
                 if qtc.is_empty() {
                     self.finalise_qt_root();
@@ -419,8 +456,16 @@ impl Triangulation {
         Ok(())
     }
 
-    fn finalise_triangle(&mut self, ti: usize) {
-        // self.ts[ti]
+    fn finalise_triangle(&mut self, ti: usize) -> io::Result<()> {
+        io::stdout().write_all(
+            &format!(
+                "f {} {} {}\n",
+                self.sma_ids[&self.ts[ti][0]],
+                self.sma_ids[&self.ts[ti][1]],
+                self.sma_ids[&self.ts[ti][2]],
+            )
+            .as_bytes(),
+        )?;
         self.freelist_ts.push(ti);
         // println!("{:?}", self.ts[ti]);
         for i in 3..6 {
@@ -430,14 +475,14 @@ impl Triangulation {
                 self.ts[tadj][k.unwrap() + 3] = 0;
             }
         }
-        // println!("flush triangle: {:?}", ti);
+        Ok(())
     }
 
     fn is_triangle_final(&self, ti: usize, bbox: &[f64]) -> bool {
         let t0 = self.ts[ti];
         //-- cannot remove triangles adjacent to boundary convexhull
         for i in 3..6 {
-            if self.is_triangle_finite(t0[i]) == false {
+            if t0[i] != 0 && self.is_triangle_finite(t0[i]) == false {
                 return false;
             }
         }
@@ -594,16 +639,27 @@ impl Triangulation {
     //     Ok(())
     // }
 
-    fn finalise_qt_root(&mut self) {
+    fn finalise_qt_root(&mut self) -> io::Result<()> {
         info!("Finalise the quadtree root cell");
         let q2: Vec<u8> = Vec::new();
-        // for vi in &self.qt.cells[&q2].pts {
-        //     println!("flush vi: {}", vi);
-        // }
-        // for ti in &self.qt.cells[&q2].ts {
-        //     println!("flush ti: {}", ti);
-        // }
-        // info!("finalise all points too");
+        for ti in &self.qt.cells[&q2].ts {
+            if self.is_triangle_finite(*ti) == false {
+                continue;
+            }
+            io::stdout().write_all(
+                &format!(
+                    "f {} {} {}\n",
+                    self.sma_ids[&self.ts[*ti][0]],
+                    self.sma_ids[&self.ts[*ti][1]],
+                    self.sma_ids[&self.ts[*ti][2]],
+                )
+                .as_bytes(),
+            )?;
+        }
+        for vi in &self.qt.cells[&q2].pts {
+            io::stdout().write_all(&format!("x {}\n", self.sma_ids[vi]).as_bytes())?;
+        }
+        Ok(())
     }
 
     // pub fn finalise_leftover_triangles(&mut self) -> io::Result<()> {
