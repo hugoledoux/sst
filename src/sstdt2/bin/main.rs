@@ -14,16 +14,9 @@ use std::io::{self, Write};
 
 use clap::App;
 
-pub enum Outputmode {
-    Sma,   //-- streaming mesh ascii
-    Smb,   //-- streaming mesh binary
-    Stars, //-- only stars with global index
-    Both,  //-- vertices & stars
-}
-
 fn main() -> io::Result<()> {
-    let _matches = App::new("sstdt")
-        .version("0.2")
+    let _matches = App::new("sstdt2")
+        .version("0.1")
         .about("streaming startin -- Delaunay triangulation")
         .arg("--stars...       'output stars instead of .sma'")
         .arg("--both...        'output both vertices and stars'")
@@ -98,9 +91,9 @@ fn main() -> io::Result<()> {
                 //-- bbox
                 let re = parse_4_f64(&l);
                 dt.set_bbox(re.0, re.1, re.2, re.3);
-                // io::stdout().write_all(
-                //     &format!("b {:.3} {:.3} {:.3} {:.3}\n", re.0, re.1, re.2, re.3).as_bytes(),
-                // )?;
+                io::stdout().write_all(
+                    &format!("b {:.3} {:.3} {:.3} {:.3}\n", re.0, re.1, re.2, re.3).as_bytes(),
+                )?;
             }
             'v' => {
                 //-- vertex
