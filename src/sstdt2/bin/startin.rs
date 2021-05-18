@@ -359,6 +359,7 @@ impl Triangulation {
         Ok(())
     }
 
+    //-- finalise the leaf
     pub fn finalise_qtcell(&mut self, gx: usize, gy: usize) -> io::Result<()> {
         info!(
             "Cell {}--{} finalised ({} vertices)",
