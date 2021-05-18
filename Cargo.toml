@@ -34,3 +34,6 @@ path = "src/sstdt/bin/main.rs"
 name = "sstdt2"
 path = "src/sstdt2/bin/main.rs"
 
+[[bin]]
+name = "sstval"
+path = "src/sstval/bin/main.rs"
