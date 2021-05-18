@@ -523,16 +523,6 @@ impl Triangulation {
         self.qt.cells.get_mut(qtc).unwrap().pts.remove(&vi);
         self.freelist_vs.push(vi);
         Ok(())
-        // self.sma_ids.insert(vi, self.sma_count_vertices);
-        // self.sma_count_vertices += 1;
-        // io::stdout().write_all(
-        //     &format!(
-        //         "v {} {} {}\n",
-        //         &self.vs[vi][0], &self.vs[vi][1], &self.vs[vi][2]
-        //     )
-        //     .as_bytes(),
-        // )?;
-        // self.vs_active[vi] == true;
     }
 
     /// write triangle to stdout stream + update neighbours + remove from qt cell
