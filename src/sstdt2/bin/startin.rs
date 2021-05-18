@@ -1035,11 +1035,22 @@ impl Triangulation {
     }
 
     fn flip13(&mut self, vi: usize, ti: usize) -> (usize, usize, usize) {
-        let newi = self.ts.len();
+        let newi0;
+        let newi1;
+        let mut reuse: bool = false;
+        if self.freelist_ts.len() < 2 {
+            newi0 = self.ts.len();
+            newi1 = newi0 + 1;
+        } else {
+            newi0 = self.freelist_ts.pop().unwrap();
+            newi1 = self.freelist_ts.pop().unwrap();
+            reuse = true;
+        }
+
         let t = self.ts[ti];
-        let t0 = [vi, t[0], t[1], t[5], newi, newi + 1];
-        let t1 = [vi, t[1], t[2], t[3], newi + 1, ti];
-        let t2 = [vi, t[2], t[0], t[4], ti, newi];
+        let t0 = [vi, t[0], t[1], t[5], newi0, newi1];
+        let t1 = [vi, t[1], t[2], t[3], newi1, ti];
+        let t2 = [vi, t[2], t[0], t[4], ti, newi0];
         //-- increment the number of incident triangles
         self.vs_incident[t[0]] += 1;
         self.vs_incident[t[1]] += 1;
@@ -1050,7 +1061,7 @@ impl Triangulation {
             let a = self.ts[n];
             let a1 = &a[3..6].iter().position(|&x| x == ti).unwrap();
             if let Some(x) = self.ts.get_mut(n) {
-                (*x)[*a1 + 3] = newi;
+                (*x)[*a1 + 3] = newi0;
             }
         }
         n = t[4];
@@ -1058,7 +1069,7 @@ impl Triangulation {
             let a = self.ts[n];
             let a1 = &a[3..6].iter().position(|&x| x == ti).unwrap();
             if let Some(x) = self.ts.get_mut(n) {
-                (*x)[*a1 + 3] = newi + 1;
+                (*x)[*a1 + 3] = newi1;
             }
         }
         n = t[5];
@@ -1069,15 +1080,18 @@ impl Triangulation {
                 (*x)[*a1 + 3] = ti;
             }
         }
-
         if let Some(x) = self.ts.get_mut(ti) {
             (*x) = t0;
         }
-        self.ts.insert(newi, t1);
-        self.ts.insert(newi + 1, t2);
-        (ti, newi, newi + 1)
+        if reuse == false {
+            self.ts.push(t1);
+            self.ts.push(t2);
+        } else {
+            self.ts[newi0] = t1;
+            self.ts[newi1] = t2;
+        }
+        (ti, newi0, newi1)
     }
-
 
     pub fn incident_triangles_to_vertex(&self, vi: usize) -> Option<Vec<usize>> {
         let mut l: Vec<usize> = Vec::new();
