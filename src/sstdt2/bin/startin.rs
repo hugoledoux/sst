@@ -17,15 +17,15 @@ extern crate rand;
 
 //----------------------
 struct Qtcell {
-    pts: HashSet<usize>,
-    ts: HashSet<usize>,
+    pts: HashSet<usize>,            // TODO: this should be a Vec maybe?
+    ts: HashMap<usize, Vec<usize>>, // TODO: this should be a HashMap wiht [t0, t1, t2]
     finalised: bool,
 }
 
 impl Qtcell {
     pub fn new() -> Qtcell {
         let p: HashSet<usize> = HashSet::new();
-        let t: HashSet<usize> = HashSet::new();
+        let t: HashMap<usize, Vec<usize>> = HashMap::new();
         Qtcell {
             pts: p,
             ts: t,
@@ -45,8 +45,8 @@ impl Qtcell {
         self.pts.insert(vi);
     }
 
-    pub fn add_ts(&mut self, ti: usize) {
-        self.ts.insert(ti);
+    pub fn add_ts(&mut self, ti: usize, adj0: usize, adj1: usize, adj2: usize) {
+        self.ts.insert(ti, vec![adj0, adj1, adj2]);
     }
 
     pub fn set_final(&mut self, b: bool) {
@@ -62,7 +62,7 @@ impl Qtcell {
     }
     pub fn get_vec_ts(&self) -> Vec<usize> {
         let mut r: Vec<usize> = Vec::new();
-        for ti in &self.ts {
+        for (ti, adjs) in &self.ts {
             r.push(*ti);
         }
         r
@@ -319,6 +319,15 @@ impl Triangulation {
         self.qt.init(s);
     }
 
+    fn does_triangle_exist(&self, ti: usize, adjs: &Vec<usize>) -> bool {
+        let t0 = self.ts[ti];
+        if t0[0] != adjs[0] || t0[1] != adjs[1] || t0[2] != adjs[2] {
+            false
+        } else {
+            true
+        }
+    }
+
     fn finalise_cell_and_merge(&mut self, qtc: &Vec<u8>) -> io::Result<()> {
         let mut q2 = vec![0; qtc.len() - 1];
         q2.clone_from_slice(&qtc[..qtc.len() - 1]);
@@ -334,8 +343,10 @@ impl Triangulation {
         for i in 0..4 {
             q2.pop();
             q2.push(i);
-            for ti in &self.qt.cells[&q2].ts {
-                nc.add_ts(*ti);
+            for (ti, adjs) in &self.qt.cells[&q2].ts {
+                if self.does_triangle_exist(*ti, &adjs) == true {
+                    nc.add_ts(*ti, adjs[0], adjs[1], adjs[2]);
+                }
             }
             for vi in &self.qt.cells[&q2].pts {
                 nc.add_pt(*vi);
@@ -369,19 +380,22 @@ impl Triangulation {
         );
 
         let mut qtc = self.qt.get_qtc_from_gxgy(gx, gy);
-
         let mut gbbox: [f64; 4] = [0.0, 0.0, 0.0, 0.0];
         self.qt.get_cell_bbox(gx, gy, &mut gbbox);
 
         //-- 1. collect all (unique) triangles and add to qt cell
-        // let mut allts: HashSet<usize> = HashSet::new();
-        // let mut allts: HashSet<usize> = HashSet::new();
         let allpts: Vec<usize> = self.qt.get_cell_pts(gx, gy);
         for vi in &allpts {
             let l: Vec<usize> = self.incident_triangles_to_vertex(*vi).unwrap();
             for ti in &l {
                 // allts.insert(*ti);
-                self.qt.cells.get_mut(&qtc).unwrap().add_ts(*ti);
+                // self.ts[*ti][0]
+                self.qt.cells.get_mut(&qtc).unwrap().add_ts(
+                    *ti,
+                    self.ts[*ti][0],
+                    self.ts[*ti][1],
+                    self.ts[*ti][2],
+                );
             }
         }
 
@@ -506,7 +520,6 @@ impl Triangulation {
     fn finalise_vertex(&mut self, vi: usize, qtc: &Vec<u8>) -> io::Result<()> {
         io::stdout().write_all(&format!("x {}\n", self.sma_ids[&vi]).as_bytes())?;
         self.sma_ids.remove(&vi);
-        // TODO: PUT THIS LINE BACK
         self.qt.cells.get_mut(qtc).unwrap().pts.remove(&vi);
         self.freelist_vs.push(vi);
         Ok(())
@@ -560,6 +573,7 @@ impl Triangulation {
         }
         //-- remove from qt cell list
         self.qt.cells.get_mut(qtc).unwrap().ts.remove(&ti);
+        // println!("qtcell: {} -- {:?}", ti, self.qt.cells[qtc].ts);
         Ok(())
     }
 
@@ -726,23 +740,19 @@ impl Triangulation {
 
     fn finalise_qt_root(&mut self) -> io::Result<()> {
         info!("Finalise the quadtree root cell");
+        let fout = format!("/Users/hugo/temp/sstout/leftovers.geojson");
+        let _re = self.write_geojson_triangles(fout.to_string());
         let q2: Vec<u8> = Vec::new();
-        for ti in &self.qt.cells[&q2].ts {
-            if self.is_triangle_finite(*ti) == false {
-                continue;
+        let allts = self.qt.cells[&q2].get_vec_ts();
+        for ti in &allts {
+            if self.is_triangle_finite(*ti) == true {
+                let _re = self.finalise_triangle(*ti, &q2);
             }
-            io::stdout().write_all(
-                &format!(
-                    "f {} {} {}\n",
-                    self.sma_ids[&self.ts[*ti][0]],
-                    self.sma_ids[&self.ts[*ti][1]],
-                    self.sma_ids[&self.ts[*ti][2]],
-                )
-                .as_bytes(),
-            )?;
         }
-        for vi in &self.qt.cells[&q2].pts {
-            io::stdout().write_all(&format!("x {}\n", self.sma_ids[vi]).as_bytes())?;
+        //-- finalise the vertices on the convexhull
+        let allvs = self.qt.cells[&q2].get_vec_vs();
+        for vi in &allvs {
+            let _re = self.finalise_vertex(*vi, &q2);
         }
         Ok(())
     }
