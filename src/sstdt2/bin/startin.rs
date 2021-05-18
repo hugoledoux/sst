@@ -256,6 +256,8 @@ impl Quadtree {
 //----------------------
 pub struct Triangulation {
     vs: Vec<[f64; 3]>,
+    vs_incident: Vec<usize>, //-- number of incident triangles
+    vs_active: Vec<bool>,    //-- is the vertex active (ie written once to the stream)
     ts: Vec<[usize; 6]>,
     qt: Quadtree,
     snaptol: f64,
@@ -274,6 +276,10 @@ impl Triangulation {
         let mut thevs: Vec<[f64; 3]> = Vec::new();
         let p: [f64; 3] = [-99999.9, -99999.9, -99999.9];
         thevs.push(p); //-- add the infinity point
+        let mut thevs_incident: Vec<usize> = Vec::new();
+        thevs_incident.push(0);
+        let mut thevs_active: Vec<bool> = Vec::new();
+        thevs_active.push(false);
         let mut thets: Vec<[usize; 6]> = Vec::new();
         let t: [usize; 6] = [0, 0, 0, 0, 0, 0]; //-- add a dummy triangle to simulate missing triangles (null pointers)
         thets.push(t);
@@ -283,6 +289,8 @@ impl Triangulation {
         let thesma_ids: HashMap<usize, usize> = HashMap::new();
         Triangulation {
             vs: thevs,
+            vs_incident: thevs_incident,
+            vs_active: thevs_active,
             ts: thets,
             qt: q,
             snaptol: 0.001,
@@ -757,6 +765,8 @@ impl Triangulation {
         let p = [x, y, z];
         // let c = self.vs.len();
         self.vs.push(p);
+        self.vs_incident.push(0);
+        self.vs_active.push(false);
         let l = self.vs.len();
         if l >= 4 {
             let a = l - 3;
@@ -784,6 +794,9 @@ impl Triangulation {
                 self.ts.push([b, 0, a, 2, 1, 3]);
                 self.is_init = true;
             }
+            self.vs_incident[a] = 3;
+            self.vs_incident[b] = 3;
+            self.vs_incident[c] = 3;
         }
         self.curt = 1;
         // TODO: add those lines
@@ -853,6 +866,8 @@ impl Triangulation {
         //-- ok we now insert the point in the data structure
         let pi: usize = self.vs.len();
         self.vs.push([px, py, pz]);
+        self.vs_incident.push(3); //-- b/c of flip13
+        self.vs_active.push(false);
 
         //-- flip13()
         // self.print_ds();
@@ -946,6 +961,10 @@ impl Triangulation {
         let t0 = [vi, t[0], t[1], t[5], newi, newi + 1];
         let t1 = [vi, t[1], t[2], t[3], newi + 1, ti];
         let t2 = [vi, t[2], t[0], t[4], ti, newi];
+        //-- increment the number of incident triangles
+        self.vs_incident[t[0]] += 1;
+        self.vs_incident[t[1]] += 1;
+        self.vs_incident[t[2]] += 1;
         //-- update neighbours
         let mut n = t[3];
         if n != 0 {
@@ -1254,6 +1273,11 @@ impl Triangulation {
             t0[((*k0 + 1) % 3) + 3],
             t0i,
         ];
+        //-- update the number of incident triangles
+        self.vs_incident[t0[*k0]] += 1;
+        self.vs_incident[t1[*k1]] += 1;
+        self.vs_incident[t0[(*k0 + 1) % 3]] -= 1;
+        self.vs_incident[t0[(*k0 + 2) % 3]] -= 1;
 
         //-- update 2 neighbouring triangles
         //-- because 2 stay the same since the indices are not changed
@@ -1366,6 +1390,10 @@ impl Triangulation {
             let pt = Geometry::new(Value::Point(vec![v[0], v[1]]));
             let mut attributes = Map::new();
             attributes.insert(String::from("id"), to_value(i.to_string()).unwrap());
+            attributes.insert(
+                String::from("incident"),
+                to_value(self.vs_incident[i].to_string()).unwrap(),
+            );
             let f = Feature {
                 bbox: None,
                 geometry: Some(pt),
