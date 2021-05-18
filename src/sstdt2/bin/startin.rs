@@ -268,6 +268,8 @@ pub struct Triangulation {
     freelist_vs: Vec<usize>,
     sma_ids: HashMap<usize, usize>,
     sma_count_vertices: usize,
+    pub max_vs: usize,
+    pub max_ts: usize,
 }
 
 impl Triangulation {
@@ -301,6 +303,8 @@ impl Triangulation {
             freelist_ts: theflt,
             sma_ids: thesma_ids,
             sma_count_vertices: 1,
+            max_vs: 0,
+            max_ts: 0,
         }
     }
 
@@ -901,6 +905,13 @@ impl Triangulation {
             let x = re.unwrap();
             self.qt.insert_one_vi(px, py, x);
         };
+        //-- update for the stats
+        if self.vs.len() > self.max_vs {
+            self.max_vs = self.vs.len()
+        }
+        if self.ts.len() > self.max_ts {
+            self.max_ts = self.ts.len()
+        }
         re
     }
 
