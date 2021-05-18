@@ -420,10 +420,10 @@ impl Triangulation {
         self.qt.set_final_qtc(&qtc, true);
         loop {
             if self.qt.are_sibling_final(&qtc) == true {
-                self.finalise_cell_and_merge(&qtc);
+                let _re = self.finalise_cell_and_merge(&qtc);
                 qtc.pop();
                 if qtc.is_empty() {
-                    self.finalise_qt_root();
+                    let _re = self.finalise_qt_root();
                     break;
                 }
             } else {
@@ -925,6 +925,7 @@ impl Triangulation {
         let p: [f64; 3] = [px, py, pz];
         let ti = self.walk(&p);
         // println!("Starting Ti: {}", ti);
+        // assert_eq!(vec, [1, 2, 3]);
         //-- checking if within snap_tol of one vertex, then no insert
         for i in 0..3 {
             if geom::distance2d_squared(&self.vs[self.ts[ti][i]], &p)
@@ -1077,27 +1078,6 @@ impl Triangulation {
         (ti, newi, newi + 1)
     }
 
-    // /// Returns the coordinates of the vertex v in a Vec [x,y,z]
-    // pub fn get_point(&self, v: usize) -> Option<Vec<f64>> {
-    //     if self.vertex_exists(v) == false {
-    //         None
-    //     } else {
-    //         Some(self.stars[&v].pt.to_vec())
-    //     }
-    // }
-
-    /// Returns a list (`Vec<usize>`) (ordered CCW) of the adjacent vertices.
-    /// [`None`] if the vertex is not part of the triangulation.
-    // pub fn adjacent_vertices_to_vertex(&self, v: usize) -> Option<Vec<usize>> {
-    //     if self.vertex_exists(v) == false {
-    //         return None;
-    //     }
-    //     let mut adjs: Vec<usize> = Vec::new();
-    //     for each in self.stars[&v].link.iter() {
-    //         adjs.push(*each);
-    //     }
-    //     Some(adjs)
-    // }
 
     pub fn incident_triangles_to_vertex(&self, vi: usize) -> Option<Vec<usize>> {
         let mut l: Vec<usize> = Vec::new();
@@ -1148,37 +1128,6 @@ impl Triangulation {
         total
     }
 
-    // /// Returns the convex hull of the dataset, oriented CCW.
-    // /// It is a list of vertex indices (first != last)
-    // pub fn convex_hull(&self) -> Vec<usize> {
-    //     let mut re: Vec<usize> = Vec::new();
-    //     for x in self.stars[&0].link.iter() {
-    //         re.push(*x);
-    //     }
-    //     re.reverse();
-    //     re
-    // }
-
-    // /// Returns the size (ie the number of vertices) of the convex hull of the dataset
-    // pub fn number_of_vertices_on_convex_hull(&self) -> usize {
-    //     //-- number of finite vertices on the boundary of the convex hull
-    //     if self.is_init == false {
-    //         return 0;
-    //     }
-    //     return self.stars[&0].link.len();
-    // }
-
-    // /// Returns true if the vertex v is part of the boundary of the convex
-    // /// hull of the dataset. False otherwise.
-    // pub fn is_vertex_convex_hull(&self, v: usize) -> bool {
-    //     if v == 0 {
-    //         return false;
-    //     }
-    //     if self.vertex_exists(v) == false {
-    //         return false;
-    //     }
-    //     self.stars[&v].link.contains_infinite_vertex()
-    // }
 
     fn walk(&self, x: &[f64]) -> usize {
         //-- find a starting tr

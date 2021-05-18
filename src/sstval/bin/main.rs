@@ -67,12 +67,12 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
-fn parse_2_usize(l: &String) -> (usize, usize) {
-    let ls: Vec<&str> = l.split_whitespace().collect();
-    let a: usize = ls[1].parse::<usize>().unwrap();
-    let b: usize = ls[2].parse::<usize>().unwrap();
-    (a, b)
-}
+// fn parse_2_usize(l: &String) -> (usize, usize) {
+//     let ls: Vec<&str> = l.split_whitespace().collect();
+//     let a: usize = ls[1].parse::<usize>().unwrap();
+//     let b: usize = ls[2].parse::<usize>().unwrap();
+//     (a, b)
+// }
 
 fn parse_3_f64(l: &String) -> (f64, f64, f64) {
     let ls: Vec<&str> = l.split_whitespace().collect();
