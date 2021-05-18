@@ -148,6 +148,8 @@ fn main() -> io::Result<()> {
 
     // info!("max # points in DT during process: {}", dt.max);
     // let _x = dt.finalise_leftover_triangles();
+    info!("max # points in DT during process: {}", dt.max_vs);
+    info!("max # triangles in DT during process: {}", dt.max_ts);
 
     info!("✅");
     Ok(())
