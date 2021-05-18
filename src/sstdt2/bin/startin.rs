@@ -923,15 +923,23 @@ impl Triangulation {
             }
         }
         //-- ok we now insert the point in the data structure
-        let pi: usize = self.vs.len();
-        self.vs.push([px, py, pz]);
-        self.vs_incident.push(3); //-- b/c of flip13
-        self.vs_active.push(false);
+        let pi: usize;
+        if self.freelist_vs.is_empty() {
+            // println!("no free");
+            pi = self.vs.len();
+            self.vs.push([px, py, pz]);
+            self.vs_incident.push(3); //-- b/c of flip13
+            self.vs_active.push(false);
+        } else {
+            println!("freelist used: {:?}", self.freelist_vs);
+            pi = self.freelist_vs.pop().unwrap();
+            self.vs[pi] = [px, py, pz];
+            self.vs_incident[pi] = 3; //-- b/c of flip13
+            self.vs_active[pi] = false;
+        }
 
         //-- flip13()
-        // self.print_ds();
         let incidents = self.flip13(pi, ti);
-        // self.print_ds();
 
         //-- update_dt()
         let mut mystack: Vec<usize> = Vec::new();
@@ -1114,7 +1122,7 @@ impl Triangulation {
     /// Returns number of finite vertices in the triangulation.
     pub fn number_of_vertices(&self) -> usize {
         //-- number of finite vertices
-        self.vs.len() - 1
+        self.vs.len() - self.freelist_vs.len() - 1
     }
 
     /// Returns number of finite triangles in the triangulation.
@@ -1276,7 +1284,8 @@ impl Triangulation {
     fn walk_bruteforce_triangles(&self, x: &[f64]) -> Option<usize> {
         // warn!("walk_bruteforce_triangles()");
         for (id, t) in self.ts.iter().enumerate() {
-            if self.is_triangle_finite(id) == true {
+            //-- TODO: here the finalised/flushed triangles need to be better handled
+            if self.freelist_ts.contains(&id) == false && self.is_triangle_finite(id) == true {
                 if geom::intriangle(
                     &self.vs[t[0]],
                     &self.vs[t[1]],
