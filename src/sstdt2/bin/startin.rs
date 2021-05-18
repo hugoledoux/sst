@@ -330,46 +330,32 @@ impl Triangulation {
         //-- create parent cell
         let mut nc = Qtcell::new();
         nc.set_final(true);
-        //-- copy from 4 children the vertices/triangles that remain active
-        let mut active_vs_in_ts: HashSet<usize> = HashSet::new();
-        let mut all_vs: HashSet<usize> = HashSet::new();
+        //-- copy from 4 children the vertices and triangles
         for i in 0..4 {
             q2.pop();
             q2.push(i);
-            let allts: Vec<usize> = self.qt.cells[&q2].get_vec_ts();
-            for ti in &allts {
-                if self.is_triangle_final(*ti, &gbbox) == true {
-                    let _re = self.finalise_triangle(*ti);
-                } else {
-                    nc.add_ts(*ti);
-                    for i in 0..3 {
-                        active_vs_in_ts.insert(self.ts[*ti][i]);
-                    }
-                }
+            for ti in &self.qt.cells[&q2].ts {
+                nc.add_ts(*ti);
             }
             for vi in &self.qt.cells[&q2].pts {
-                all_vs.insert(*vi);
+                nc.add_pt(*vi);
+                // all_vs.insert(*vi);
             }
             self.qt.cells.remove(&q2);
         }
-        //-- keep only the active vertices and add them to nc
-        info!("all_vs: {:?}", all_vs);
-        info!("active_vs_in_ts: {:?}", active_vs_in_ts);
-        let intersect: HashSet<_> = all_vs.intersection(&active_vs_in_ts).collect();
-        info!("still active (intersection): {:?}", intersect);
-        for vi in &intersect {
-            nc.add_pt(**vi);
-        }
-        let difference: HashSet<_> = all_vs.difference(&active_vs_in_ts).collect();
-        info!("finalised (difference): {:?}", difference);
-        for vi in &difference {
-            io::stdout().write_all(&format!("x {}\n", self.sma_ids[*vi]).as_bytes())?;
-        }
         //-- insert the new parent cell in the QT
-        q2.pop();
+        q2.pop(); //-- now q2 is the new cell (the parent here)
         let mut req = vec![0; q2.len()];
         req.clone_from_slice(&q2);
-        self.qt.cells.insert(q2, nc);
+        self.qt.cells.insert(req, nc);
+        //-- verify if triangles encroach the new cell
+        let allts = self.qt.cells[&q2].get_vec_ts();
+        for ti in &allts {
+            // println!("ti: {}", ti);
+            if self.is_triangle_final(*ti, &gbbox) == true {
+                let _re = self.finalise_triangle(*ti, &q2);
+            }
+        }
         Ok(())
     }
 
@@ -386,82 +372,28 @@ impl Triangulation {
         let mut gbbox: [f64; 4] = [0.0, 0.0, 0.0, 0.0];
         self.qt.get_cell_bbox(gx, gy, &mut gbbox);
 
-        //-- 1. collect all (unique) triangles
+        //-- 1. collect all (unique) triangles and add to qt cell
         // let mut allts: HashSet<usize> = HashSet::new();
-        let mut allts: HashMap<usize, bool> = HashMap::new();
+        // let mut allts: HashSet<usize> = HashSet::new();
         let allpts: Vec<usize> = self.qt.get_cell_pts(gx, gy);
-
-        //-- active all the vertices of the leaf cell
-        //-- TODO: maybe make this better (benchmark?)
-        for (i, vi) in allpts.iter().enumerate() {
-            self.sma_ids.insert(*vi, self.sma_count_vertices);
-            self.sma_count_vertices += 1;
-            io::stdout().write_all(
-                &format!(
-                    "v {} {} {}\n",
-                    &self.vs[*vi][0], &self.vs[*vi][1], &self.vs[*vi][2]
-                )
-                .as_bytes(),
-            )?;
-        }
-        //-- check the star of each vertex and collect triangles
-        //-- and finalise the vertices whose star is filled with triangles
-        //-- that can be finalised
-        let mut fin_vs: Vec<usize> = Vec::new();
         for vi in &allpts {
-            //-- 2. encroachment?
             let l: Vec<usize> = self.incident_triangles_to_vertex(*vi).unwrap();
-            let mut finv: bool = true;
             for ti in &l {
-                if allts.contains_key(ti) {
-                    if allts[ti] == false {
-                        finv = false;
-                    }
-                } else if self.is_triangle_final(*ti, &gbbox) == false {
-                    finv = false;
-                    allts.insert(*ti, false);
-                } else {
-                    // //-- write to stream final triangles
-                    // io::stdout().write_all(
-                    //     &format!(
-                    //         "f {} {} {}\n",
-                    //         self.sma_ids[&self.ts[*ti][0]],
-                    //         self.sma_ids[&self.ts[*ti][1]],
-                    //         self.sma_ids[&self.ts[*ti][2]],
-                    //     )
-                    //     .as_bytes(),
-                    // )?;
-                    allts.insert(*ti, true);
-                }
-            }
-            if finv == true {
-                fin_vs.push(*vi);
-                // println!("vertex final {:?}", *vi);
-                //-- TODO: remove the point from the DS!
-                //-- finalise the vertices in the stream
-                // io::stdout().write_all(&format!("x {}\n", self.sma_ids[vi]).as_bytes())?;
-                // self.qt.cells.get_mut(&qtc).unwrap().pts.remove(vi);
-            }
-        }
-        // println!("allts: {:?}", allts);
-
-        //-- finalise the triangles (write to stream)
-        //-- and remove from the ds
-        for (ti, finalised) in &allts {
-            // println!("{}: \"{}\"", ti, finalised);
-            if *finalised == true {
-                let _re = self.finalise_triangle(*ti);
-            } else {
+                // allts.insert(*ti);
                 self.qt.cells.get_mut(&qtc).unwrap().add_ts(*ti);
             }
         }
 
-        //-- finalise the vertices that will never be used again
-        for vi in &fin_vs {
-            //-- TODO: remove the point from the DS!
-            //-- finalise the vertices in the stream
-            io::stdout().write_all(&format!("x {}\n", self.sma_ids[vi]).as_bytes())?;
-            self.qt.cells.get_mut(&qtc).unwrap().pts.remove(vi);
+        //-- 2. check encroachment on current qt cell (a leaf at this point)
+        //-- and delete them if final
+        let allts = self.qt.cells[&qtc].get_vec_ts();
+        for ti in &allts {
+            // println!("{}: \"{}\"", ti, finalised);
+            if self.is_triangle_final(*ti, &gbbox) == true {
+                let _re = self.finalise_triangle(*ti, &qtc);
+                // } else {
+                //     self.qt.cells.get_mut(&qtc).unwrap().add_ts(*ti);
+            }
         }
 
         //-- merge cell with parent, and continue until impossible
@@ -482,25 +414,151 @@ impl Triangulation {
         Ok(())
     }
 
-    fn finalise_triangle(&mut self, ti: usize) -> io::Result<()> {
+    // //-- finalise the vertices that will never be used again
+    // for vi in &fin_vs {
+    //     //-- TODO: remove the point from the DS!
+    //     //-- finalise the vertices in the stream
+    //     io::stdout().write_all(&format!("x {}\n", self.sma_ids[vi]).as_bytes())?;
+    //     self.qt.cells.get_mut(&qtc).unwrap().pts.remove(vi);
+    // }
+
+    // //-- active all the vertices of the leaf cell
+    // //-- TODO: maybe make this better (benchmark?)
+    // for (i, vi) in allpts.iter().enumerate() {
+    //     self.sma_ids.insert(*vi, self.sma_count_vertices);
+    //     self.sma_count_vertices += 1;
+    //     io::stdout().write_all(
+    //         &format!(
+    //             "v {} {} {}\n",
+    //             &self.vs[*vi][0], &self.vs[*vi][1], &self.vs[*vi][2]
+    //         )
+    //         .as_bytes(),
+    //     )?;
+    // }
+
+    // //-- check the star of each vertex and collect triangles
+    // //-- and finalise the vertices whose star is filled with triangles
+    // //-- that can be finalised
+    // let mut fin_vs: Vec<usize> = Vec::new();
+    // for vi in &allpts {
+    //     //-- 2. encroachment?
+    //     let l: Vec<usize> = self.incident_triangles_to_vertex(*vi).unwrap();
+    //     let mut finv: bool = true;
+    //     for ti in &l {
+    //         if allts.contains_key(ti) {
+    //             if allts[ti] == false {
+    //                 finv = false;
+    //             }
+    //         } else if self.is_triangle_final(*ti, &gbbox) == false {
+    //             finv = false;
+    //             allts.insert(*ti, false);
+    //         } else {
+    //             // //-- write to stream final triangles
+    //             // io::stdout().write_all(
+    //             //     &format!(
+    //             //         "f {} {} {}\n",
+    //             //         self.sma_ids[&self.ts[*ti][0]],
+    //             //         self.sma_ids[&self.ts[*ti][1]],
+    //             //         self.sma_ids[&self.ts[*ti][2]],
+    //             //     )
+    //             //     .as_bytes(),
+    //             // )?;
+    //             allts.insert(*ti, true);
+    //         }
+    //     }
+    //     if finv == true {
+    //         fin_vs.push(*vi);
+    //         // println!("vertex final {:?}", *vi);
+    //         //-- TODO: remove the point from the DS!
+    //         //-- finalise the vertices in the stream
+    //         // io::stdout().write_all(&format!("x {}\n", self.sma_ids[vi]).as_bytes())?;
+    //         // self.qt.cells.get_mut(&qtc).unwrap().pts.remove(vi);
+    //     }
+    // }
+    // println!("allts: {:?}", allts);
+
+    // //-- finalise the triangles (write to stream)
+    // //-- and remove from the ds
+    // for (ti, finalised) in &allts {
+    //     // println!("{}: \"{}\"", ti, finalised);
+    //     if *finalised == true {
+    //         let _re = self.finalise_triangle(*ti);
+    //     } else {
+    //         self.qt.cells.get_mut(&qtc).unwrap().add_ts(*ti);
+    //     }
+    // }
+
+    fn activate_vertex(&mut self, vi: usize) -> io::Result<()> {
+        self.sma_ids.insert(vi, self.sma_count_vertices);
+        self.sma_count_vertices += 1;
         io::stdout().write_all(
             &format!(
-                "f {} {} {}\n",
-                self.sma_ids[&self.ts[ti][0]],
-                self.sma_ids[&self.ts[ti][1]],
-                self.sma_ids[&self.ts[ti][2]],
+                "v {} {} {}\n",
+                &self.vs[vi][0], &self.vs[vi][1], &self.vs[vi][2]
             )
             .as_bytes(),
         )?;
+        self.vs_active[vi] = true;
+        Ok(())
+    }
+
+    fn finalise_vertex(&mut self, vi: usize, qtc: &Vec<u8>) -> io::Result<()> {
+        io::stdout().write_all(&format!("x {}\n", self.sma_ids[&vi]).as_bytes())?;
+        self.sma_ids.remove(&vi);
+        // TODO: PUT THIS LINE BACK
+        self.qt.cells.get_mut(qtc).unwrap().pts.remove(&vi);
+        self.freelist_vs.push(vi);
+        Ok(())
+        // self.sma_ids.insert(vi, self.sma_count_vertices);
+        // self.sma_count_vertices += 1;
+        // io::stdout().write_all(
+        //     &format!(
+        //         "v {} {} {}\n",
+        //         &self.vs[vi][0], &self.vs[vi][1], &self.vs[vi][2]
+        //     )
+        //     .as_bytes(),
+        // )?;
+        // self.vs_active[vi] == true;
+    }
+
+    /// write triangle to stdout stream + update neighbours + remove from qt cell
+    fn finalise_triangle(&mut self, ti: usize, qtc: &Vec<u8>) -> io::Result<()> {
+        let t0 = self.ts[ti];
+        //-- check if the vertices involved are active, if not activate them
+        for i in 0..3 {
+            if self.vs_active[t0[i]] == false {
+                let _re = self.activate_vertex(t0[i]);
+            }
+        }
+        //-- write the triangle to the stream
+        io::stdout().write_all(
+            &format!(
+                "f {} {} {}\n",
+                self.sma_ids[&t0[0]], self.sma_ids[&t0[1]], self.sma_ids[&t0[2]],
+            )
+            .as_bytes(),
+        )?;
+        //-- add to free list to reuse in the future
         self.freelist_ts.push(ti);
         // println!("{:?}", self.ts[ti]);
+        //-- update neighbouring triangles (if any) for the walking
         for i in 3..6 {
-            let tadj = self.ts[ti][i];
+            let tadj = t0[i];
             let k = &self.ts[tadj][3..6].iter().position(|&x| x == ti);
             if k.is_none() == false {
                 self.ts[tadj][k.unwrap() + 3] = 0;
             }
         }
+        //-- update # incident triangles for 3 vertices of the triangle
+        //-- and finalise the vertex if now zero (never used again)
+        for i in 0..3 {
+            self.vs_incident[t0[i]] -= 1;
+            if self.vs_incident[t0[i]] == 0 {
+                let _re = self.finalise_vertex(t0[i], &qtc);
+            }
+        }
+        //-- remove from qt cell list
+        self.qt.cells.get_mut(qtc).unwrap().ts.remove(&ti);
         Ok(())
     }
 
