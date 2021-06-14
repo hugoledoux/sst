@@ -135,7 +135,7 @@ impl Quadtree {
         r
     }
 
-    fn are_sibling_final(&self, qtc: &Vec<u8>) -> bool {
+    fn are_sibling_finalised(&self, qtc: &Vec<u8>) -> bool {
         let mut q2 = vec![0; qtc.len() - 1];
         q2.clone_from_slice(&qtc[..qtc.len() - 1]);
         q2.push(0);
@@ -157,7 +157,7 @@ impl Quadtree {
         false
     }
 
-    fn set_final_qtc(&mut self, qtc: &Vec<u8>, b: bool) {
+    fn set_qtc_as_finalised(&mut self, qtc: &Vec<u8>, b: bool) {
         self.cells.get_mut(qtc).unwrap().set_final(true);
     }
 
@@ -254,7 +254,7 @@ impl Quadtree {
 //----------------------
 pub struct Triangulation {
     vs: Vec<[f64; 3]>,
-    vs_incident: Vec<usize>, //-- number of incident triangles
+    vs_incident: Vec<usize>, //-- number of incident triangles to each vertex (to know when to finalise)
     vs_active: Vec<bool>,    //-- is the vertex active (ie written once to the stream)
     ts: Vec<[usize; 6]>,
     qt: Quadtree,
@@ -330,7 +330,7 @@ impl Triangulation {
         }
     }
 
-    fn finalise_cell_and_merge(&mut self, qtc: &Vec<u8>) -> io::Result<()> {
+    fn finalise_nonleaf_qtcell_and_merge(&mut self, qtc: &Vec<u8>) -> io::Result<()> {
         let mut q2 = vec![0; qtc.len() - 1];
         q2.clone_from_slice(&qtc[..qtc.len() - 1]);
         info!("Cell qtc{:?} finalised", q2);
@@ -373,7 +373,7 @@ impl Triangulation {
     }
 
     //-- finalise the leaf
-    pub fn finalise_qtcell(&mut self, gx: usize, gy: usize) -> io::Result<()> {
+    pub fn finalise_qt_leaf(&mut self, gx: usize, gy: usize) -> io::Result<()> {
         info!(
             "Cell {}--{} finalised ({} vertices)",
             gx,
@@ -415,10 +415,10 @@ impl Triangulation {
 
         //-- merge cell with parent, and continue until impossible
         //-- or only one cell left
-        self.qt.set_final_qtc(&qtc, true);
+        self.qt.set_qtc_as_finalised(&qtc, true);
         loop {
-            if self.qt.are_sibling_final(&qtc) == true {
-                let _re = self.finalise_cell_and_merge(&qtc);
+            if self.qt.are_sibling_finalised(&qtc) == true {
+                let _re = self.finalise_nonleaf_qtcell_and_merge(&qtc);
                 qtc.pop();
                 if qtc.is_empty() {
                     let _re = self.finalise_qt_root();
@@ -666,7 +666,7 @@ impl Triangulation {
             self.vs_incident.push(3); //-- b/c of flip13
             self.vs_active.push(false);
         } else {
-            println!("freelist used: {:?}", self.freelist_vs);
+            // println!("freelist used: {:?}", self.freelist_vs);
             pi = self.freelist_vs.pop().unwrap();
             self.vs[pi] = [px, py, pz];
             self.vs_incident[pi] = 3; //-- b/c of flip13
@@ -747,7 +747,8 @@ impl Triangulation {
                 }
             }
         }
-        let mut newcurt = self.ts.len() - 1;
+        //-- the self.curt is updated to one of the incident to the newly inserted point
+        let mut newcurt = ti;
         if self.is_triangle_finite(newcurt) == false {
             let it = self.ts[newcurt];
             let k = &it[0..3].iter().position(|&x| x == 0).unwrap();

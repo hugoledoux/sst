@@ -111,7 +111,7 @@ fn main() -> io::Result<()> {
                     let _re = dt.write_geojson_triangles(fout.to_string());
                 }
 
-                let _re = dt.finalise_qtcell(re.0, re.1);
+                let _re = dt.finalise_qt_leaf(re.0, re.1);
 
                 if (re.0 == gx) && (re.1 == gy) {
                     let fout = format!("/Users/hugo/temp/sstout/c-{}-{}.geojson", re.0, re.1);
