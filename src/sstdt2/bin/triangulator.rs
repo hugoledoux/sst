@@ -1,5 +1,3 @@
-//! # startin
-
 mod geom;
 
 use std::fmt;
@@ -1142,10 +1140,13 @@ impl Triangulation {
         total
     }
 
-
     fn walk(&self, x: &[f64]) -> usize {
+        let mut tr = self.curt;
         //-- find a starting tr
-        let tr = self.curt;
+        if self.freelist_ts.contains(&self.curt) == true {
+            tr = 1;
+        }
+        assert!(self.freelist_ts.contains(&tr) == false);
 
         //-- TODO: maybe based on QT size if larger than go to cell first?
 

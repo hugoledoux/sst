@@ -2,7 +2,7 @@
 
 #[allow(dead_code)]
 #[allow(unused_variables)]
-mod startin;
+mod triangulator;
 
 #[macro_use]
 extern crate log; //info/debug/error
@@ -25,7 +25,7 @@ fn main() -> io::Result<()> {
     let mut _totalpts: usize = 0;
 
     info!("Init DT");
-    let mut dt = startin::Triangulation::new();
+    let mut dt = triangulator::Triangulation::new();
 
     // if matches.occurrences_of("stars") > 0 {
     //     dt.set_outputmode(Outputmode::Stars);
@@ -42,8 +42,8 @@ fn main() -> io::Result<()> {
     //----- reading from stdin -----//
 
     //----- reading from file -----//
-    // let fi = File::open("/Users/hugo/projects/sst/data/s400_50.spa").expect("Unable to open file");
-    let fi = File::open("/Users/hugo/projects/sst/data/100_25.spa").expect("Unable to open file");
+    let fi = File::open("/Users/hugo/projects/sst/data/s400_50.spa").expect("Unable to open file");
+    // let fi = File::open("/Users/hugo/projects/sst/data/100_25.spa").expect("Unable to open file");
     // let fi = File::open("/Users/hugo/projects/sst/data/rect1_50.spa").expect("Unable to open file");
     // let fi = File::open("/Users/hugo/projects/sst/data/test1.spa").expect("Unable to open file");
     let f = BufReader::new(fi);
@@ -111,8 +111,8 @@ fn main() -> io::Result<()> {
                 //-- finalise a cell
                 // println!("=>{}", l);
                 let re = parse_2_usize(&l);
-                let gx = 0;
-                let gy = 1;
+                let gx = 1;
+                let gy = 3;
 
                 if (re.0 == gx) && (re.1 == gy) {
                     let fout = format!("/Users/hugo/temp/sstout/c-{}-{}-b.geojson", re.0, re.1);
@@ -120,6 +120,7 @@ fn main() -> io::Result<()> {
                 }
 
                 let _re = dt.finalise_qtcell(re.0, re.1);
+
                 if (re.0 == gx) && (re.1 == gy) {
                     let fout = format!("/Users/hugo/temp/sstout/c-{}-{}.geojson", re.0, re.1);
                     let _re = dt.write_geojson_triangles(fout.to_string());
@@ -141,11 +142,9 @@ fn main() -> io::Result<()> {
 
     // dt.print_ds();
 
-    info!("Finished reading the stream");
+    // info!("Finished reading the stream");
     info!("dt.number_of_vertices() = {}", dt.number_of_vertices());
 
-    // info!("max # points in DT during process: {}", dt.max);
-    // let _x = dt.finalise_leftover_triangles();
     info!("max # points in DT during process: {}", dt.max_vs);
     info!("max # triangles in DT during process: {}", dt.max_ts);
 
