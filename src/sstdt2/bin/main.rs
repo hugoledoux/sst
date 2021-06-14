@@ -18,8 +18,6 @@ fn main() -> io::Result<()> {
     let _matches = App::new("sstdt2")
         .version("0.1")
         .about("streaming startin -- Delaunay triangulation")
-        .arg("--stars...       'output stars instead of .sma'")
-        .arg("--both...        'output both vertices and stars'")
         .get_matches();
 
     env_logger::init();
