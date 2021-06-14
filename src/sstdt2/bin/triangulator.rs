@@ -254,8 +254,9 @@ impl Quadtree {
 //----------------------
 pub struct Triangulation {
     vs: Vec<[f64; 3]>,
-    vs_incident: Vec<usize>, //-- number of incident triangles to each vertex (to know when to finalise)
-    vs_active: Vec<bool>,    //-- is the vertex active (ie written once to the stream)
+    vs_no_incident: Vec<usize>, //-- number of incident triangles to each vertex (to know when to finalise)
+    vs_active: Vec<bool>,       //-- is the vertex active (ie written once to the stream)
+    vs_incident_tr: Vec<usize>, //-- link to one incident triangle
     ts: Vec<[usize; 6]>,
     qt: Quadtree,
     snaptol: f64,
@@ -278,6 +279,8 @@ impl Triangulation {
         thevs.push(p); //-- add the infinity point
         let mut thevs_incident: Vec<usize> = Vec::new();
         thevs_incident.push(0);
+        let mut thevs_i_tr: Vec<usize> = Vec::new();
+        thevs_i_tr.push(0);
         let mut thevs_active: Vec<bool> = Vec::new();
         thevs_active.push(false);
         let mut thets: Vec<[usize; 6]> = Vec::new();
@@ -289,8 +292,9 @@ impl Triangulation {
         let thesma_ids: HashMap<usize, usize> = HashMap::new();
         Triangulation {
             vs: thevs,
-            vs_incident: thevs_incident,
+            vs_no_incident: thevs_incident,
             vs_active: thevs_active,
+            vs_incident_tr: thevs_i_tr,
             ts: thets,
             qt: q,
             snaptol: 0.001,
@@ -484,8 +488,8 @@ impl Triangulation {
         //-- update # incident triangles for 3 vertices of the triangle
         //-- and finalise the vertex if now zero (never used again)
         for i in 0..3 {
-            self.vs_incident[t0[i]] -= 1;
-            if self.vs_incident[t0[i]] == 0 {
+            self.vs_no_incident[t0[i]] -= 1;
+            if self.vs_no_incident[t0[i]] == 0 {
                 let _re = self.finalise_vertex(t0[i], &qtc);
             }
         }
@@ -540,6 +544,7 @@ impl Triangulation {
         }
         Ok(())
     }
+
     fn insert_one_pt_init_phase(&mut self, x: f64, y: f64, z: f64) -> Result<usize, usize> {
         let p: [f64; 3] = [x, y, z];
         for i in 0..self.vs.len() {
@@ -551,7 +556,8 @@ impl Triangulation {
         let p = [x, y, z];
         // let c = self.vs.len();
         self.vs.push(p);
-        self.vs_incident.push(0);
+        self.vs_no_incident.push(0);
+        self.vs_incident_tr.push(0);
         self.vs_active.push(false);
         let l = self.vs.len();
         if l >= 4 {
@@ -580,9 +586,13 @@ impl Triangulation {
                 self.ts.push([b, 0, a, 2, 1, 3]);
                 self.is_init = true;
             }
-            self.vs_incident[a] = 3;
-            self.vs_incident[b] = 3;
-            self.vs_incident[c] = 3;
+            self.vs_no_incident[a] = 3;
+            self.vs_no_incident[b] = 3;
+            self.vs_no_incident[c] = 3;
+            //-- all 3 vertices point to the new triangle (the first, thus "0")
+            self.vs_incident_tr[a] = 0;
+            self.vs_incident_tr[b] = 0;
+            self.vs_incident_tr[c] = 0;
         }
         self.curt = 1;
         // TODO: add those lines
@@ -663,14 +673,16 @@ impl Triangulation {
             // println!("no free");
             pi = self.vs.len();
             self.vs.push([px, py, pz]);
-            self.vs_incident.push(3); //-- b/c of flip13
+            self.vs_no_incident.push(3); //-- b/c of flip13
             self.vs_active.push(false);
+            self.vs_incident_tr.push(0);
         } else {
             // println!("freelist used: {:?}", self.freelist_vs);
             pi = self.freelist_vs.pop().unwrap();
             self.vs[pi] = [px, py, pz];
-            self.vs_incident[pi] = 3; //-- b/c of flip13
+            self.vs_no_incident[pi] = 3; //-- b/c of flip13
             self.vs_active[pi] = false;
+            self.vs_incident_tr.push(0);
         }
 
         //-- flip13()
@@ -776,9 +788,15 @@ impl Triangulation {
         let t1 = [vi, t[1], t[2], t[3], newi1, ti];
         let t2 = [vi, t[2], t[0], t[4], ti, newi0];
         //-- increment the number of incident triangles
-        self.vs_incident[t[0]] += 1;
-        self.vs_incident[t[1]] += 1;
-        self.vs_incident[t[2]] += 1;
+        self.vs_no_incident[t[0]] += 1;
+        self.vs_no_incident[t[1]] += 1;
+        self.vs_no_incident[t[2]] += 1;
+        //-- set the pointer to one incident triangle to the new triangles
+        self.vs_incident_tr[vi] = ti;
+        self.vs_incident_tr[t[0]] = ti;
+        self.vs_incident_tr[t[1]] = newi0;
+        self.vs_incident_tr[t[2]] = newi1;
+
         //-- update neighbours
         let mut n = t[3];
         if n != 0 {
@@ -1043,10 +1061,15 @@ impl Triangulation {
             t0i,
         ];
         //-- update the number of incident triangles
-        self.vs_incident[t0[*k0]] += 1;
-        self.vs_incident[t1[*k1]] += 1;
-        self.vs_incident[t0[(*k0 + 1) % 3]] -= 1;
-        self.vs_incident[t0[(*k0 + 2) % 3]] -= 1;
+        self.vs_no_incident[t0[*k0]] += 1;
+        self.vs_no_incident[t1[*k1]] += 1;
+        self.vs_no_incident[t0[(*k0 + 1) % 3]] -= 1;
+        self.vs_no_incident[t0[(*k0 + 2) % 3]] -= 1;
+        //-- update the pointer incident triangle for each 4 vertices involved
+        self.vs_incident_tr[t0[*k0]] = t0i;
+        self.vs_incident_tr[t1[*k1]] = t1i;
+        self.vs_incident_tr[t0[(*k0 + 1) % 3]] = t0i;
+        self.vs_incident_tr[t0[(*k0 + 2) % 3]] = t1i;
 
         //-- update 2 neighbouring triangles
         //-- because 2 stay the same since the indices are not changed
@@ -1161,7 +1184,7 @@ impl Triangulation {
             attributes.insert(String::from("id"), to_value(i.to_string()).unwrap());
             attributes.insert(
                 String::from("incident"),
-                to_value(self.vs_incident[i].to_string()).unwrap(),
+                to_value(self.vs_no_incident[i].to_string()).unwrap(),
             );
             let f = Feature {
                 bbox: None,
