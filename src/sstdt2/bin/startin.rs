@@ -1,6 +1,6 @@
 //! # startin
 
-pub mod geom;
+mod geom;
 
 use std::fmt;
 use std::fs::File;
