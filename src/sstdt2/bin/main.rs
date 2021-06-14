@@ -27,14 +27,6 @@ fn main() -> io::Result<()> {
     info!("Init DT");
     let mut dt = triangulator::Triangulation::new();
 
-    // if matches.occurrences_of("stars") > 0 {
-    //     dt.set_outputmode(Outputmode::Stars);
-    // }
-
-    // if matches.occurrences_of("both") > 0 {
-    //     dt.set_outputmode(Outputmode::Both);
-    // }
-
     //----- reading from stdin -----//
     // let stdin = std::io::stdin();
     // for line in stdin.lock().lines() {
