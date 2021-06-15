@@ -923,7 +923,7 @@ impl Triangulation {
                 let re: usize = rng.gen_range(0..allpts.len());
                 let dtemp = geom::distance2d_squared(&self.vs[allpts[re]], &x);
                 if dtemp < dmin {
-                    v0 = re;
+                    v0 = allpts[re];
                     dmin = dtemp;
                 }
             }
