@@ -943,6 +943,26 @@ impl Triangulation {
             }
         }
 
+        //-- 2. try walk from a few randomly chosen in the cell
+        // warn!("walk.2");
+        // let g = self.qt.get_gxgy(x[0], x[1]);
+        // let allpts: Vec<usize> = self.qt.get_cell_pts(g.0, g.1);
+        // let mut rng = thread_rng();
+        // let mut dmin: f64 = std::f64::MAX;
+        // let n = (allpts.len() as f64).powf(0.2);
+        // let mut v0: usize = 0;
+        if allpts.is_empty() == false {
+            for _i in 0..n as usize {
+                let re: usize = rng.gen_range(0..allpts.len());
+                // let dtemp = geom::distance2d_squared(&self.vs[allpts[re]], &x);
+
+                let re = self.walk_safe(x, self.vs_incident_tr[allpts[re]]);
+                if re.is_some() {
+                    return re.unwrap();
+                }
+            }
+        }
+
         //-- 3. try from all vertices in the qtcell then
         warn!("walk.3");
         for vi in &allpts {
@@ -1045,7 +1065,6 @@ impl Triangulation {
     fn walk_bruteforce_triangles(&self, x: &[f64]) -> Option<usize> {
         // warn!("walk_bruteforce_triangles()");
         for (id, t) in self.ts.iter().enumerate() {
-            //-- TODO: here the finalised/flushed triangles need to be better handled
             if self.freelist_ts.contains(&id) == false && self.is_triangle_finite(id) == true {
                 if geom::intriangle(
                     &self.vs[t[0]],
