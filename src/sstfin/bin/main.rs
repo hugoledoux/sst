@@ -105,7 +105,7 @@ fn main() {
     let totalpts: usize = re.1;
     info!("count pts={}", totalpts.to_formatted_string(&Locale::en));
     info!("bbox={:?}", bbox);
-    info!("First pass ✅");
+    info!("First pass 🏁");
 
     //-- sprinkler
     let mut rng = thread_rng();
