@@ -112,7 +112,7 @@ fn main() {
     let mut sprinkled: HashMap<usize, Point> = HashMap::new();
     let nc: usize = (totalpts as f64 * sprinkle_param) as usize; //-- TODO: what is a good value?
     for _i in 0..nc {
-        sprinkled.insert(rng.gen_range(0, totalpts), Point::new());
+        sprinkled.insert(rng.gen_range(0..totalpts), Point::new());
     }
     info!("Sprinkled points: {}", sprinkled.len());
 

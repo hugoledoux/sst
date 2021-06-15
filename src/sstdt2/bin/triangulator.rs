@@ -11,8 +11,7 @@ use serde_json::{to_value, Map};
 use hashbrown::HashMap;
 use std::collections::HashSet;
 
-use rand::prelude::thread_rng;
-use rand::Rng;
+use rand::{thread_rng, Rng};
 
 //----------------------
 struct Qtcell {
@@ -921,7 +920,7 @@ impl Triangulation {
         let mut v0: usize = 0;
         if allpts.is_empty() == false {
             for _i in 0..n as usize {
-                let re: usize = rng.gen_range(1, allpts.len());
+                let re: usize = rng.gen_range(0..allpts.len());
                 let dtemp = geom::distance2d_squared(&self.vs[re], &x);
                 if dtemp < dmin {
                     v0 = re;
