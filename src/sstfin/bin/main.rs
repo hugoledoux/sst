@@ -119,12 +119,14 @@ fn main() {
     //-- pass #2
     info!("Second pass ➡️");
     let mut g: Vec<Vec<usize>> = pass_2(&paths, &bbox, cellsize, &mut sprinkled, &inputformat);
-    info!("Second pass ✅");
+    info!("Second pass 🏁");
 
     // //-- pass #3
     info!("Third pass ➡️");
     let _re = pass_3(&paths, &bbox, cellsize, &mut g, &sprinkled, &inputformat);
-    info!("Third pass ✅");
+    info!("Third pass 🏁");
+
+    info!("✅");
 }
 
 fn pass_1(paths: &Vec<String>, it: &InputType) -> (Vec<f64>, usize) {
