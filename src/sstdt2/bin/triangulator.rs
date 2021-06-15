@@ -837,7 +837,8 @@ impl Triangulation {
 
     pub fn incident_triangles_to_vertex(&self, vi: usize) -> Option<Vec<usize>> {
         let mut l: Vec<usize> = Vec::new();
-        let t0 = self.walk(&[self.vs[vi][0], self.vs[vi][1]]);
+        // let t0 = self.walk(&[self.vs[vi][0], self.vs[vi][1]]);
+        let t0 = self.vs_incident_tr[vi];
         // println!("{}--{:?}", t0, self.ts[t0]);
         l.push(t0);
         let mut curt = t0;
