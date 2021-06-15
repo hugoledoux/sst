@@ -264,7 +264,7 @@ pub struct Triangulation {
     curt: usize,
     is_init: bool,
     robust_predicates: bool,
-    freelist_ts: Vec<usize>, // TODO: use the freelist for insertion
+    freelist_ts: HashSet<usize>,
     freelist_vs: Vec<usize>,
     sma_ids: HashMap<usize, usize>,
     sma_count_vertices: usize,
@@ -288,7 +288,7 @@ impl Triangulation {
         let t: [usize; 6] = [0, 0, 0, 0, 0, 0]; //-- add a dummy triangle to simulate missing triangles (null pointers)
         thets.push(t);
         let q = Quadtree::new();
-        let theflt: Vec<usize> = Vec::new();
+        let theflt: HashSet<usize> = HashSet::new();
         let theflv: Vec<usize> = Vec::new();
         let thesma_ids: HashMap<usize, usize> = HashMap::new();
         Triangulation {
@@ -476,7 +476,7 @@ impl Triangulation {
             .as_bytes(),
         )?;
         //-- add to free list to reuse in the future
-        self.freelist_ts.push(ti);
+        self.freelist_ts.insert(ti);
         // println!("{:?}", self.ts[ti]);
         //-- update neighbouring triangles (if any) for the walking
         for i in 3..6 {
@@ -779,8 +779,12 @@ impl Triangulation {
             newi0 = self.ts.len();
             newi1 = newi0 + 1;
         } else {
-            newi0 = self.freelist_ts.pop().unwrap();
-            newi1 = self.freelist_ts.pop().unwrap();
+            // newi0 = self.freelist_ts.pop().unwrap();
+            // newi1 = self.freelist_ts.pop().unwrap();
+            newi0 = self.freelist_ts.iter().next().unwrap().clone();
+            self.freelist_ts.remove(&newi0);
+            newi1 = self.freelist_ts.iter().next().unwrap().clone();
+            self.freelist_ts.remove(&newi1);
             reuse = true;
         }
 
