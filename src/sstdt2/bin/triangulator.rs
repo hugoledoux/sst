@@ -15,14 +15,14 @@ use rand::{thread_rng, Rng};
 
 //----------------------
 struct Qtcell {
-    pts: HashSet<usize>,            // TODO: this should be a Vec maybe?
-    ts: HashMap<usize, Vec<usize>>, // TODO: this should be a HashMap wiht [t0, t1, t2]
+    pub pts: Vec<usize>,
+    ts: HashMap<usize, Vec<usize>>,
     finalised: bool,
 }
 
 impl Qtcell {
     pub fn new() -> Qtcell {
-        let p: HashSet<usize> = HashSet::new();
+        let p: Vec<usize> = Vec::new();
         let t: HashMap<usize, Vec<usize>> = HashMap::new();
         Qtcell {
             pts: p,
@@ -40,7 +40,7 @@ impl Qtcell {
     }
 
     pub fn add_pt(&mut self, vi: usize) {
-        self.pts.insert(vi);
+        self.pts.push(vi);
     }
 
     pub fn add_ts(&mut self, ti: usize, adj0: usize, adj1: usize, adj2: usize) {
@@ -452,7 +452,17 @@ impl Triangulation {
     fn finalise_vertex(&mut self, vi: usize, qtc: &Vec<u8>) -> io::Result<()> {
         io::stdout().write_all(&format!("x {}\n", self.sma_ids[&vi]).as_bytes())?;
         self.sma_ids.remove(&vi);
-        self.qt.cells.get_mut(qtc).unwrap().pts.remove(&vi);
+        // self.qt.cells.get_mut(qtc).unwrap().pts.remove(vi);
+        let pos = self
+            .qt
+            .cells
+            .get(qtc)
+            .unwrap()
+            .pts
+            .iter()
+            .position(|&x| x == vi)
+            .unwrap();
+        self.qt.cells.get_mut(qtc).unwrap().pts.remove(pos);
         self.freelist_vs.push(vi);
         Ok(())
     }
