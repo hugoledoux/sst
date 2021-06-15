@@ -11,7 +11,8 @@ use serde_json::{to_value, Map};
 use hashbrown::HashMap;
 use std::collections::HashSet;
 
-extern crate rand;
+use rand::prelude::thread_rng;
+use rand::Rng;
 
 //----------------------
 struct Qtcell {
@@ -906,11 +907,31 @@ impl Triangulation {
             return re.unwrap();
         }
 
-        //-- 2. try walk from one in the same cell
-        // TODO: try walk from one in the same cell BROKEN
+        //-- 2. try walk from the closest in the same cell
         // warn!("walk.2");
         let g = self.qt.get_gxgy(x[0], x[1]);
         let allpts: Vec<usize> = self.qt.get_cell_pts(g.0, g.1);
+        let mut rng = thread_rng();
+        let mut dmin: f64 = std::f64::MAX;
+        let n = (allpts.len() as f64).powf(0.25);
+        let mut v0: usize = 0;
+        if allpts.is_empty() == false {
+            for _i in 0..n as usize {
+                let re: usize = rng.gen_range(1, allpts.len());
+                let dtemp = geom::distance2d_squared(&self.vs[re], &x);
+                if dtemp < dmin {
+                    v0 = re;
+                    dmin = dtemp;
+                }
+            }
+            let re = self.walk_safe(x, self.vs_incident_tr[v0]);
+            if re.is_some() {
+                return re.unwrap();
+            }
+        }
+
+        //-- 3. try from all vertices in the qtcell then
+        warn!("walk.3");
         for vi in &allpts {
             let t0 = self.vs_incident_tr[*vi];
             let re = self.walk_safe(x, t0);
@@ -919,13 +940,13 @@ impl Triangulation {
             }
         }
 
-        //-- 3. try brute-force
+        //-- 4. try brute-force
         //-- TODO: this brute-force too?
         // let re2 = self.walk_bruteforce_closest_vertex_then_walksafe(x);
         // if re2.is_some() {
         //     return re2.unwrap();
         // }
-        warn!("walk.3");
+        warn!("walk.4");
         let re3 = self.walk_bruteforce_triangles(x);
         if re3.is_some() {
             return re3.unwrap();
@@ -933,7 +954,7 @@ impl Triangulation {
 
         //-- 4. we are outside the CH of the current dataset
         // warn!("point is outside the CH, finding closest point on the CH");
-        warn!("walk.4");
+        warn!("walk.5");
         let re4 = self.walk_bruteforce_outside_convex_hull(x);
         if re4.is_some() {
             return re4.unwrap();
