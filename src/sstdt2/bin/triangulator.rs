@@ -112,15 +112,6 @@ impl Quadtree {
         }
     }
 
-    pub fn get_cell_count(&self, gx: usize, gy: usize) -> Option<usize> {
-        if gx >= self.griddim || gy > self.griddim {
-            None
-        } else {
-            let q = self.get_qtc_from_gxgy(gx, gy);
-            Some(self.cells[&q].pts.len())
-        }
-    }
-
     pub fn insert_one_vi(&mut self, x: f64, y: f64, vi: usize) {
         let q = self.get_qtc_from_xy(x, y);
         self.cells.get_mut(&q).unwrap().add_pt(vi);
