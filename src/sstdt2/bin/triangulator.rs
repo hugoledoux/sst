@@ -15,7 +15,7 @@ use rand::{thread_rng, Rng};
 
 //----------------------
 struct Qtcell {
-    pub pts: Vec<usize>,
+    pts: Vec<usize>,
     ts: HashMap<usize, Vec<usize>>,
     finalised: bool,
 }
@@ -369,44 +369,61 @@ impl Triangulation {
 
     //-- finalise the leaf
     pub fn finalise_qt_leaf(&mut self, gx: usize, gy: usize) -> io::Result<()> {
+        let mut qtc = self.qt.get_qtc_from_gxgy(gx, gy);
         info!(
             "Cell {}--{} finalised ({} vertices)",
             gx,
             gy,
-            self.qt.get_cell_count(gx, gy).unwrap()
+            self.qt.cells[&qtc].number_pts()
         );
-
-        let mut qtc = self.qt.get_qtc_from_gxgy(gx, gy);
         let mut gbbox: [f64; 4] = [0.0, 0.0, 0.0, 0.0];
         self.qt.get_cell_bbox(gx, gy, &mut gbbox);
 
         //-- 1. collect all (unique) triangles and add to qt cell
-        let allpts: Vec<usize> = self.qt.get_cell_pts(gx, gy);
-        for vi in &allpts {
+        let allpts = &self.qt.cells.get(&qtc).unwrap().pts;
+        // let mut allts: Vec<(usize, usize, usize, usize)> = Vec::new();
+        let mut allts: HashMap<usize, (usize, usize, usize)> = HashMap::new();
+        for vi in allpts {
             let l: Vec<usize> = self.incident_triangles_to_vertex(*vi).unwrap();
             for ti in &l {
-                // allts.insert(*ti);
-                // self.ts[*ti][0]
-                self.qt.cells.get_mut(&qtc).unwrap().add_ts(
-                    *ti,
-                    self.ts[*ti][0],
-                    self.ts[*ti][1],
-                    self.ts[*ti][2],
-                );
+                allts.insert(*ti, (self.ts[*ti][0], self.ts[*ti][1], self.ts[*ti][2]));
             }
         }
+        //-- add those triangle to the qt cell TODO: not that smart, twice work done
+        // {
+        //     let qc = &mut self.qt.cells.get_mut(&qtc).unwrap();
+        //     for each in &ts {
+        //         qc.add_ts(each.0, each.1, each.2, each.3);
+        //     }
+        // }
 
         //-- 2. check encroachment on current qt cell (a leaf at this point)
         //-- and delete them if final
-        let allts = self.qt.cells[&qtc].get_vec_ts();
-        for ti in &allts {
-            // println!("{}: \"{}\"", ti, finalised);
+        // let allts = &mut self.qt.cells.get_mut(&qtc).unwrap().ts;
+        let mut t_to_keep: Vec<usize> = Vec::new();
+        for (ti, vs) in &allts {
+            // println!("{:?}", ti);
             if self.is_triangle_final(*ti, &gbbox) == true {
                 let _re = self.finalise_triangle(*ti, &qtc);
-                // } else {
-                //     self.qt.cells.get_mut(&qtc).unwrap().add_ts(*ti);
+            } else {
+                t_to_keep.push(*ti);
             }
         }
+        //-- add the kept triangles to the qc cell
+        let qc = &mut self.qt.cells.get_mut(&qtc).unwrap();
+        for each in &t_to_keep {
+            qc.add_ts(*each, allts[each].0, allts[each].1, allts[each].2);
+        }
+
+        // let allts = self.qt.cells[&qtc].get_vec_ts();
+        // for ti in &allts {
+        //     // println!("{}: \"{}\"", ti, finalised);
+        //     if self.is_triangle_final(*ti, &gbbox) == true {
+        //         let _re = self.finalise_triangle(*ti, &qtc);
+        //         // } else {
+        //         //     self.qt.cells.get_mut(&qtc).unwrap().add_ts(*ti);
+        //     }
+        // }
 
         //-- merge cell with parent, and continue until impossible
         //-- or only one cell left
