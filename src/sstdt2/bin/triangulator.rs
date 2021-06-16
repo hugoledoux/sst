@@ -475,7 +475,9 @@ impl Triangulation {
         }
         //-- remove from qt cell list
         self.qt.cells.get_mut(qtc).unwrap().ts.remove(&ti);
-        // println!("qtcell: {} -- {:?}", ti, self.qt.cells[qtc].ts);
+        if self.curt == ti {
+            self.curt = 0;
+        }
         Ok(())
     }
 
@@ -875,49 +877,50 @@ impl Triangulation {
     }
 
     fn walk(&self, x: &[f64]) -> usize {
-        let mut tr = self.curt;
-        //-- find a starting tr
-        if self.freelist_ts.contains(&self.curt) == true {
-            for i in 0..self.ts.len() {
-                if self.freelist_ts.contains(&i) == false && self.is_triangle_finite(i) == true {
-                    tr = i;
-                    break;
-                }
+        let tr = self.curt;
+        if tr != 0 {
+            //-- 1. try walk from latest
+            let re = self.walk_safe(x, tr);
+            if re.is_some() {
+                return re.unwrap();
             }
         }
-        // assert!(self.freelist_ts.contains(&tr) == false);
-
-        //-- TODO: maybe based on QT size if larger than go to cell first?
-
-        //-- 1. try walk from latest
-        let re = self.walk_safe(x, tr);
-        if re.is_some() {
-            return re.unwrap();
-        }
-
         //-- 2. try walk from the closest (sampled) in the same cell
         // warn!("walk.2");
         let g = self.qt.get_gxgy(x[0], x[1]);
         let qtc = self.qt.get_qtc_from_gxgy(g.0, g.1);
         let allpts = &self.qt.cells.get(&qtc).unwrap().pts;
         let mut rng = thread_rng();
-        let mut dmin: f64 = std::f64::MAX;
-        let n = (allpts.len() as f64).powf(0.25);
-        let mut v0: usize = 0;
-        if allpts.is_empty() == false {
-            for _i in 0..n as usize {
-                let re: usize = rng.gen_range(0..allpts.len());
-                let dtemp = geom::distance2d_squared(&self.vs[allpts[re]], &x);
-                if dtemp < dmin {
-                    v0 = allpts[re];
-                    dmin = dtemp;
-                }
-            }
-            let re = self.walk_safe(x, self.vs_incident_tr[v0]);
-            if re.is_some() {
-                return re.unwrap();
-            }
-        }
+        let n = (allpts.len() as f64).powf(0.1);
+        // let mut dmin: f64 = std::f64::MAX;
+        // let mut v0: usize = 0;
+        // if allpts.is_empty() == false {
+        //     for _i in 0..n as usize {
+        //         let re: usize = rng.gen_range(0..allpts.len());
+        //         let dtemp = geom::distance2d_squared(&self.vs[allpts[re]], &x);
+        //         if dtemp < dmin {
+        //             v0 = allpts[re];
+        //             dmin = dtemp;
+        //         }
+        //     }
+        //     let re = self.walk_safe(x, self.vs_incident_tr[v0]);
+        //     if re.is_some() {
+        //         return re.unwrap();
+        //     }
+        // }
+        // //-- find a starting tr
+        // if self.freelist_ts.contains(&self.curt) == true {
+        //     warn!("deleted curt");
+        //     for i in 0..self.ts.len() {
+        //         if self.freelist_ts.contains(&i) == false && self.is_triangle_finite(i) == true {
+        //             tr = i;
+        //             break;
+        //         }
+        //     }
+        // }
+        // assert!(self.freelist_ts.contains(&tr) == false);
+
+        //-- TODO: maybe based on QT size if larger than go to cell first?
 
         //-- 2. try walk from a few randomly chosen in the cell
         // warn!("walk.2");
@@ -931,14 +934,32 @@ impl Triangulation {
             }
         }
 
-        //-- 3. try from all vertices in the qtcell then
-        // warn!("walk.3");
-        for vi in allpts {
-            let t0 = self.vs_incident_tr[*vi];
-            let re = self.walk_safe(x, t0);
-            if re.is_some() {
-                return re.unwrap();
+        // //-- 3. try from all vertices in the qtcell then
+        // // warn!("walk.3");
+        // for vi in allpts {
+        //     let t0 = self.vs_incident_tr[*vi];
+        //     let re = self.walk_safe(x, t0);
+        //     if re.is_some() {
+        //         return re.unwrap();
+        //     }
+        // }
+
+        //-- 3. try closest in the DT
+        warn!("walk.3.2");
+        let mut dmin: f64 = std::f64::MAX;
+        let mut v0: usize = 0;
+        for (i, v) in self.vs.iter().enumerate() {
+            if self.freelist_vs.contains(&i) == false {
+                let dtemp = geom::distance2d_squared(v, &x);
+                if dtemp < dmin {
+                    v0 = i;
+                    dmin = dtemp;
+                }
             }
+        }
+        let re = self.walk_safe(x, self.vs_incident_tr[v0]);
+        if re.is_some() {
+            return re.unwrap();
         }
 
         //-- 4. try brute-force
