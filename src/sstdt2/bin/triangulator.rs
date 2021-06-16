@@ -102,15 +102,6 @@ impl Quadtree {
         self.cells.get_mut(&q).unwrap().add_pt(vi);
     }
 
-    pub fn get_cell_pts(&self, gx: usize, gy: usize) -> Vec<usize> {
-        let q = self.get_qtc_from_gxgy(gx, gy);
-        let mut r: Vec<usize> = Vec::new();
-        for vi in &self.cells[&q].pts {
-            r.push(*vi);
-        }
-        r
-    }
-
     fn are_sibling_finalised(&self, qtc: &Vec<u8>) -> bool {
         let mut q2 = vec![0; qtc.len() - 1];
         q2.clone_from_slice(&qtc[..qtc.len() - 1]);
@@ -904,10 +895,11 @@ impl Triangulation {
             return re.unwrap();
         }
 
-        //-- 2. try walk from the closest in the same cell
+        //-- 2. try walk from the closest (sampled) in the same cell
         // warn!("walk.2");
         let g = self.qt.get_gxgy(x[0], x[1]);
-        let allpts: Vec<usize> = self.qt.get_cell_pts(g.0, g.1);
+        let qtc = self.qt.get_qtc_from_gxgy(g.0, g.1);
+        let allpts = &self.qt.cells.get(&qtc).unwrap().pts;
         let mut rng = thread_rng();
         let mut dmin: f64 = std::f64::MAX;
         let n = (allpts.len() as f64).powf(0.25);
@@ -929,17 +921,9 @@ impl Triangulation {
 
         //-- 2. try walk from a few randomly chosen in the cell
         // warn!("walk.2");
-        // let g = self.qt.get_gxgy(x[0], x[1]);
-        // let allpts: Vec<usize> = self.qt.get_cell_pts(g.0, g.1);
-        // let mut rng = thread_rng();
-        // let mut dmin: f64 = std::f64::MAX;
-        // let n = (allpts.len() as f64).powf(0.2);
-        // let mut v0: usize = 0;
         if allpts.is_empty() == false {
             for _i in 0..n as usize {
                 let re: usize = rng.gen_range(0..allpts.len());
-                // let dtemp = geom::distance2d_squared(&self.vs[allpts[re]], &x);
-
                 let re = self.walk_safe(x, self.vs_incident_tr[allpts[re]]);
                 if re.is_some() {
                     return re.unwrap();
@@ -948,8 +932,8 @@ impl Triangulation {
         }
 
         //-- 3. try from all vertices in the qtcell then
-        warn!("walk.3");
-        for vi in &allpts {
+        // warn!("walk.3");
+        for vi in allpts {
             let t0 = self.vs_incident_tr[*vi];
             let re = self.walk_safe(x, t0);
             if re.is_some() {
@@ -959,10 +943,6 @@ impl Triangulation {
 
         //-- 4. try brute-force
         //-- TODO: this brute-force too?
-        // let re2 = self.walk_bruteforce_closest_vertex_then_walksafe(x);
-        // if re2.is_some() {
-        //     return re2.unwrap();
-        // }
         warn!("walk.4");
         let re3 = self.walk_bruteforce_triangles(x);
         if re3.is_some() {
