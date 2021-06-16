@@ -104,12 +104,15 @@ fn main() -> io::Result<()> {
                 // println!("=>{}", l);
                 let re = parse_2_usize(&l);
                 let gx = 1;
-                let gy = 3;
+                let gy = 0;
 
                 // if (re.0 == gx) && (re.1 == gy) {
                 //     let fout = format!("/Users/hugo/temp/sstout/c-{}-{}-b.geojson", re.0, re.1);
                 //     let _re = dt.write_geojson_triangles(fout.to_string());
                 // }
+                // info!("Writing GeoJSON file to disk: /Users/hugo/temp/sstout/z.grid.geojson");
+                // let _re =
+                //     dt.write_geojson_grid("/Users/hugo/temp/sstout/z.grid.geojson".to_string());
 
                 let _re = dt.finalise_qt_leaf(re.0, re.1);
 
