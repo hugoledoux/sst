@@ -1027,7 +1027,6 @@ impl Triangulation {
     }
 
     fn walk_bruteforce_triangles(&self, x: &[f64]) -> Option<usize> {
-        // warn!("walk_bruteforce_triangles()");
         for (id, t) in self.ts.iter().enumerate() {
             if self.freelist_ts.contains(&id) == false && self.is_triangle_finite(id) == true {
                 if geom::intriangle(
@@ -1045,25 +1044,7 @@ impl Triangulation {
         return None;
     }
 
-    // fn walk_bruteforce_closest_vertex_then_walksafe(&self, x: &[f64]) -> Option<usize> {
-    //     //-- find closest vertex that is on the CH
-    //     let mut dmin: f64 = std::f64::MAX;
-    //     let mut vmin: usize = 0;
-    //     for i in self.stars.keys() {
-    //         if *i != 0 {
-    //             let d = geom::distance2d_squared(x, &self.vs[i]);
-    //             if d < dmin {
-    //                 dmin = d;
-    //                 vmin = *i;
-    //             }
-    //         }
-    //     }
-    //     self.walk_safe(x, vmin)
-    // }
-
     fn flip22(&mut self, t0i: usize, t1i: usize) {
-        // println!("flip22");
-        // self.print_ds();
         let t0 = self.ts[t0i];
         let t1 = self.ts[t1i];
         let k0 = &t0[3..6].iter().position(|&x| x == t1i).unwrap();
