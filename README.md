@@ -60,9 +60,9 @@ x 2 3
 
 ### 2. **sstdt**
 
-  - conceptually equivalent to Isenburg's *spdelaunay*
-  - takes as input (stdin) the .spa output of sstfin and creates a DT of the points
-  - outputs a variation of an .obj file where a few vertex finalisers are added. It's simpler than Isenburg's .sma (**s**treaming **m**esh **a**scii) and can be opened as an .obj file by different software (MeshLab just ignores the extra lines, so you can open the file with it)
+  - conceptually equivalent to Isenburg's *spdelaunay*;
+  - takes as input (stdin) the .spa output of sstfin and creates a DT of the points;
+  - outputs a variation of an .obj file where a few vertex finalisers are added. It's simpler than Isenburg's .sma (**s**treaming **m**esh **a**scii) and can be opened as an .obj file by different software (MeshLab just ignores the extra lines, so you can open the file with it);
 
 ```bash
 export RUST_LOG=info

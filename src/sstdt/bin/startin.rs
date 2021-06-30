@@ -14,7 +14,9 @@ use serde_json::{to_value, Map};
 use hashbrown::HashMap;
 use std::collections::HashSet;
 
-extern crate rand;
+use rand::prelude::thread_rng;
+use rand::seq::SliceRandom;
+use rand::Rng;
 
 /// A Triangle is a triplet of indices
 pub struct Triangle {
@@ -451,12 +453,14 @@ pub struct Triangulation {
     smacount: usize,
     smaid_mapping: HashMap<usize, usize>,
     pub max: usize,
+    pub walks: HashMap<usize, usize>,
 }
 
 impl Triangulation {
     //-- new
     pub fn new() -> Triangulation {
         let mut s: HashMap<usize, Star> = HashMap::new();
+        let thewalks: HashMap<usize, usize> = HashMap::new();
         let mut mystar = Star::new(-99999.99999, -99999.99999, -99999.99999);
         mystar.written = true;
         s.insert(0, mystar);
@@ -473,6 +477,7 @@ impl Triangulation {
             smacount: 1,
             smaid_mapping: HashMap::new(),
             max: 1,
+            walks: thewalks,
         }
     }
 
@@ -803,7 +808,7 @@ impl Triangulation {
         if self.is_init == true {
             //-- insert the previous vertices in the dt
             for j in 1..(l - 3) {
-                let tr = self.walk(&self.stars[&j].pt);
+                let (tr, i) = self.walk(&self.stars[&j].pt);
                 // println!("found tr: {}", tr);
                 self.flip13(j, &tr);
                 self.update_dt(j);
@@ -880,7 +885,15 @@ impl Triangulation {
         }
         //-- walk
         let p: [f64; 3] = [px, py, pz];
-        let tr = self.walk(&p);
+        let (tr, w) = self.walk(&p);
+        if self.walks.contains_key(&w) == false {
+            self.walks.insert(w, 1);
+        } else {
+            if let Some(x) = self.walks.get_mut(&w) {
+                *x += 1;
+            }
+        }
+
         // println!("STARTING TR: {}", tr);
         if geom::distance2d_squared(&self.stars[&tr.v[0]].pt, &p) <= (self.snaptol * self.snaptol) {
             return Err(tr.v[0]);
@@ -1187,7 +1200,7 @@ impl Triangulation {
     /// If it is direction on a vertex/edge, then one is randomly chosen.
     pub fn locate(&self, px: f64, py: f64) -> Option<Triangle> {
         let p: [f64; 3] = [px, py, 0.0];
-        let re = self.walk(&p);
+        let (re, w) = self.walk(&p);
         match re.is_infinite() {
             true => None,
             false => Some(re),
@@ -1224,63 +1237,113 @@ impl Triangulation {
         Some(closest)
     }
 
-    fn walk(&self, x: &[f64]) -> Triangle {
+    fn walk(&self, x: &[f64]) -> (Triangle, usize) {
         //-- find a starting tr
         let cur = self.cur;
 
         //-- 1. try walk from latest
         let re = self.walk_safe(x, cur);
         if re.is_some() {
-            return re.unwrap();
+            let r = re.unwrap();
+            // self.cur = r.v[0];
+            return (r, 10);
         }
 
         //-- 2. try walk from one in the same cell
-        // warn!("attempt to find one vertex in the grid cell and start from it");
+        // warn!("walk in grid");
         let g = self.qt.get_cell_gxgy(x[0], x[1]);
-        if self.qt.gpts[g.0][g.1].len() > 0 {
-            let mut dmin: f64 = std::f64::MAX;
-            let mut vmin: usize = 0;
-            for i in &self.qt.gpts[g.0][g.1] {
-                if *i != 0 {
-                    let d = geom::distance2d_squared(x, &self.stars.get(&i).unwrap().pt);
-                    if d < dmin {
-                        dmin = d;
-                        vmin = *i;
-                    }
+        // let v: Vec<_> = self.qt.gpts[g.0][g.1].iter().collect();
+        // let samples: Vec<_> = v.choose_multiple(&mut rand::thread_rng(), 10).collect();
+        // let mut dmin: f64 = std::f64::MAX;
+        // let mut vmin: usize = 0;
+        // for each in samples {
+        //     let dtemp = geom::distance2d_squared(&self.stars.get(&each).unwrap().pt, &x);
+        //     if dtemp < dmin {
+        //         dmin = dtemp;
+        //         vmin = **each;
+        //     }
+        // }
+        //-- pick the first one
+        if self.qt.gpts[g.0][g.1].is_empty() == false {
+            let o = self.qt.gpts[g.0][g.1].iter().next().unwrap();
+            let re = self.walk_safe(x, *o);
+            if re.is_some() {
+                return (re.unwrap(), 20);
+            }
+        }
+        //-- try neighbouring cells
+        // if gnext.0 >= 0 && gnext.0 < self.qt.gpts.len() {
+        let mut gnext: (usize, usize);
+        if g.0 != 0 {
+            gnext = (g.0 - 1, g.1);
+            if self.qt.gpts[gnext.0][gnext.1].is_empty() == false {
+                let o = self.qt.gpts[gnext.0][gnext.1].iter().next().unwrap();
+                let re = self.walk_safe(x, *o);
+                if re.is_some() {
+                    return (re.unwrap(), 21);
                 }
             }
-            // cur = *self.qt.gpts[g.0][g.1].iter().next().unwrap();
-            let re = self.walk_safe(x, vmin);
-            if re.is_some() {
-                return re.unwrap();
+        }
+        if g.1 != 0 {
+            gnext = (g.0, g.1 - 1);
+            if self.qt.gpts[gnext.0][gnext.1].is_empty() == false {
+                let o = self.qt.gpts[gnext.0][gnext.1].iter().next().unwrap();
+                let re = self.walk_safe(x, *o);
+                if re.is_some() {
+                    return (re.unwrap(), 22);
+                }
+            }
+        }
+        // info!("{:?} {}", self.qt.gpts.len(), g.0);
+        if g.0 < self.qt.gpts.len() - 1 {
+            gnext = (g.0 + 1, g.1);
+            if self.qt.gpts[gnext.0][gnext.1].is_empty() == false {
+                let o = self.qt.gpts[gnext.0][gnext.1].iter().next().unwrap();
+                let re = self.walk_safe(x, *o);
+                if re.is_some() {
+                    return (re.unwrap(), 23);
+                }
+            }
+        }
+        if g.1 < self.qt.gpts[g.0].len() - 1 {
+            gnext = (g.0, g.1 + 1);
+            if self.qt.gpts[gnext.0][gnext.1].is_empty() == false {
+                let o = self.qt.gpts[gnext.0][gnext.1].iter().next().unwrap();
+                let re = self.walk_safe(x, *o);
+                if re.is_some() {
+                    return (re.unwrap(), 24);
+                }
             }
         }
 
         //-- 3. try brute-force
+        // warn!("brute-force walk :(");
         let re2 = self.walk_bruteforce_closest_vertex_then_walksafe(x);
         if re2.is_some() {
-            return re2.unwrap();
+            return (re2.unwrap(), 30);
         }
 
+        // warn!("ouch :(");
         let re3 = self.walk_bruteforce_triangles(x);
         if re3.is_some() {
-            return re3.unwrap();
+            return (re3.unwrap(), 31);
         }
 
         //-- 4. we are outside the CH of the current dataset
+        // warn!("c'mon :(");
         // warn!("point is outside the CH, finding closest point on the CH");
         let re4 = self.walk_bruteforce_vertices(x);
         // for key in self.stars.keys() {
         //     println!("{:?}", key);
         // }
         if re4.is_some() {
-            return re4.unwrap();
+            return (re4.unwrap(), 4);
         } else {
             error!("WALK FAILED MISERABLY :'(");
         }
 
         let tr = Triangle { v: [0, 0, 0] };
-        return tr;
+        return (tr, 5);
     }
 
     fn walk_safe(&self, x: &[f64], cur: usize) -> Option<Triangle> {
@@ -1316,7 +1379,7 @@ impl Triangulation {
             }
         }
         if b == false {
-            info!("Cannot find a starting finite triangle.");
+            // info!("Cannot find a starting finite triangle.");
             return None;
         }
 
