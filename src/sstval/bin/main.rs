@@ -9,15 +9,15 @@ use hashbrown::HashMap;
 use std::io::BufRead;
 use std::io::{self};
 
-use clap::App;
+use clap::Parser;
+#[derive(Parser)]
+#[command(name = "sstval")]
+#[command(about = "streaming startin -- validate the sma file [sstval]")]
+#[command(author, version)]
+struct Cli {}
 
 fn main() -> io::Result<()> {
-    let _matches = App::new("sstval")
-        .version("0.2")
-        .about("validate the sobj file")
-        .get_matches();
-
-    env_logger::init();
+    let _cli = Cli::parse();
 
     let mut total_vs: usize = 0;
     let mut total_ts: usize = 0;

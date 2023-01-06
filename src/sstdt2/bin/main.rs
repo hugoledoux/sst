@@ -12,15 +12,25 @@ use std::io::BufRead;
 use std::io::BufReader;
 use std::io::{self, Write};
 
-use clap::App;
+use clap::Parser;
+#[derive(Parser)]
+#[command(name = "sstdt2")]
+#[command(about = "streaming startin -- Delaunay triangulation [sstdt2]")]
+#[command(author, version)]
+struct Cli {
+    #[clap(flatten)]
+    verbose: clap_verbosity_flag::Verbosity,
+    // /// output stars instead of .sma
+    // stars: bool,
+    // /// output both vertices and stars
+    // both: bool,
+}
 
 fn main() -> io::Result<()> {
-    let _matches = App::new("sstdt2")
-        .version("0.1")
-        .about("streaming startin -- Delaunay triangulation")
-        .get_matches();
-
-    env_logger::init();
+    let cli = Cli::parse();
+    env_logger::Builder::new()
+        .filter_level(cli.verbose.log_level_filter())
+        .init();
 
     let mut _totalpts: usize = 0;
 

@@ -16,7 +16,8 @@ geojson= "*"
 serde_json= "*"
 las = { version = "0.7", features = ["laz"] }
 num-format = "0.4.0"
-clap = "^3.0.0-beta.1"
+clap = { version = "4.0.*", features = ["derive"] }
+clap-verbosity-flag = "2.0.0"
 robust = "0.2"
 
 [[bin]]
