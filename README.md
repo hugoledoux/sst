@@ -34,7 +34,7 @@ This reads `crop_1.laz` and then `crop_2.laz` (in that order); I split `crop.laz
 
 ```bash
 export RUST_LOG=info
-./target/release/sstfin ./data/crop_1_2.files 10 > /dev/null/
+./target/release/sstfin ./data/crop_1_2.files 10 > /dev/null
 ```
 
 __.spa file__

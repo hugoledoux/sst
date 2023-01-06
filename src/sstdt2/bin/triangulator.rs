@@ -892,22 +892,23 @@ impl Triangulation {
         let allpts = &self.qt.cells.get(&qtc).unwrap().pts;
         let mut rng = thread_rng();
         let n = (allpts.len() as f64).powf(0.1);
-        // let mut dmin: f64 = std::f64::MAX;
-        // let mut v0: usize = 0;
-        // if allpts.is_empty() == false {
-        //     for _i in 0..n as usize {
-        //         let re: usize = rng.gen_range(0..allpts.len());
-        //         let dtemp = geom::distance2d_squared(&self.vs[allpts[re]], &x);
-        //         if dtemp < dmin {
-        //             v0 = allpts[re];
-        //             dmin = dtemp;
-        //         }
-        //     }
-        //     let re = self.walk_safe(x, self.vs_incident_tr[v0]);
-        //     if re.is_some() {
-        //         return re.unwrap();
-        //     }
-        // }
+        let mut dmin: f64 = std::f64::MAX;
+        let mut v0: usize = 0;
+        if allpts.is_empty() == false {
+            for _i in 0..n as usize {
+                let re: usize = rng.gen_range(0..allpts.len());
+                let dtemp = geom::distance2d_squared(&self.vs[allpts[re]], &x);
+                if dtemp < dmin {
+                    v0 = allpts[re];
+                    dmin = dtemp;
+                }
+            }
+            info!("closest vi: {}", v0);
+            let re = self.walk_safe(x, self.vs_incident_tr[v0]);
+            if re.is_some() {
+                return re.unwrap();
+            }
+        }
         // //-- find a starting tr
         // if self.freelist_ts.contains(&self.curt) == true {
         //     warn!("deleted curt");
@@ -934,18 +935,18 @@ impl Triangulation {
             }
         }
 
-        // //-- 3. try from all vertices in the qtcell then
-        // // warn!("walk.3");
-        // for vi in allpts {
-        //     let t0 = self.vs_incident_tr[*vi];
-        //     let re = self.walk_safe(x, t0);
-        //     if re.is_some() {
-        //         return re.unwrap();
-        //     }
-        // }
+        //-- 3. try from all vertices in the qtcell then
+        warn!("walk.3 ({}, {})", x[0], x[1]);
+        for vi in allpts {
+            let t0 = self.vs_incident_tr[*vi];
+            let re = self.walk_safe(x, t0);
+            if re.is_some() {
+                return re.unwrap();
+            }
+        }
 
-        //-- 3. try closest in the DT
-        warn!("walk.3.2");
+        //-- 4. try closest in the DT
+        warn!("walk.4");
         let mut dmin: f64 = std::f64::MAX;
         let mut v0: usize = 0;
         for (i, v) in self.vs.iter().enumerate() {
@@ -962,17 +963,17 @@ impl Triangulation {
             return re.unwrap();
         }
 
-        //-- 4. try brute-force
+        //-- 5. try brute-force
         //-- TODO: this brute-force too?
-        warn!("walk.4");
+        warn!("walk.5");
         let re3 = self.walk_bruteforce_triangles(x);
         if re3.is_some() {
             return re3.unwrap();
         }
 
-        //-- 4. we are outside the CH of the current dataset
+        //-- 6. we are outside the CH of the current dataset
         // warn!("point is outside the CH, finding closest point on the CH");
-        warn!("walk.5");
+        warn!("walk.6");
         let re4 = self.walk_bruteforce_outside_convex_hull(x);
         if re4.is_some() {
             return re4.unwrap();
@@ -1204,6 +1205,9 @@ impl Triangulation {
         //-- vertices
         for (i, v) in self.vs.iter().enumerate() {
             if i == 0 {
+                continue;
+            }
+            if self.freelist_vs.contains(&i) == true {
                 continue;
             }
             let pt = Geometry::new(Value::Point(vec![v[0], v[1]]));
