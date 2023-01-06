@@ -25,17 +25,17 @@ cargo build --release
 To see the format of the output stream ("spa" is **s**treaming **p**oint **a**scii; binary to follow at some point)
 
 ```bash
-export RUST_LOG=info
-./target/release/sstfin ./data/crop.laz 10 > ./data/crop_10.spa
+./target/release/sstfin -vv ./data/crop.laz 10 > ./data/crop_10.spa
 ```
 
 Multiple LAZ files if you provide them in a `myfiles.files`, see the example in `./data/crop_1_2.files`.
 This reads `crop_1.laz` and then `crop_2.laz` (in that order); I split `crop.laz` to obtain those 2 files.
 
 ```bash
-export RUST_LOG=info
-./target/release/sstfin ./data/crop_1_2.files 10 > /dev/null/
+./target/release/sstfin -vv ./data/crop_1_2.files 10 > /dev/null
 ```
+
+(remove `-vv` to remove the INFO and WARN)
 
 __.spa file__
 
@@ -65,9 +65,11 @@ x 2 3
   - outputs a variation of an .obj file where a few vertex finalisers are added. It's simpler than Isenburg's .sma (**s**treaming **m**esh **a**scii) and can be opened as an .obj file by different software (MeshLab just ignores the extra lines, so you can open the file with it);
 
 ```bash
-export RUST_LOG=info
-./target/release/sstfin ./data/crop.laz 10 |  ./target/release/sstdt > ./data/crop_10.sma
+./target/release/sstfin -vv ./data/crop.laz 10 | ./target/release/sstdt -vv > ./data/crop_10.sma
 ```
+
+The output file `crop_10.sma` is a valid OBJ file: change its extension and you can open it normally in [MeshLab](https://www.meshlab.net/) for instance.
+
 
 __output file__
 

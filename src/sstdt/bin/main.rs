@@ -10,7 +10,19 @@ extern crate log; //info/debug/error
 use std::io::BufRead;
 use std::io::{self, Write};
 
-use clap::App;
+use clap::Parser;
+#[derive(Parser)]
+#[command(name = "sstdt")]
+#[command(about = "streaming startin -- Delaunay triangulation [sstdt]")]
+#[command(author, version)]
+struct Cli {
+    /// output stars instead of .sma
+    stars: bool,
+    /// output both vertices and stars
+    both: bool,
+    #[clap(flatten)]
+    verbose: clap_verbosity_flag::Verbosity,
+}
 
 pub enum Outputmode {
     Sma,   //-- streaming mesh ascii
@@ -20,25 +32,21 @@ pub enum Outputmode {
 }
 
 fn main() -> io::Result<()> {
-    let matches = App::new("sstdt")
-        .version("0.2")
-        .about("streaming startin -- Delaunay triangulation")
-        .arg("--stars...       'output stars instead of .sma'")
-        .arg("--both...        'output both vertices and stars'")
-        .get_matches();
-
-    env_logger::init();
+    let cli = Cli::parse();
+    env_logger::Builder::new()
+        .filter_level(cli.verbose.log_level_filter())
+        .init();
 
     let mut _totalpts: usize = 0;
 
     info!("Init DT");
     let mut dt = startin::Triangulation::new();
 
-    if matches.occurrences_of("stars") > 0 {
+    if cli.stars {
         dt.set_outputmode(Outputmode::Stars);
     }
 
-    if matches.occurrences_of("both") > 0 {
+    if cli.both {
         dt.set_outputmode(Outputmode::Both);
     }
 

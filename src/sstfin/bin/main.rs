@@ -10,7 +10,6 @@ use std::io::{self, Write};
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
-use clap::App;
 use num_format::{Locale, ToFormattedString};
 
 extern crate las;
@@ -19,6 +18,26 @@ use las::Read;
 
 #[macro_use]
 extern crate log; //info/debug/error
+
+use clap::Parser;
+#[derive(Parser)]
+#[command(name = "sstfin")]
+#[command(about = "streaming startin -- finalisation [sstfin]")]
+#[command(author, version)]
+struct Cli {
+    /// The input LAS/LAZ/XYZ file(s) to use
+    input: String,
+    /// The cell resolution (integer, eg '5' for 5mX5m)
+    resolution: usize,
+    /// Use only ground in LAS files
+    #[arg(short, long)]
+    ground: bool,
+    /// Value to use (totalpts * 0.001)
+    #[arg(short, long, default_value_t = 0.001)]
+    sprinkle: f64,
+    #[clap(flatten)]
+    verbose: clap_verbosity_flag::Verbosity,
+}
 
 #[derive(Clone)]
 pub struct Point {
@@ -50,22 +69,15 @@ impl fmt::Display for Point {
 }
 
 fn main() {
-    let matches = App::new("sstfin")
-        .version("0.1")
-        .about("streaming startin -- finalisation")
-        .arg("<INPUT>             'The input LAS/LAZ/XYZ file(s) to use.'")
-        .arg("<RESOLUTION>        'The cell resolution (integer, eg '5' for 5mX5m)'")
-        .arg("-g...               'Use only ground in LAS files'")
-        .arg("--sprinkle...       'Value to use (0.001 is default; totalpts * 0.001)'")
-        .get_matches();
-
-    env_logger::init();
+    let cli = Cli::parse();
+    env_logger::Builder::new()
+        .filter_level(cli.verbose.log_level_filter())
+        .init();
 
     let mut inputformat: InputType = InputType::LAS;
 
     let mut paths: Vec<String> = Vec::new();
-    let t1 = matches.value_of("INPUT").unwrap();
-    let path = Path::new(&t1);
+    let path = Path::new(&cli.input);
     if path.extension().unwrap() == "las"
         || path.extension().unwrap() == "laz"
         || path.extension().unwrap() == "LAS"
@@ -92,12 +104,9 @@ fn main() {
         info!("\t{}. {}", i + 1, each);
     }
 
-    let cellsize: usize = matches.value_of("RESOLUTION").unwrap().parse().unwrap();
+    let cellsize: usize = cli.resolution;
 
-    let mut sprinkle_param: f64 = 0.001;
-    if matches.occurrences_of("sprinkle") > 0 {
-        sprinkle_param = matches.value_of("sprinkle").unwrap().parse().unwrap();
-    }
+    let sprinkle_param = cli.sprinkle;
 
     //-- pass #1
     let re = pass_1(&paths, &inputformat);
