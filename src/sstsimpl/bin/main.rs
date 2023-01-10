@@ -38,7 +38,7 @@ impl Surface {
         self.pts.is_empty()
     }
 
-    fn get_bbox(&self) -> (f64, f64, f64, f64) {
+    fn get_bbox(&self) -> Vec<f64> {
         let mut xmin: f64 = f64::MAX;
         let mut ymin: f64 = f64::MAX;
         let mut xmax: f64 = f64::MIN;
@@ -57,11 +57,32 @@ impl Surface {
                 ymax = p[1]
             }
         }
-        (xmin - 10.0, ymin - 10.0, xmax + 10.0, ymax + 10.0)
+        vec![xmin - 10.0, ymin - 10.0, xmax + 10.0, ymax + 10.0]
+    }
+
+    fn get_average_elevation(&self) -> f64 {
+        let mut total = 0_f64;
+        let mut n: usize = 0;
+        for p in self.pts.iter().step_by(10) {
+            total += p[2] as f64;
+            n += 1;
+        }
+        total / n as f64
     }
 
     fn finalise(&self) -> io::Result<()> {
-        io::stdout().write_all(&format!("{}", "FINALISE").as_bytes())?;
+        let bbox = self.get_bbox();
+        let zavg = self.get_average_elevation();
+        let mut dt = startin::Triangulation::new();
+        //-- insert 4 dummy corner TODO: better z-values would be nice
+        let _ = dt.insert_one_pt(bbox[0], bbox[1], zavg);
+        let _ = dt.insert_one_pt(bbox[2], bbox[1], zavg);
+        let _ = dt.insert_one_pt(bbox[2], bbox[3], zavg);
+        let _ = dt.insert_one_pt(bbox[0], bbox[3], zavg);
+
+        // dt.insert(&self.get_bbox(), startin::InsertionStrategy::AsIs);
+
+        // io::stdout().write_all(&format!("{}\n", "FINALISE").as_bytes())?;
         Ok(())
     }
 }
@@ -87,19 +108,19 @@ fn main() -> io::Result<()> {
             '#' => continue,
             'n' => {
                 //-- number of points
-                io::stdout().write_all(&format!("{}", &l).as_bytes())?;
+                io::stdout().write_all(&format!("{}\n", &l).as_bytes())?;
             }
             's' => {
                 //-- cellsize
-                io::stdout().write_all(&format!("{}", &l).as_bytes())?;
+                io::stdout().write_all(&format!("{}\n", &l).as_bytes())?;
             }
             'c' => {
                 //-- dimension grid (always square cXc)
-                io::stdout().write_all(&format!("{}", &l).as_bytes())?;
+                io::stdout().write_all(&format!("{}\n", &l).as_bytes())?;
             }
             'b' => {
                 //-- bbox
-                io::stdout().write_all(&format!("{}", &l).as_bytes())?;
+                io::stdout().write_all(&format!("{}\n", &l).as_bytes())?;
             }
             'v' => {
                 //-- a vertex
@@ -108,7 +129,7 @@ fn main() -> io::Result<()> {
             'x' => {
                 //-- finalise a vertex
                 if s.is_empty() {
-                    io::stdout().write_all(&format!("{}", &l).as_bytes())?;
+                    io::stdout().write_all(&format!("{}\n", &l).as_bytes())?;
                 } else {
                     //-- create a DT
                     s.finalise();
