@@ -10,6 +10,7 @@ extern crate startin;
 use std::io::BufRead;
 use std::io::{self, Write};
 
+use std::collections::HashMap;
 // use std::cmp::Ordering;
 // use std::collections::BinaryHeap;
 
@@ -43,13 +44,15 @@ struct Cli {
 // }
 
 struct Surface {
-    pts: Vec<Vec<f64>>,
+    // pts: Vec<Vec<f64>>,
+    pts: HashMap<usize, Vec<f64>>,
     max_epsilon: f64,
 }
 
 impl Surface {
     fn new(epsilon: f64) -> Surface {
-        let l = Vec::new();
+        // let l = Vec::new();
+        let l: HashMap<usize, Vec<f64>> = HashMap::new();
         Surface {
             pts: l,
             max_epsilon: epsilon,
@@ -61,7 +64,8 @@ impl Surface {
     }
 
     fn add_pt(&mut self, pt: Vec<f64>) {
-        self.pts.push(pt);
+        // self.pts.push(pt);
+        self.pts.insert(self.pts.len(), pt);
     }
 
     fn is_empty(&self) -> bool {
@@ -73,7 +77,7 @@ impl Surface {
         let mut ymin: f64 = f64::MAX;
         let mut xmax: f64 = f64::MIN;
         let mut ymax: f64 = f64::MIN;
-        for p in &self.pts {
+        for (i, p) in &self.pts {
             if p[0] < xmin {
                 xmin = p[0]
             }
@@ -90,11 +94,33 @@ impl Surface {
         vec![xmin - 10.0, ymin - 10.0, xmax + 10.0, ymax + 10.0]
     }
 
+    fn get_4_extremes(&self) -> Vec<usize> {
+        let mut left = 0;
+        let mut bottom = 0;
+        let mut right = 0;
+        let mut top = 0;
+        for i in 1..self.pts.len() {
+            if self.pts[&i][0] < self.pts[&left][0] {
+                left = i;
+            }
+            if self.pts[&i][0] > self.pts[&right][0] {
+                right = i;
+            }
+            if self.pts[&i][1] < self.pts[&bottom][1] {
+                bottom = i;
+            }
+            if self.pts[&i][1] > self.pts[&top][1] {
+                top = i;
+            }
+        }
+        vec![left, bottom, right, top]
+    }
+
     fn get_average_elevation(&self) -> f64 {
         let mut total = 0_f64;
         let mut n: usize = 0;
-        for p in self.pts.iter().step_by(10) {
-            total += p[2] as f64;
+        for i in (0..self.pts.len()).step_by(10) {
+            total += self.pts[&i][2] as f64;
             n += 1;
         }
         total / n as f64
@@ -102,7 +128,7 @@ impl Surface {
 
     fn finalise(&mut self) -> io::Result<()> {
         info!("finalise: {}", self.pts.len());
-        info!("max_epsilon: {}", self.max_epsilon);
+        // info!("max_epsilon: {}", self.max_epsilon);
         let bbox = self.get_bbox();
         let zavg = self.get_average_elevation();
         let mut dt = startin::Triangulation::new();
@@ -111,24 +137,31 @@ impl Surface {
         let _ = dt.insert_one_pt(bbox[2], bbox[1], zavg);
         let _ = dt.insert_one_pt(bbox[2], bbox[3], zavg);
         let _ = dt.insert_one_pt(bbox[0], bbox[3], zavg);
+        //-- insert the 4 extremes to avoid large parts of datasets missing
+        //-- (when it's flat like NL)
+        let extremes = self.get_4_extremes();
+        for e in &extremes {
+            let _ = dt.insert_one_pt(self.pts[e][0], self.pts[e][1], self.pts[e][2]);
+        }
+
         let mut epsilon = std::f64::MAX;
         while epsilon > self.max_epsilon {
             // info!("self.pts.len()= {}", self.pts.len());
             epsilon = 0.0;
             let mut pi: usize = 0;
-            for (i, p) in self.pts.iter().enumerate() {
+            for (i, p) in &self.pts {
                 let z2 = dt.interpolate_tin_linear(p[0], p[1]).unwrap();
                 let e = (p[2] - z2).abs();
                 if e > epsilon {
-                    // info!("{:?}", e);
+                    // info!("self.pts.len()= {} -- {:?}", self.pts.len(), e);
                     epsilon = e;
-                    pi = i;
+                    pi = *i;
                 }
             }
-            let _ = dt.insert_one_pt(self.pts[pi][0], self.pts[pi][1], self.pts[pi][2]);
-            self.pts.remove(pi);
+            let _ = dt.insert_one_pt(self.pts[&pi][0], self.pts[&pi][1], self.pts[&pi][2]);
+            self.pts.remove(&pi);
         }
-
+        //-- stream out the vertices
         let impdigits = 3;
         let allv = &dt.all_vertices();
         for i in 5..dt.number_of_vertices() {
