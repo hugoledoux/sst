@@ -10,24 +10,54 @@ extern crate startin;
 use std::io::BufRead;
 use std::io::{self, Write};
 
+// use std::cmp::Ordering;
+// use std::collections::BinaryHeap;
+
 use clap::Parser;
 #[derive(Parser)]
 #[command(name = "sstsimpl")]
 #[command(about = "streaming startin -- simplify the terrain [sstsimpl]")]
 #[command(author, version)]
 struct Cli {
+    /// vertical epsilon
+    vepsilon: f64,
     #[clap(flatten)]
     verbose: clap_verbosity_flag::Verbosity,
 }
 
+// struct PotentialVertex {
+//     id: usize,
+//     verr: f64,
+// }
+
+// impl PartialOrd for PotentialVertex {
+//     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+//         self.verr.partial_cmp(&other.verr)
+//     }
+// }
+
+// impl PartialEq for PotentialVertex {
+//     fn eq(&self, other: &Self) -> bool {
+//         self.verr == other.verr
+//     }
+// }
+
 struct Surface {
     pts: Vec<Vec<f64>>,
+    max_epsilon: f64,
 }
 
 impl Surface {
-    fn new() -> Surface {
+    fn new(epsilon: f64) -> Surface {
         let l = Vec::new();
-        Surface { pts: l }
+        Surface {
+            pts: l,
+            max_epsilon: epsilon,
+        }
+    }
+
+    fn clear(&mut self) {
+        self.pts.clear();
     }
 
     fn add_pt(&mut self, pt: Vec<f64>) {
@@ -53,7 +83,7 @@ impl Surface {
             if p[0] > xmax {
                 xmax = p[0]
             }
-            if p[1] < ymax {
+            if p[1] > ymax {
                 ymax = p[1]
             }
         }
@@ -70,7 +100,9 @@ impl Surface {
         total / n as f64
     }
 
-    fn finalise(&self) -> io::Result<()> {
+    fn finalise(&mut self) -> io::Result<()> {
+        info!("finalise: {}", self.pts.len());
+        info!("max_epsilon: {}", self.max_epsilon);
         let bbox = self.get_bbox();
         let zavg = self.get_average_elevation();
         let mut dt = startin::Triangulation::new();
@@ -79,10 +111,35 @@ impl Surface {
         let _ = dt.insert_one_pt(bbox[2], bbox[1], zavg);
         let _ = dt.insert_one_pt(bbox[2], bbox[3], zavg);
         let _ = dt.insert_one_pt(bbox[0], bbox[3], zavg);
+        let mut epsilon = std::f64::MAX;
+        while epsilon > self.max_epsilon {
+            // info!("self.pts.len()= {}", self.pts.len());
+            epsilon = 0.0;
+            let mut pi: usize = 0;
+            for (i, p) in self.pts.iter().enumerate() {
+                let z2 = dt.interpolate_tin_linear(p[0], p[1]).unwrap();
+                let e = (p[2] - z2).abs();
+                if e > epsilon {
+                    // info!("{:?}", e);
+                    epsilon = e;
+                    pi = i;
+                }
+            }
+            let _ = dt.insert_one_pt(self.pts[pi][0], self.pts[pi][1], self.pts[pi][2]);
+            self.pts.remove(pi);
+        }
 
-        // dt.insert(&self.get_bbox(), startin::InsertionStrategy::AsIs);
-
-        // io::stdout().write_all(&format!("{}\n", "FINALISE").as_bytes())?;
+        let impdigits = 3;
+        let allv = &dt.all_vertices();
+        for i in 5..dt.number_of_vertices() {
+            io::stdout().write_all(
+                &format!(
+                    "v {0:.3$} {1:.3$} {2:.3$}\n",
+                    allv[i][0], allv[i][1], allv[i][2], impdigits
+                )
+                .as_bytes(),
+            )?;
+        }
         Ok(())
     }
 }
@@ -94,7 +151,7 @@ fn main() -> io::Result<()> {
         .init();
 
     // let mut pts: Vec<Vec<f64>> = Vec::new();
-    let mut s = Surface::new();
+    let mut s = Surface::new(cli.vepsilon);
 
     let stdin = std::io::stdin();
     for line in stdin.lock().lines() {
@@ -127,16 +184,14 @@ fn main() -> io::Result<()> {
                 s.add_pt(parse_3_f64(&l));
             }
             'x' => {
-                //-- finalise a vertex
+                //-- finalise a cell
                 if s.is_empty() {
                     io::stdout().write_all(&format!("{}\n", &l).as_bytes())?;
                 } else {
-                    //-- create a DT
-                    s.finalise();
+                    let _ = s.finalise();
+                    s.clear();
+                    io::stdout().write_all(&format!("{}\n", &l).as_bytes())?;
                 }
-                // let ls: Vec<&str> = l.split_whitespace().collect();
-                // let a: usize = ls[1].parse::<usize>().unwrap();
-                // d.remove(&a);
                 continue;
             }
             _ => {
@@ -150,32 +205,10 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
-// fn finalise_cell(pts: &Vec<Vec<f64>>) {
-//     let mut dt = startin::Triangulation::new();
-//     //-- insert 4 corner
-//     let total = 0_f64;
-//     for pt in pts {
-//         total += pt[2];
-//     }
-//     let avgz: f64 = total / pts.len();
-
-//     //-- insert all
-//     // dt.insert(&pts);
-// }
-
 fn parse_3_f64(l: &String) -> Vec<f64> {
     let ls: Vec<&str> = l.split_whitespace().collect();
     let a: f64 = ls[1].parse::<f64>().unwrap();
     let b: f64 = ls[2].parse::<f64>().unwrap();
     let c: f64 = ls[3].parse::<f64>().unwrap();
     vec![a, b, c]
-}
-
-fn parse_4_f64(l: &String) -> (f64, f64, f64, f64) {
-    let ls: Vec<&str> = l.split_whitespace().collect();
-    let a: f64 = ls[1].parse::<f64>().unwrap();
-    let b: f64 = ls[2].parse::<f64>().unwrap();
-    let c: f64 = ls[3].parse::<f64>().unwrap();
-    let d: f64 = ls[4].parse::<f64>().unwrap();
-    (a, b, c, d)
 }
