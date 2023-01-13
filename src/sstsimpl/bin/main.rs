@@ -142,7 +142,7 @@ impl Surface {
     }
 
     fn finalise(&mut self) -> io::Result<()> {
-        info!("finalise3: {}", self.pts.len());
+        // info!("->: {}", self.pts.len());
         let bbox = self.get_bbox();
         // let zavg = self.get_average_elevation();
         let cornerz = self.get_corner_elevations();
@@ -172,11 +172,11 @@ impl Surface {
             let z2 = dt.interpolate_tin_linear(p[0], p[1]).unwrap();
             let e = (p[2] - z2).abs();
             if e > self.max_epsilon {
-                let _ = dt.insert_one_pt(self.pts[i][0], self.pts[i][1], self.pts[i][2]);
+                let _ = dt.insert_one_pt(p[0], p[1], p[2]);
             }
         }
         //-- stream out the vertices
-        let impdigits = 3;
+        let impdigits = 3; // TODO : impdigit to store in the stream?
         let allv = &dt.all_vertices();
         for i in 5..dt.number_of_vertices() {
             io::stdout().write_all(
@@ -187,6 +187,11 @@ impl Surface {
                 .as_bytes(),
             )?;
         }
+        // info!("<-: {}", dt.number_of_vertices() - 5);
+        info!(
+            "{:.1?}% kept",
+            (dt.number_of_vertices() - 5) as f64 / self.pts.len() as f64 * 100.
+        );
         Ok(())
     }
 }
