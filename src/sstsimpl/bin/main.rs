@@ -14,6 +14,9 @@ use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::collections::HashMap;
 
+use rand::seq::SliceRandom;
+use rand::thread_rng;
+
 use clap::Parser;
 #[derive(Parser)]
 #[command(name = "sstsimpl")]
@@ -133,6 +136,54 @@ impl Surface {
         total / n as f64
     }
 
+    fn finalise3(&mut self) -> io::Result<()> {
+        info!("finalise3: {}", self.pts.len());
+        let bbox = self.get_bbox();
+        let zavg = self.get_average_elevation();
+        let mut dt = startin::Triangulation::new();
+        //-- insert 4 dummy corner TODO: better z-values would be nice
+        let _ = dt.insert_one_pt(bbox[0], bbox[1], zavg);
+        let _ = dt.insert_one_pt(bbox[2], bbox[1], zavg);
+        let _ = dt.insert_one_pt(bbox[2], bbox[3], zavg);
+        let _ = dt.insert_one_pt(bbox[0], bbox[3], zavg);
+        //-- insert 4 dummy corner TODO: better z-values would be nice
+        let _ = dt.insert_one_pt(bbox[0], bbox[1], zavg);
+        let _ = dt.insert_one_pt(bbox[2], bbox[1], zavg);
+        let _ = dt.insert_one_pt(bbox[2], bbox[3], zavg);
+        let _ = dt.insert_one_pt(bbox[0], bbox[3], zavg);
+        //-- insert the 4 extremes to avoid large parts of datasets missing
+        //-- (when it's flat like NL)
+        let extremes = self.get_4_extremes();
+        for e in &extremes {
+            let _ = dt.insert_one_pt(self.pts[e][0], self.pts[e][1], self.pts[e][2]);
+        }
+
+        //-- shuffle the input points
+        let mut ids: Vec<usize> = (0..self.pts.len()).collect();
+        ids.shuffle(&mut thread_rng());
+        for i in &ids {
+            let p = &self.pts[i];
+            let z2 = dt.interpolate_tin_linear(p[0], p[1]).unwrap();
+            let e = (p[2] - z2).abs();
+            if e > self.max_epsilon {
+                let _ = dt.insert_one_pt(self.pts[&i][0], self.pts[&i][1], self.pts[&i][2]);
+            }
+        }
+        //-- stream out the vertices
+        let impdigits = 3;
+        let allv = &dt.all_vertices();
+        for i in 5..dt.number_of_vertices() {
+            io::stdout().write_all(
+                &format!(
+                    "v {0:.3$} {1:.3$} {2:.3$}\n",
+                    allv[i][0], allv[i][1], allv[i][2], impdigits
+                )
+                .as_bytes(),
+            )?;
+        }
+        Ok(())
+    }
+
     fn finalise2(&mut self) -> io::Result<()> {
         info!("finalise2: {}", self.pts.len());
         let bbox = self.get_bbox();
@@ -163,7 +214,7 @@ impl Surface {
 
         let mut epsilon = heap.peek().unwrap().verr;
         while epsilon > self.max_epsilon {
-            // info!("self.pts.len()= {}", self.pts.len());
+            info!("heap.len()= {}", heap.len());
             // epsilon = 0.0;
             for _i in 0..10 {
                 match heap.pop() {
@@ -310,7 +361,9 @@ fn main() -> io::Result<()> {
                 if s.is_empty() {
                     io::stdout().write_all(&format!("{}\n", &l).as_bytes())?;
                 } else {
-                    let _ = s.finalise();
+                    // let _ = s.finalise();
+                    // let _ = s.finalise2();
+                    let _ = s.finalise3();
                     s.clear();
                     io::stdout().write_all(&format!("{}\n", &l).as_bytes())?;
                 }
