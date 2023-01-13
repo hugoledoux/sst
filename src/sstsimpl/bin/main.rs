@@ -29,40 +29,40 @@ struct Cli {
     verbose: clap_verbosity_flag::Verbosity,
 }
 
-struct PotentialVertex {
-    xyz: Vec<f64>,
-    verr: f64,
-}
+// struct PotentialVertex {
+//     xyz: Vec<f64>,
+//     verr: f64,
+// }
 
-impl Ord for PotentialVertex {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.verr.partial_cmp(&other.verr).unwrap()
-    }
-}
+// impl Ord for PotentialVertex {
+//     fn cmp(&self, other: &Self) -> Ordering {
+//         self.verr.partial_cmp(&other.verr).unwrap()
+//     }
+// }
 
-impl PartialOrd for PotentialVertex {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.verr.partial_cmp(&other.verr)
-    }
-}
+// impl PartialOrd for PotentialVertex {
+//     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+//         self.verr.partial_cmp(&other.verr)
+//     }
+// }
 
-impl Eq for PotentialVertex {}
-impl PartialEq for PotentialVertex {
-    fn eq(&self, other: &Self) -> bool {
-        self.verr == other.verr
-    }
-}
+// impl Eq for PotentialVertex {}
+// impl PartialEq for PotentialVertex {
+//     fn eq(&self, other: &Self) -> bool {
+//         self.verr == other.verr
+//     }
+// }
 
 struct Surface {
-    // pts: Vec<Vec<f64>>,
-    pts: HashMap<usize, Vec<f64>>,
+    pts: Vec<Vec<f64>>,
+    // pts: HashMap<usize, Vec<f64>>,
     max_epsilon: f64,
 }
 
 impl Surface {
     fn new(epsilon: f64) -> Surface {
-        // let l = Vec::new();
-        let l: HashMap<usize, Vec<f64>> = HashMap::new();
+        let l = Vec::new();
+        // let l: HashMap<usize, Vec<f64>> = HashMap::new();
         Surface {
             pts: l,
             max_epsilon: epsilon,
@@ -74,8 +74,8 @@ impl Surface {
     }
 
     fn add_pt(&mut self, pt: Vec<f64>) {
-        // self.pts.push(pt);
-        self.pts.insert(self.pts.len(), pt);
+        self.pts.push(pt);
+        // self.pts.insert(self.pts.len(), pt);
     }
 
     fn is_empty(&self) -> bool {
@@ -87,7 +87,8 @@ impl Surface {
         let mut ymin: f64 = f64::MAX;
         let mut xmax: f64 = f64::MIN;
         let mut ymax: f64 = f64::MIN;
-        for (_i, p) in &self.pts {
+        // for (_i, p) in &self.pts {
+        for p in &self.pts {
             if p[0] < xmin {
                 xmin = p[0]
             }
@@ -110,16 +111,16 @@ impl Surface {
         let mut right = 0;
         let mut top = 0;
         for i in 1..self.pts.len() {
-            if self.pts[&i][0] < self.pts[&left][0] {
+            if self.pts[i][0] < self.pts[left][0] {
                 left = i;
             }
-            if self.pts[&i][0] > self.pts[&right][0] {
+            if self.pts[i][0] > self.pts[right][0] {
                 right = i;
             }
-            if self.pts[&i][1] < self.pts[&bottom][1] {
+            if self.pts[i][1] < self.pts[bottom][1] {
                 bottom = i;
             }
-            if self.pts[&i][1] > self.pts[&top][1] {
+            if self.pts[i][1] > self.pts[top][1] {
                 top = i;
             }
         }
@@ -130,70 +131,63 @@ impl Surface {
         let mut total = 0_f64;
         let mut n: usize = 0;
         for i in (0..self.pts.len()).step_by(10) {
-            total += self.pts[&i][2] as f64;
+            total += self.pts[i][2] as f64;
             n += 1;
         }
         total / n as f64
     }
 
-    fn finalise3(&mut self) -> io::Result<()> {
+    fn get_corner_elevations(&self) -> Vec<f64> {
+        let bbox = self.get_bbox();
+        let deltax = bbox[2] - bbox[0];
+        let deltay = bbox[3] - bbox[1];
+        // let corners: Vec<f64> = Vec::new();
+        let mut totals: Vec<f64> = vec![0., 0., 0., 0.];
+        let mut ns: Vec<usize> = vec![0, 0, 0, 0];
+        for i in (0..self.pts.len()).step_by(10) {
+            let dx = (self.pts[i][0] - bbox[0]) / deltax;
+            let dy = (self.pts[i][1] - bbox[1]) / deltay;
+            if dx < 0.5 && dy < 0.5 {
+                totals[0] += self.pts[i][2];
+                ns[0] += 1;
+            };
+            if dx > 0.5 && dy < 0.5 {
+                totals[1] += self.pts[i][2];
+                ns[1] += 1;
+            };
+            if dx > 0.5 && dy > 0.5 {
+                totals[2] += self.pts[i][2];
+                ns[2] += 1;
+            };
+            if dx < 0.5 && dy > 0.5 {
+                totals[3] += self.pts[i][2];
+                ns[3] += 1;
+            };
+        }
+        vec![
+            totals[0] / ns[0] as f64,
+            totals[1] / ns[1] as f64,
+            totals[2] / ns[2] as f64,
+            totals[3] / ns[3] as f64,
+        ]
+    }
+
+    fn finalise(&mut self) -> io::Result<()> {
         info!("finalise3: {}", self.pts.len());
         let bbox = self.get_bbox();
         let zavg = self.get_average_elevation();
+        let cornerz = self.get_corner_elevations();
         let mut dt = startin::Triangulation::new();
         //-- insert 4 dummy corner TODO: better z-values would be nice
-        let _ = dt.insert_one_pt(bbox[0], bbox[1], zavg);
-        let _ = dt.insert_one_pt(bbox[2], bbox[1], zavg);
-        let _ = dt.insert_one_pt(bbox[2], bbox[3], zavg);
-        let _ = dt.insert_one_pt(bbox[0], bbox[3], zavg);
+        let _ = dt.insert_one_pt(bbox[0], bbox[1], cornerz[0]);
+        let _ = dt.insert_one_pt(bbox[2], bbox[1], cornerz[1]);
+        let _ = dt.insert_one_pt(bbox[2], bbox[3], cornerz[2]);
+        let _ = dt.insert_one_pt(bbox[0], bbox[3], cornerz[3]);
         //-- insert 4 dummy corner TODO: better z-values would be nice
-        let _ = dt.insert_one_pt(bbox[0], bbox[1], zavg);
-        let _ = dt.insert_one_pt(bbox[2], bbox[1], zavg);
-        let _ = dt.insert_one_pt(bbox[2], bbox[3], zavg);
-        let _ = dt.insert_one_pt(bbox[0], bbox[3], zavg);
-        //-- insert the 4 extremes to avoid large parts of datasets missing
-        //-- (when it's flat like NL)
-        let extremes = self.get_4_extremes();
-        for e in &extremes {
-            let _ = dt.insert_one_pt(self.pts[e][0], self.pts[e][1], self.pts[e][2]);
-        }
-
-        //-- shuffle the input points
-        let mut ids: Vec<usize> = (0..self.pts.len()).collect();
-        ids.shuffle(&mut thread_rng());
-        for i in &ids {
-            let p = &self.pts[i];
-            let z2 = dt.interpolate_tin_linear(p[0], p[1]).unwrap();
-            let e = (p[2] - z2).abs();
-            if e > self.max_epsilon {
-                let _ = dt.insert_one_pt(self.pts[&i][0], self.pts[&i][1], self.pts[&i][2]);
-            }
-        }
-        //-- stream out the vertices
-        let impdigits = 3;
-        let allv = &dt.all_vertices();
-        for i in 5..dt.number_of_vertices() {
-            io::stdout().write_all(
-                &format!(
-                    "v {0:.3$} {1:.3$} {2:.3$}\n",
-                    allv[i][0], allv[i][1], allv[i][2], impdigits
-                )
-                .as_bytes(),
-            )?;
-        }
-        Ok(())
-    }
-
-    fn finalise2(&mut self) -> io::Result<()> {
-        info!("finalise2: {}", self.pts.len());
-        let bbox = self.get_bbox();
-        let zavg = self.get_average_elevation();
-        let mut dt = startin::Triangulation::new();
-        //-- insert 4 dummy corner TODO: better z-values would be nice
-        let _ = dt.insert_one_pt(bbox[0], bbox[1], zavg);
-        let _ = dt.insert_one_pt(bbox[2], bbox[1], zavg);
-        let _ = dt.insert_one_pt(bbox[2], bbox[3], zavg);
-        let _ = dt.insert_one_pt(bbox[0], bbox[3], zavg);
+        // let _ = dt.insert_one_pt(bbox[0], bbox[1], zavg);
+        // let _ = dt.insert_one_pt(bbox[2], bbox[1], zavg);
+        // let _ = dt.insert_one_pt(bbox[2], bbox[3], zavg);
+        // let _ = dt.insert_one_pt(bbox[0], bbox[3], zavg);
         // //-- insert the 4 extremes to avoid large parts of datasets missing
         // //-- (when it's flat like NL)
         // let extremes = self.get_4_extremes();
@@ -201,56 +195,17 @@ impl Surface {
         //     let _ = dt.insert_one_pt(self.pts[e][0], self.pts[e][1], self.pts[e][2]);
         // }
 
-        // let mut heap = BinaryHeap::new();
-        let mut heap: BinaryHeap<PotentialVertex> = BinaryHeap::new();
-        for (_i, p) in &self.pts {
+        //-- shuffle the input points
+        let mut ids: Vec<usize> = (0..self.pts.len()).collect();
+        ids.shuffle(&mut thread_rng());
+        for i in ids {
+            let p = &self.pts[i];
             let z2 = dt.interpolate_tin_linear(p[0], p[1]).unwrap();
             let e = (p[2] - z2).abs();
-            heap.push(PotentialVertex {
-                xyz: p.to_vec(),
-                verr: e,
-            });
-        }
-
-        let mut epsilon = heap.peek().unwrap().verr;
-        while epsilon > self.max_epsilon {
-            info!("heap.len()= {}", heap.len());
-            // epsilon = 0.0;
-            for _i in 0..10 {
-                match heap.pop() {
-                    Some(p) => {
-                        let _ = dt.insert_one_pt(p.xyz[0], p.xyz[1], p.xyz[2]);
-                    }
-                    None => break,
-                };
+            if e > self.max_epsilon {
+                let _ = dt.insert_one_pt(self.pts[i][0], self.pts[i][1], self.pts[i][2]);
             }
-            loop {
-                match heap.pop() {
-                    Some(v) => {
-                        let z2 = dt.interpolate_tin_linear(v.xyz[0], v.xyz[1]).unwrap();
-                        let e = (v.xyz[2] - z2).abs();
-                        heap.push(PotentialVertex {
-                            xyz: v.xyz.to_vec(),
-                            verr: e,
-                        });
-                    }
-                    None => break,
-                }
-            }
-            // //-- recalculate the hash
-            // let vec = heap.into_sorted_vec();
-            // // heap.clear();
-            // for each in &vec {
-            //     let z2 = dt.interpolate_tin_linear(each.xyz[0], each.xyz[1]).unwrap();
-            //     let e = (each.xyz[2] - z2).abs();
-            //     heap.push(PotentialVertex {
-            //         xyz: each.xyz.to_vec(),
-            //         verr: e,
-            //     });
-            // }
-            epsilon = heap.peek().unwrap().verr;
         }
-
         //-- stream out the vertices
         let impdigits = 3;
         let allv = &dt.all_vertices();
@@ -266,55 +221,137 @@ impl Surface {
         Ok(())
     }
 
-    fn finalise(&mut self) -> io::Result<()> {
-        info!("finalise: {}", self.pts.len());
-        // info!("max_epsilon: {}", self.max_epsilon);
-        let bbox = self.get_bbox();
-        let zavg = self.get_average_elevation();
-        let mut dt = startin::Triangulation::new();
-        //-- insert 4 dummy corner TODO: better z-values would be nice
-        let _ = dt.insert_one_pt(bbox[0], bbox[1], zavg);
-        let _ = dt.insert_one_pt(bbox[2], bbox[1], zavg);
-        let _ = dt.insert_one_pt(bbox[2], bbox[3], zavg);
-        let _ = dt.insert_one_pt(bbox[0], bbox[3], zavg);
-        //-- insert the 4 extremes to avoid large parts of datasets missing
-        //-- (when it's flat like NL)
-        let extremes = self.get_4_extremes();
-        for e in &extremes {
-            let _ = dt.insert_one_pt(self.pts[e][0], self.pts[e][1], self.pts[e][2]);
-        }
+    // fn finalise2(&mut self) -> io::Result<()> {
+    //     info!("finalise2: {}", self.pts.len());
+    //     let bbox = self.get_bbox();
+    //     let zavg = self.get_average_elevation();
+    //     let mut dt = startin::Triangulation::new();
+    //     //-- insert 4 dummy corner TODO: better z-values would be nice
+    //     let _ = dt.insert_one_pt(bbox[0], bbox[1], zavg);
+    //     let _ = dt.insert_one_pt(bbox[2], bbox[1], zavg);
+    //     let _ = dt.insert_one_pt(bbox[2], bbox[3], zavg);
+    //     let _ = dt.insert_one_pt(bbox[0], bbox[3], zavg);
+    //     // //-- insert the 4 extremes to avoid large parts of datasets missing
+    //     // //-- (when it's flat like NL)
+    //     // let extremes = self.get_4_extremes();
+    //     // for e in &extremes {
+    //     //     let _ = dt.insert_one_pt(self.pts[e][0], self.pts[e][1], self.pts[e][2]);
+    //     // }
 
-        let mut epsilon = std::f64::MAX;
-        while epsilon > self.max_epsilon {
-            // info!("self.pts.len()= {}", self.pts.len());
-            epsilon = 0.0;
-            let mut pi: usize = 0;
-            for (i, p) in &self.pts {
-                let z2 = dt.interpolate_tin_linear(p[0], p[1]).unwrap();
-                let e = (p[2] - z2).abs();
-                if e > epsilon {
-                    // info!("self.pts.len()= {} -- {:?}", self.pts.len(), e);
-                    epsilon = e;
-                    pi = *i;
-                }
-            }
-            let _ = dt.insert_one_pt(self.pts[&pi][0], self.pts[&pi][1], self.pts[&pi][2]);
-            self.pts.remove(&pi);
-        }
-        //-- stream out the vertices
-        let impdigits = 3;
-        let allv = &dt.all_vertices();
-        for i in 5..dt.number_of_vertices() {
-            io::stdout().write_all(
-                &format!(
-                    "v {0:.3$} {1:.3$} {2:.3$}\n",
-                    allv[i][0], allv[i][1], allv[i][2], impdigits
-                )
-                .as_bytes(),
-            )?;
-        }
-        Ok(())
-    }
+    //     // let mut heap = BinaryHeap::new();
+    //     let mut heap: BinaryHeap<PotentialVertex> = BinaryHeap::new();
+    //     for (_i, p) in &self.pts {
+    //         let z2 = dt.interpolate_tin_linear(p[0], p[1]).unwrap();
+    //         let e = (p[2] - z2).abs();
+    //         heap.push(PotentialVertex {
+    //             xyz: p.to_vec(),
+    //             verr: e,
+    //         });
+    //     }
+
+    //     let mut epsilon = heap.peek().unwrap().verr;
+    //     while epsilon > self.max_epsilon {
+    //         info!("heap.len()= {}", heap.len());
+    //         // epsilon = 0.0;
+    //         for _i in 0..10 {
+    //             match heap.pop() {
+    //                 Some(p) => {
+    //                     let _ = dt.insert_one_pt(p.xyz[0], p.xyz[1], p.xyz[2]);
+    //                 }
+    //                 None => break,
+    //             };
+    //         }
+    //         loop {
+    //             match heap.pop() {
+    //                 Some(v) => {
+    //                     let z2 = dt.interpolate_tin_linear(v.xyz[0], v.xyz[1]).unwrap();
+    //                     let e = (v.xyz[2] - z2).abs();
+    //                     heap.push(PotentialVertex {
+    //                         xyz: v.xyz.to_vec(),
+    //                         verr: e,
+    //                     });
+    //                 }
+    //                 None => break,
+    //             }
+    //         }
+    //         // //-- recalculate the hash
+    //         // let vec = heap.into_sorted_vec();
+    //         // // heap.clear();
+    //         // for each in &vec {
+    //         //     let z2 = dt.interpolate_tin_linear(each.xyz[0], each.xyz[1]).unwrap();
+    //         //     let e = (each.xyz[2] - z2).abs();
+    //         //     heap.push(PotentialVertex {
+    //         //         xyz: each.xyz.to_vec(),
+    //         //         verr: e,
+    //         //     });
+    //         // }
+    //         epsilon = heap.peek().unwrap().verr;
+    //     }
+
+    //     //-- stream out the vertices
+    //     let impdigits = 3;
+    //     let allv = &dt.all_vertices();
+    //     for i in 5..dt.number_of_vertices() {
+    //         io::stdout().write_all(
+    //             &format!(
+    //                 "v {0:.3$} {1:.3$} {2:.3$}\n",
+    //                 allv[i][0], allv[i][1], allv[i][2], impdigits
+    //             )
+    //             .as_bytes(),
+    //         )?;
+    //     }
+    //     Ok(())
+    // }
+
+    // fn finalise(&mut self) -> io::Result<()> {
+    //     info!("finalise: {}", self.pts.len());
+    //     // info!("max_epsilon: {}", self.max_epsilon);
+    //     let bbox = self.get_bbox();
+    //     let zavg = self.get_average_elevation();
+    //     let mut dt = startin::Triangulation::new();
+    //     //-- insert 4 dummy corner TODO: better z-values would be nice
+    //     let _ = dt.insert_one_pt(bbox[0], bbox[1], zavg);
+    //     let _ = dt.insert_one_pt(bbox[2], bbox[1], zavg);
+    //     let _ = dt.insert_one_pt(bbox[2], bbox[3], zavg);
+    //     let _ = dt.insert_one_pt(bbox[0], bbox[3], zavg);
+    //     //-- insert the 4 extremes to avoid large parts of datasets missing
+    //     //-- (when it's flat like NL)
+    //     let extremes = self.get_4_extremes();
+    //     for e in &extremes {
+    //         let _ = dt.insert_one_pt(self.pts[e][0], self.pts[e][1], self.pts[e][2]);
+    //     }
+
+    //     let mut epsilon = std::f64::MAX;
+    //     while epsilon > self.max_epsilon {
+    //         // info!("self.pts.len()= {}", self.pts.len());
+    //         epsilon = 0.0;
+    //         let mut pi: usize = 0;
+    //         for (i, p) in &self.pts {
+    //             let z2 = dt.interpolate_tin_linear(p[0], p[1]).unwrap();
+    //             let e = (p[2] - z2).abs();
+    //             if e > epsilon {
+    //                 // info!("self.pts.len()= {} -- {:?}", self.pts.len(), e);
+    //                 epsilon = e;
+    //                 pi = *i;
+    //             }
+    //         }
+    //         let _ = dt.insert_one_pt(self.pts[&pi][0], self.pts[&pi][1], self.pts[&pi][2]);
+    //         self.pts.remove(&pi);
+    //     }
+    //     //-- stream out the vertices
+    //     let impdigits = 3;
+    //     let allv = &dt.all_vertices();
+    //     for i in 5..dt.number_of_vertices() {
+    //         io::stdout().write_all(
+    //             &format!(
+    //                 "v {0:.3$} {1:.3$} {2:.3$}\n",
+    //                 allv[i][0], allv[i][1], allv[i][2], impdigits
+    //             )
+    //             .as_bytes(),
+    //         )?;
+    //     }
+    //     Ok(())
+    // }
 }
 
 fn main() -> io::Result<()> {
@@ -361,9 +398,7 @@ fn main() -> io::Result<()> {
                 if s.is_empty() {
                     io::stdout().write_all(&format!("{}\n", &l).as_bytes())?;
                 } else {
-                    // let _ = s.finalise();
-                    // let _ = s.finalise2();
-                    let _ = s.finalise3();
+                    let _ = s.finalise();
                     s.clear();
                     io::stdout().write_all(&format!("{}\n", &l).as_bytes())?;
                 }
