@@ -28,50 +28,62 @@ struct Cli {
 struct Surface {
     pts: Vec<Vec<f64>>,
     max_epsilon: f64,
+    bbox: Vec<f64>,
 }
 
 impl Surface {
     fn new(epsilon: f64) -> Surface {
         let l = Vec::new();
+        let b = vec![f64::MAX, f64::MAX, f64::MIN, f64::MIN];
         Surface {
             pts: l,
             max_epsilon: epsilon,
+            bbox: b,
         }
     }
 
     fn clear(&mut self) {
         self.pts.clear();
+        self.bbox = vec![f64::MAX, f64::MAX, f64::MIN, f64::MIN];
     }
 
-    fn add_pt(&mut self, pt: Vec<f64>) {
-        self.pts.push(pt);
+    fn add_pt(&mut self, p: Vec<f64>) {
+        if p[0] < self.bbox[0] {
+            self.bbox[0] = p[0]
+        }
+        if p[1] < self.bbox[1] {
+            self.bbox[1] = p[1]
+        }
+        if p[0] > self.bbox[2] {
+            self.bbox[2] = p[0]
+        }
+        if p[1] > self.bbox[3] {
+            self.bbox[3] = p[1]
+        }
+        self.pts.push(p);
     }
 
     fn is_empty(&self) -> bool {
         self.pts.is_empty()
     }
 
-    fn get_bbox(&self) -> Vec<f64> {
-        let mut xmin: f64 = f64::MAX;
-        let mut ymin: f64 = f64::MAX;
-        let mut xmax: f64 = f64::MIN;
-        let mut ymax: f64 = f64::MIN;
-        // for (_i, p) in &self.pts {
-        for p in &self.pts {
-            if p[0] < xmin {
-                xmin = p[0]
-            }
-            if p[1] < ymin {
-                ymin = p[1]
-            }
-            if p[0] > xmax {
-                xmax = p[0]
-            }
-            if p[1] > ymax {
-                ymax = p[1]
-            }
+    fn close_to_bbox(&self, p: &Vec<f64>, d: f64) -> bool {
+        // let bbox = self.get_bbox();
+        let deltax = self.bbox[2] - self.bbox[0];
+        let deltay = self.bbox[3] - self.bbox[1];
+        if p[0] - self.bbox[0] < (d * deltax) {
+            return true;
         }
-        vec![xmin - 10.0, ymin - 10.0, xmax + 10.0, ymax + 10.0]
+        if self.bbox[2] - p[0] < (d * deltax) {
+            return true;
+        }
+        if p[1] - self.bbox[1] < (d * deltay) {
+            return true;
+        }
+        if self.bbox[3] - p[1] < (d * deltay) {
+            return true;
+        }
+        false
     }
 
     fn get_4_extremes(&self) -> Vec<usize> {
@@ -107,15 +119,15 @@ impl Surface {
     }
 
     fn get_corner_elevations(&self) -> Vec<f64> {
-        let bbox = self.get_bbox();
-        let deltax = bbox[2] - bbox[0];
-        let deltay = bbox[3] - bbox[1];
+        // let bbox = self.get_bbox();
+        let deltax = self.bbox[2] - self.bbox[0];
+        let deltay = self.bbox[3] - self.bbox[1];
         // let corners: Vec<f64> = Vec::new();
         let mut totals: Vec<f64> = vec![0., 0., 0., 0.];
         let mut ns: Vec<usize> = vec![0, 0, 0, 0];
         for i in (0..self.pts.len()).step_by(10) {
-            let dx = (self.pts[i][0] - bbox[0]) / deltax;
-            let dy = (self.pts[i][1] - bbox[1]) / deltay;
+            let dx = (self.pts[i][0] - self.bbox[0]) / deltax;
+            let dy = (self.pts[i][1] - self.bbox[1]) / deltay;
             if dx < 0.5 && dy < 0.5 {
                 totals[0] += self.pts[i][2];
                 ns[0] += 1;
@@ -143,36 +155,28 @@ impl Surface {
 
     fn finalise(&mut self) -> io::Result<()> {
         // info!("->: {}", self.pts.len());
-        let bbox = self.get_bbox();
+        let bbox = &self.bbox;
         // let zavg = self.get_average_elevation();
         let cornerz = self.get_corner_elevations();
         let mut dt = startin::Triangulation::new();
         //-- insert 4 dummy corner TODO: better z-values would be nice
-        let _ = dt.insert_one_pt(bbox[0], bbox[1], cornerz[0]);
-        let _ = dt.insert_one_pt(bbox[2], bbox[1], cornerz[1]);
-        let _ = dt.insert_one_pt(bbox[2], bbox[3], cornerz[2]);
-        let _ = dt.insert_one_pt(bbox[0], bbox[3], cornerz[3]);
-        //-- insert 4 dummy corner TODO: better z-values would be nice
-        // let _ = dt.insert_one_pt(bbox[0], bbox[1], zavg);
-        // let _ = dt.insert_one_pt(bbox[2], bbox[1], zavg);
-        // let _ = dt.insert_one_pt(bbox[2], bbox[3], zavg);
-        // let _ = dt.insert_one_pt(bbox[0], bbox[3], zavg);
-        // //-- insert the 4 extremes to avoid large parts of datasets missing
-        // //-- (when it's flat like NL)
-        // let extremes = self.get_4_extremes();
-        // for e in &extremes {
-        //     let _ = dt.insert_one_pt(self.pts[e][0], self.pts[e][1], self.pts[e][2]);
-        // }
+        let bufferbbox = 1000.0;
+        let _ = dt.insert_one_pt(bbox[0] - bufferbbox, bbox[1] - bufferbbox, cornerz[0]);
+        let _ = dt.insert_one_pt(bbox[2] + bufferbbox, bbox[1] - bufferbbox, cornerz[1]);
+        let _ = dt.insert_one_pt(bbox[2] + bufferbbox, bbox[3] + bufferbbox, cornerz[2]);
+        let _ = dt.insert_one_pt(bbox[0] - bufferbbox, bbox[3] + bufferbbox, cornerz[3]);
 
         //-- shuffle the input points
         let mut ids: Vec<usize> = (0..self.pts.len()).collect();
         ids.shuffle(&mut thread_rng());
         for i in ids {
             let p = &self.pts[i];
-            let z2 = dt.interpolate_tin_linear(p[0], p[1]).unwrap();
-            let e = (p[2] - z2).abs();
-            if e > self.max_epsilon {
-                let _ = dt.insert_one_pt(p[0], p[1], p[2]);
+            if self.close_to_bbox(&p, 0.02) == false {
+                let z2 = dt.interpolate_tin_linear(p[0], p[1]).unwrap();
+                let e = (p[2] - z2).abs();
+                if e > self.max_epsilon {
+                    let _ = dt.insert_one_pt(p[0], p[1], p[2]);
+                }
             }
         }
         //-- stream out the vertices
@@ -187,10 +191,9 @@ impl Surface {
                 .as_bytes(),
             )?;
         }
-        // info!("<-: {}", dt.number_of_vertices() - 5);
         info!(
             "{:.1?}% kept",
-            (dt.number_of_vertices() - 5) as f64 / self.pts.len() as f64 * 100.
+            (dt.number_of_vertices() - 4) as f64 / self.pts.len() as f64 * 100.
         );
         Ok(())
     }
