@@ -41,6 +41,9 @@ path = "src/sstdt2/bin/main.rs"
 name = "sstsimpl"
 path = "src/sstsimpl/bin/main.rs"
 
+[[bin]]
+name = "sstsimpl2"
+path = "src/sstsimpl2/bin/main.rs"
 
 [[bin]]
 name = "sstval"
