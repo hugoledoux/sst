@@ -362,7 +362,7 @@ fn pass_3_las(
     //-- chunker: promote these points at the top of the stream
     for (_, pt) in sprinkled {
         io::stdout().write_all(
-            &format!("v {0:.3$} {1:.3$} {2:.3$}\n", pt.x, pt.y, pt.z, impdigits).as_bytes(),
+            &format!("w {0:.3$} {1:.3$} {2:.3$}\n", pt.x, pt.y, pt.z, impdigits).as_bytes(),
         )?;
     }
 
@@ -443,7 +443,7 @@ fn pass_3_xyz(
 
     //-- chunker: promote these points at the top of the stream
     for (_, pt) in sprinkled {
-        io::stdout().write_all(&format!("v {} {} {}\n", pt.x, pt.y, pt.z).as_bytes())?;
+        io::stdout().write_all(&format!("w {} {} {}\n", pt.x, pt.y, pt.z).as_bytes())?;
     }
 
     //-- read again the files

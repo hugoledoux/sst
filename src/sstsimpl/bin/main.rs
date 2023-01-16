@@ -238,6 +238,10 @@ fn main() -> io::Result<()> {
                 //-- a vertex
                 s.add_pt(parse_3_f64(&l));
             }
+            'w' => {
+                //-- sprinkled point
+                io::stdout().write_all(&format!("{}\n", &l).as_bytes())?;
+            }
             'x' => {
                 //-- finalise a cell
                 if s.is_empty() {

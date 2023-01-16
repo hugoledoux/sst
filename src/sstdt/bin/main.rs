@@ -109,7 +109,7 @@ fn main() -> io::Result<()> {
                 // let _re =
                 //     dt.write_geojson_grid("/Users/hugo/temp/sstout/z.grid.geojson".to_string());
             }
-            'v' => {
+            'v' | 'w' => {
                 //-- vertex
                 // println!("=>{}", l);
                 // count += 1;

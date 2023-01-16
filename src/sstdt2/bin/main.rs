@@ -96,7 +96,7 @@ fn main() -> io::Result<()> {
                     &format!("b {:.3} {:.3} {:.3} {:.3}\n", re.0, re.1, re.2, re.3).as_bytes(),
                 )?;
             }
-            'v' => {
+            'v' | 'w' => {
                 //-- vertex
                 // println!("=>{}", l);
                 // count += 1;
