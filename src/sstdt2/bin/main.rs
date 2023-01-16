@@ -7,9 +7,9 @@ mod triangulator;
 #[macro_use]
 extern crate log; //info/debug/error
 
-use std::fs::File;
+// use std::fs::File;
+// use std::io::BufReader;
 use std::io::BufRead;
-use std::io::BufReader;
 use std::io::{self, Write};
 
 use clap::Parser;

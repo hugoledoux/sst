@@ -86,37 +86,37 @@ impl Surface {
         false
     }
 
-    fn get_4_extremes(&self) -> Vec<usize> {
-        let mut left = 0;
-        let mut bottom = 0;
-        let mut right = 0;
-        let mut top = 0;
-        for i in 1..self.pts.len() {
-            if self.pts[i][0] < self.pts[left][0] {
-                left = i;
-            }
-            if self.pts[i][0] > self.pts[right][0] {
-                right = i;
-            }
-            if self.pts[i][1] < self.pts[bottom][1] {
-                bottom = i;
-            }
-            if self.pts[i][1] > self.pts[top][1] {
-                top = i;
-            }
-        }
-        vec![left, bottom, right, top]
-    }
+    // fn get_4_extremes(&self) -> Vec<usize> {
+    //     let mut left = 0;
+    //     let mut bottom = 0;
+    //     let mut right = 0;
+    //     let mut top = 0;
+    //     for i in 1..self.pts.len() {
+    //         if self.pts[i][0] < self.pts[left][0] {
+    //             left = i;
+    //         }
+    //         if self.pts[i][0] > self.pts[right][0] {
+    //             right = i;
+    //         }
+    //         if self.pts[i][1] < self.pts[bottom][1] {
+    //             bottom = i;
+    //         }
+    //         if self.pts[i][1] > self.pts[top][1] {
+    //             top = i;
+    //         }
+    //     }
+    //     vec![left, bottom, right, top]
+    // }
 
-    fn get_average_elevation(&self) -> f64 {
-        let mut total = 0_f64;
-        let mut n: usize = 0;
-        for i in (0..self.pts.len()).step_by(10) {
-            total += self.pts[i][2] as f64;
-            n += 1;
-        }
-        total / n as f64
-    }
+    // fn get_average_elevation(&self) -> f64 {
+    //     let mut total = 0_f64;
+    //     let mut n: usize = 0;
+    //     for i in (0..self.pts.len()).step_by(10) {
+    //         total += self.pts[i][2] as f64;
+    //         n += 1;
+    //     }
+    //     total / n as f64
+    // }
 
     fn get_corner_elevations(&self) -> Vec<f64> {
         // let bbox = self.get_bbox();
