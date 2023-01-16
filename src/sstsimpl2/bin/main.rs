@@ -180,8 +180,8 @@ fn main() -> io::Result<()> {
         .init();
 
     let mut threads = Vec::<std::thread::JoinHandle<()>>::new();
-    // let mut surfaces: Vec<Surface> = vec![Surface::new(cli.vepsilon)];
-    let mut s = Surface::new(cli.vepsilon);
+    let mut surfaces: Vec<Surface> = vec![Surface::new(cli.vepsilon)];
+    // let mut s = Surface::new(cli.vepsilon);
 
     let stdin = std::io::stdin();
     for line in stdin.lock().lines() {
@@ -189,6 +189,7 @@ fn main() -> io::Result<()> {
         if l.is_empty() {
             continue;
         }
+        let s = surfaces.last_mut().unwrap();
         let ch = l.chars().next().unwrap();
         match ch {
             '#' => (),
@@ -222,17 +223,30 @@ fn main() -> io::Result<()> {
                 if s.is_empty() {
                     io::stdout().write_all(&format!("{}\n", &l).as_bytes())?;
                 } else {
-                    let s2 = s.to_owned(); //-- clone to send to the thread... not way to reuse I assume, in Python
-                                           // this is happening too
-                    let handle = thread::spawn(move || {
-                        // let _ = s2.clone().finalise(&l);
-                        info!("===");
-                        let re = s2.clone().finalise(&l);
-                        info!("{:?}", re);
-                    });
-                    // handle.join().unwrap();
-                    // threads.push(handle);
-                    s.clear();
+                    let ls = surfaces.pop();
+                    let sa = std::sync::Arc::new(ls);
+                    // let s2 = s.clone(); //-- clone to send to the thread... not way to reuse I assume, in Python
+                    //                     // this is happening too
+
+                    {
+                        // Rebinds the name `foo`. After this statement, `foo` in this scope and
+                        // `foo` in the parent scope are different smart pointers, but they point
+                        // to the same shared value `Foo(1)`.
+                        let sa2 = sa.clone();
+                        // std::thread::spawn(move || println!("{}", foo.0));
+                        let handle = thread::spawn(move || {
+                            // let _ = s2.clone().finalise(&l);
+                            info!("===");
+                            let re = sa2.as_ref().as_ref().unwrap().finalise(&l);
+                            info!("{:?} {:?}", thread::current().id(), re);
+                        });
+                        threads.push(handle);
+                    }
+
+                    // s.clear();
+                    info!("size of surfaces: {}", surfaces.len());
+                    surfaces.push(Surface::new(cli.vepsilon));
+                    info!("size of surfaces: {}", surfaces.len());
                 }
             }
             _ => {
@@ -241,6 +255,10 @@ fn main() -> io::Result<()> {
             }
         }
     }
+    for thread in threads {
+        thread.join().unwrap();
+    }
+    info!("size of surfaces: {}", surfaces.len());
 
     info!("✅");
     Ok(())
