@@ -113,8 +113,8 @@ fn main() -> io::Result<()> {
                 //-- finalise a cell
                 // println!("=>{}", l);
                 let re = parse_2_usize(&l);
-                let gx = 1;
-                let gy = 0;
+                // let gx = 1;
+                // let gy = 0;
 
                 // if (re.0 == gx) && (re.1 == gy) {
                 //     let fout = format!("/Users/hugo/temp/sstout/c-{}-{}-b.geojson", re.0, re.1);
