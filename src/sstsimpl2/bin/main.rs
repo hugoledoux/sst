@@ -223,30 +223,30 @@ fn main() -> io::Result<()> {
                 if s.is_empty() {
                     io::stdout().write_all(&format!("{}\n", &l).as_bytes())?;
                 } else {
-                    let ls = surfaces.pop();
-                    let sa = std::sync::Arc::new(ls);
+                    let s2 = surfaces.pop().unwrap();
+                    // let sa = std::sync::Arc::new(ls);
                     // let s2 = s.clone(); //-- clone to send to the thread... not way to reuse I assume, in Python
-                    //                     // this is happening too
+                    // this is happening too
 
                     {
                         // Rebinds the name `foo`. After this statement, `foo` in this scope and
                         // `foo` in the parent scope are different smart pointers, but they point
                         // to the same shared value `Foo(1)`.
-                        let sa2 = sa.clone();
+                        // let sa2 = sa.clone();
                         // std::thread::spawn(move || println!("{}", foo.0));
                         let handle = thread::spawn(move || {
-                            // let _ = s2.clone().finalise(&l);
+                            let _ = s2.finalise(&l);
                             info!("===");
-                            let re = sa2.as_ref().as_ref().unwrap().finalise(&l);
-                            info!("{:?} {:?}", thread::current().id(), re);
+                            // let re = sa2.as_ref().as_ref().unwrap().finalise(&l);
+                            // info!("{:?} {:?}", thread::current().id(), re);
                         });
                         threads.push(handle);
                     }
 
                     // s.clear();
-                    info!("size of surfaces: {}", surfaces.len());
+                    // info!("size of surfaces: {}", surfaces.len());
                     surfaces.push(Surface::new(cli.vepsilon));
-                    info!("size of surfaces: {}", surfaces.len());
+                    // info!("size of surfaces: {}", surfaces.len());
                 }
             }
             _ => {
@@ -255,10 +255,10 @@ fn main() -> io::Result<()> {
             }
         }
     }
+    //-- wait for all the threads to finish
     for thread in threads {
         thread.join().unwrap();
     }
-    info!("size of surfaces: {}", surfaces.len());
 
     info!("✅");
     Ok(())
