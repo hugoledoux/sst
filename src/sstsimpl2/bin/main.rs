@@ -119,7 +119,7 @@ impl Surface {
         ]
     }
 
-    fn finalise(&self, l: &String) -> io::Result<()> {
+    fn finalise(&self, impdigits: usize, l: &String) -> io::Result<()> {
         info!("simplify {} points", self.pts.len());
         let bbox = &self.bbox;
         // let zavg = self.get_average_elevation();
@@ -145,7 +145,6 @@ impl Surface {
             }
         }
         //-- stream out the vertices
-        let impdigits = 3; // TODO : impdigit to store in the stream?
         let allv = &dt.all_vertices();
         for i in 5..dt.number_of_vertices() {
             io::stdout().write_all(
@@ -178,6 +177,8 @@ fn main() -> io::Result<()> {
 
     let mut surfaces: Vec<Surface> = vec![Surface::new(cli.vepsilon)];
 
+    let mut impdigits: usize = usize::MAX;
+
     let stdin = std::io::stdin();
     for line in stdin.lock().lines() {
         let l = line.unwrap();
@@ -206,6 +207,13 @@ fn main() -> io::Result<()> {
             }
             'v' => {
                 //-- a vertex
+                //-- find how many digits are stored in the first vertex
+                //-- and use this for all
+                if impdigits == usize::MAX {
+                    let ls: Vec<&str> = l.split_whitespace().collect();
+                    impdigits = ls[1].len() - 1 - ls[1].rfind('.').unwrap() as usize;
+                    info!("impdigits={:?}", impdigits);
+                }
                 s.add_pt(parse_3_f64(&l));
             }
             'w' => {
@@ -219,7 +227,7 @@ fn main() -> io::Result<()> {
                 } else {
                     let s2 = surfaces.pop().unwrap();
                     pool.install(move || {
-                        let _ = s2.finalise(&l);
+                        let _ = s2.finalise(impdigits, &l);
                     });
                     surfaces.push(Surface::new(cli.vepsilon));
                 }
