@@ -127,7 +127,7 @@ impl Surface {
 
     fn finalise(&self, l: &String) -> io::Result<()> {
         info!("->: {}", self.pts.len());
-        info!("I'm thread {:?}", thread::current().id());
+        info!("{:?}", thread::current().id());
         let bbox = &self.bbox;
         // let zavg = self.get_average_elevation();
         let cornerz = self.get_corner_elevations();
@@ -179,6 +179,9 @@ fn main() -> io::Result<()> {
         .filter_level(cli.verbose.log_level_filter())
         .init();
 
+    let maxthreads = thread::available_parallelism()?.get();
+    // info!("{:?}", count);
+
     let mut threads = Vec::<std::thread::JoinHandle<()>>::new();
     let mut surfaces: Vec<Surface> = vec![Surface::new(cli.vepsilon)];
     // let mut s = Surface::new(cli.vepsilon);
@@ -223,25 +226,34 @@ fn main() -> io::Result<()> {
                 if s.is_empty() {
                     io::stdout().write_all(&format!("{}\n", &l).as_bytes())?;
                 } else {
-                    let s2 = surfaces.pop().unwrap();
                     // let sa = std::sync::Arc::new(ls);
                     // let s2 = s.clone(); //-- clone to send to the thread... not way to reuse I assume, in Python
                     // this is happening too
+                    // {
+                    // Rebinds the name `foo`. After this statement, `foo` in this scope and
+                    // `foo` in the parent scope are different smart pointers, but they point
+                    // to the same shared value `Foo(1)`.
+                    // let sa2 = sa.clone();
+                    // std::thread::spawn(move || println!("{}", foo.0));
 
-                    {
-                        // Rebinds the name `foo`. After this statement, `foo` in this scope and
-                        // `foo` in the parent scope are different smart pointers, but they point
-                        // to the same shared value `Foo(1)`.
-                        // let sa2 = sa.clone();
-                        // std::thread::spawn(move || println!("{}", foo.0));
-                        let handle = thread::spawn(move || {
-                            let _ = s2.finalise(&l);
-                            info!("===");
-                            // let re = sa2.as_ref().as_ref().unwrap().finalise(&l);
-                            // info!("{:?} {:?}", thread::current().id(), re);
-                        });
-                        threads.push(handle);
+                    while threads.len() > maxthreads {
+                        for (i, t) in threads.iter_mut().enumerate() {
+                            if t.is_finished() {
+                                threads.remove(i);
+                                break;
+                            }
+                        }
                     }
+
+                    let s2 = surfaces.pop().unwrap();
+                    let handle = thread::spawn(move || {
+                        let _ = s2.finalise(&l);
+                        // info!("===");
+                        // let re = sa2.as_ref().as_ref().unwrap().finalise(&l);
+                        // info!("{:?} {:?}", thread::current().id(), re);
+                    });
+                    // handle.join();
+                    threads.push(handle);
 
                     // s.clear();
                     // info!("size of surfaces: {}", surfaces.len());
