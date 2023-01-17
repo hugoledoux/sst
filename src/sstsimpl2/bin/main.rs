@@ -18,7 +18,7 @@ use rand::thread_rng;
 use clap::Parser;
 #[derive(Parser)]
 #[command(name = "sstsimpl2")]
-#[command(about = "streaming startin -- simplify the terrain [sstsimpl]")]
+#[command(about = "streaming startin -- simplify the terrain [parallel version]")]
 #[command(author, version)]
 struct Cli {
     /// vertical epsilon
