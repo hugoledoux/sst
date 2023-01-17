@@ -21,8 +21,11 @@ use clap::Parser;
 #[command(about = "streaming startin -- simplify the terrain [parallel version]")]
 #[command(author, version)]
 struct Cli {
-    /// vertical epsilon
+    /// Vertical epsilon
     vepsilon: f64,
+    /// Number of cores to use
+    #[arg(short, long, default_value_t = 4)]
+    cores: usize,
     #[clap(flatten)]
     verbose: clap_verbosity_flag::Verbosity,
 }
@@ -171,12 +174,12 @@ fn main() -> io::Result<()> {
         .init();
 
     let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(12)
+        .num_threads(cli.cores)
         .build()
         .unwrap();
+    info!("Number of cores/threads used: {}", cli.cores);
 
     let mut surfaces: Vec<Surface> = vec![Surface::new(cli.vepsilon)];
-
     let mut impdigits: usize = usize::MAX;
 
     let stdin = std::io::stdin();
