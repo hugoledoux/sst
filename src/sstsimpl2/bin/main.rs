@@ -45,11 +45,6 @@ impl Surface {
         }
     }
 
-    fn clear(&mut self) {
-        self.pts.clear();
-        self.bbox = vec![f64::MAX, f64::MAX, f64::MIN, f64::MIN];
-    }
-
     fn add_pt(&mut self, p: Vec<f64>) {
         if p[0] < self.bbox[0] {
             self.bbox[0] = p[0]
@@ -125,8 +120,7 @@ impl Surface {
     }
 
     fn finalise(&self, l: &String) -> io::Result<()> {
-        info!("->: {}", self.pts.len());
-        info!("{:?}", thread::current().id());
+        info!("simplify {} points", self.pts.len());
         let bbox = &self.bbox;
         // let zavg = self.get_average_elevation();
         let cornerz = self.get_corner_elevations();
@@ -137,7 +131,6 @@ impl Surface {
         let _ = dt.insert_one_pt(bbox[2] + bufferbbox, bbox[1] - bufferbbox, cornerz[1]);
         let _ = dt.insert_one_pt(bbox[2] + bufferbbox, bbox[3] + bufferbbox, cornerz[2]);
         let _ = dt.insert_one_pt(bbox[0] - bufferbbox, bbox[3] + bufferbbox, cornerz[3]);
-
         //-- shuffle the input points
         let mut ids: Vec<usize> = (0..self.pts.len()).collect();
         ids.shuffle(&mut thread_rng());
