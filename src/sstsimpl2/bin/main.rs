@@ -7,8 +7,7 @@ extern crate log; //info/debug/error
 
 extern crate startin;
 
-use std::thread;
-// use std::thread::JoinHandle;
+extern crate rayon;
 
 use std::io::BufRead;
 use std::io::{self, Write};
@@ -179,12 +178,12 @@ fn main() -> io::Result<()> {
         .filter_level(cli.verbose.log_level_filter())
         .init();
 
-    let maxthreads = thread::available_parallelism()?.get();
-    // info!("{:?}", count);
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(12)
+        .build()
+        .unwrap();
 
-    let mut threads = Vec::<std::thread::JoinHandle<()>>::new();
     let mut surfaces: Vec<Surface> = vec![Surface::new(cli.vepsilon)];
-    // let mut s = Surface::new(cli.vepsilon);
 
     let stdin = std::io::stdin();
     for line in stdin.lock().lines() {
@@ -221,44 +220,15 @@ fn main() -> io::Result<()> {
                 io::stdout().write_all(&format!("{}\n", &l).as_bytes())?;
             }
             'x' => {
-                // let _ = self.finalise(l);
                 //-- finalise a cell
                 if s.is_empty() {
                     io::stdout().write_all(&format!("{}\n", &l).as_bytes())?;
                 } else {
-                    // let sa = std::sync::Arc::new(ls);
-                    // let s2 = s.clone(); //-- clone to send to the thread... not way to reuse I assume, in Python
-                    // this is happening too
-                    // {
-                    // Rebinds the name `foo`. After this statement, `foo` in this scope and
-                    // `foo` in the parent scope are different smart pointers, but they point
-                    // to the same shared value `Foo(1)`.
-                    // let sa2 = sa.clone();
-                    // std::thread::spawn(move || println!("{}", foo.0));
-
-                    while threads.len() > maxthreads {
-                        for (i, t) in threads.iter_mut().enumerate() {
-                            if t.is_finished() {
-                                threads.remove(i);
-                                break;
-                            }
-                        }
-                    }
-
                     let s2 = surfaces.pop().unwrap();
-                    let handle = thread::spawn(move || {
+                    pool.install(move || {
                         let _ = s2.finalise(&l);
-                        // info!("===");
-                        // let re = sa2.as_ref().as_ref().unwrap().finalise(&l);
-                        // info!("{:?} {:?}", thread::current().id(), re);
                     });
-                    // handle.join();
-                    threads.push(handle);
-
-                    // s.clear();
-                    // info!("size of surfaces: {}", surfaces.len());
                     surfaces.push(Surface::new(cli.vepsilon));
-                    // info!("size of surfaces: {}", surfaces.len());
                 }
             }
             _ => {
@@ -267,11 +237,6 @@ fn main() -> io::Result<()> {
             }
         }
     }
-    //-- wait for all the threads to finish
-    for thread in threads {
-        thread.join().unwrap();
-    }
-
     info!("✅");
     Ok(())
 }

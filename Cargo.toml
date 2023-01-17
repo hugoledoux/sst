@@ -20,6 +20,7 @@ clap = { version = "4.0.*", features = ["derive"] }
 clap-verbosity-flag = "2.0.0"
 robust = "0.2"
 startin = "0.6.2"
+rayon = "1.6.1"
 
 [[bin]]
 name = "sstats"
