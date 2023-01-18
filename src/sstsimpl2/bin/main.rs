@@ -8,6 +8,7 @@ extern crate log; //info/debug/error
 extern crate startin;
 
 extern crate rayon;
+use rayon::prelude::*;
 
 use std::io::BufRead;
 use std::io::{self, Write};
@@ -35,16 +36,19 @@ struct Surface {
     pts: Vec<Vec<f64>>,
     max_epsilon: f64,
     bbox: Vec<f64>,
+    cell: String,
 }
 
 impl Surface {
     fn new(epsilon: f64) -> Surface {
         let l = Vec::new();
         let b = vec![f64::MAX, f64::MAX, f64::MIN, f64::MIN];
+        let s = "x 0 0";
         Surface {
             pts: l,
             max_epsilon: epsilon,
             bbox: b,
+            cell: s.to_string(),
         }
     }
 
@@ -122,7 +126,11 @@ impl Surface {
         ]
     }
 
-    fn finalise(&self, impdigits: usize, l: &String) -> io::Result<()> {
+    fn finalise(&self, impdigits: usize) -> io::Result<()> {
+        if self.pts.is_empty() {
+            io::stdout().write_all(&format!("{}\n", &self.cell).as_bytes())?;
+            return Ok(());
+        }
         info!("simplify {} points", self.pts.len());
         let bbox = &self.bbox;
         // let zavg = self.get_average_elevation();
@@ -162,7 +170,7 @@ impl Surface {
             "{:.1?}% kept",
             (dt.number_of_vertices() - 4) as f64 / self.pts.len() as f64 * 100.
         );
-        io::stdout().write_all(&format!("{}\n", &l).as_bytes())?;
+        io::stdout().write_all(&format!("{}\n", &self.cell).as_bytes())?;
         Ok(())
     }
 }
@@ -173,11 +181,11 @@ fn main() -> io::Result<()> {
         .filter_level(cli.verbose.log_level_filter())
         .init();
 
-    let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(cli.cores)
-        .build()
-        .unwrap();
-    info!("Number of cores/threads used: {}", cli.cores);
+    // let pool = rayon::ThreadPoolBuilder::new()
+    //     .num_threads(cli.cores)
+    //     .build()
+    //     .unwrap();
+    // info!("Number of cores/threads used: {}", cli.cores);
 
     let mut surfaces: Vec<Surface> = vec![Surface::new(cli.vepsilon)];
     let mut impdigits: usize = usize::MAX;
@@ -217,6 +225,7 @@ fn main() -> io::Result<()> {
                     impdigits = ls[1].len() - 1 - ls[1].rfind('.').unwrap() as usize;
                     info!("impdigits={:?}", impdigits);
                 }
+                // surfaces.last_mut().unwrap().add_pt(parse_3_f64(&l));
                 s.add_pt(parse_3_f64(&l));
             }
             'w' => {
@@ -225,15 +234,18 @@ fn main() -> io::Result<()> {
             }
             'x' => {
                 //-- finalise a cell
-                if s.is_empty() {
-                    io::stdout().write_all(&format!("{}\n", &l).as_bytes())?;
-                } else {
-                    let s2 = surfaces.pop().unwrap();
-                    pool.install(move || {
-                        let _ = s2.finalise(impdigits, &l);
+                s.cell = l;
+                info!("1. {:?}", surfaces.len());
+                //-- wait till we have 10 in the vec, then use rayon
+                if surfaces.len() >= 16 {
+                    info!("trigger");
+                    surfaces.par_iter().for_each(move |s| {
+                        let _ = s.finalise(impdigits);
                     });
-                    surfaces.push(Surface::new(cli.vepsilon));
+                    surfaces.clear();
                 }
+                surfaces.push(Surface::new(cli.vepsilon));
+                info!("2. {:?}", surfaces.len());
             }
             _ => {
                 error!("Wrongly formatted stream. Abort.");
@@ -241,6 +253,12 @@ fn main() -> io::Result<()> {
             }
         }
     }
+    //-- write the ones not finalised
+    warn!("size surfaces: {}", surfaces.len());
+    surfaces.pop();
+    surfaces.par_iter().for_each(move |s| {
+        let _ = s.finalise(impdigits);
+    });
     info!("✅");
     Ok(())
 }
