@@ -222,6 +222,7 @@ class Processor:
 
             # Ensure total number of processes never exceeds capacity
             while len(self.processes) >= cpu_count() - 2:
+            # while len(self.processes) >= 2:
                 for i in reversed(range(len(self.processes))):
                     if not self.processes[i].is_alive():
                         del self.processes[i]
