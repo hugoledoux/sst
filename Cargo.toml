@@ -49,3 +49,7 @@ path = "src/sstsimpl2/bin/main.rs"
 [[bin]]
 name = "sstval"
 path = "src/sstval/bin/main.rs"
+
+[[bin]]
+name = "sstcount"
+path = "src/sstcount/bin/main.rs"
