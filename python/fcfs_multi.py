@@ -132,7 +132,7 @@ class Triangulation:
             sys.stdout.write("".join(stdout_lines))
             sys.stdout.flush()
 
-        sys.stderr.write(current_process().name + " - FINISHED.\n")
+        # sys.stderr.write(current_process().name + " - FINISHED.\n")
 
 class Processor:
     def __init__(self, dt):
@@ -162,7 +162,8 @@ class Processor:
                 if val:
                     memory_log_file.write(str(val.process_name) + ", " + str(val.timestamp) + ", " + str(val.memory_usage) + "\n")
                 else:
-                    time.sleep(0.5)
+                    # time.sleep(0.5)
+                    pass
 
     def process_line(self, input_line):
         split_line = input_line.rstrip("\n").split(" ")
@@ -198,8 +199,8 @@ class Processor:
             self.triangulation.set_bbox(float(data[0]), float(data[1]), float(data[2]), float(data[3]))
             sys.stdout.write(input_line)
 
-            sys.stderr.write(input_line)
-            sys.stderr.flush()
+            # sys.stderr.write(input_line)
+            # sys.stderr.flush()
 
         elif identifier == "v":
             self.vertices[self.vertex_id] = [float(data[0]), float(data[1]), float(data[2])]
@@ -215,10 +216,10 @@ class Processor:
             #     sys.stdout.write(input_line)
             #     return
 
-            sys.stderr.write("Starting new process to finalize cell: {}, {}. Processing currently running: {}\n".format(data[0], data[1], len(self.processes)))
-            sys.stderr.flush()
+            # sys.stderr.write("Starting new process to finalize cell: {}, {}. Processing currently running: {}\n".format(data[0], data[1], len(self.processes)))
+            # sys.stderr.flush()
 
-            sleep_time = 1
+            # sleep_time = 1
 
             # Ensure total number of processes never exceeds capacity
             while len(self.processes) >= cpu_count() - 2:
@@ -227,7 +228,7 @@ class Processor:
                     if not self.processes[i].is_alive():
                         del self.processes[i]
 
-                time.sleep(sleep_time)
+                # time.sleep(sleep_time)
 
             process = Process(target=self.triangulation.finalize, args=(input_line, int(data[0]), int(data[1]), self.vertices, self.stdout_lock, self.memory_usage_queue,), daemon=True)
             self.vertices = {}
@@ -254,4 +255,4 @@ if __name__ == "__main__":
     for process in processor.processes:
         process.join()
 
-    # sys.stderr.write("duration: " + str(time.time() - start_time) + "\n")
+    sys.stderr.write("duration: " + str(time.time() - start_time) + "\n")

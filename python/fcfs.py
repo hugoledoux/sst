@@ -91,7 +91,6 @@ class Triangulation:
                 del vertices[key]
 
             # Fine loop
-
             for key, vertex in vertices.items():
                 x = vertex[0]
                 y = vertex[1]
@@ -106,23 +105,24 @@ class Triangulation:
                 except OSError:
                     pass
 
-            if triangulation.number_of_vertices() > 4:
-                for i in [1, 2, 3, 4]:
-                    triangulation.remove(i)
+            # if triangulation.number_of_vertices() > 4:
+            #     for i in [1, 2, 3, 4]:
+            #         triangulation.remove(i)
 
-            for vertex in triangulation.points:
-                # Don't print infinite vertex
-                if vertex[0] > 0:
-                    stdout_lines.append("v " + str(vertex[0]) + " " + str(vertex[1]) + " " + str(vertex[2]) + "\n")
+            # for vertex in triangulation.points:
+            #     # Don't print infinite vertex
+            #     if vertex[0] > 0:
+            #         stdout_lines.append("v " + str(vertex[0]) + " " + str(vertex[1]) + " " + str(vertex[2]) + "\n")
 
-        # memory_usage_queue.put(MemoryUsage(current_process().name, round(time.time()), psutil.Process(os.getpid()).memory_info().rss))
+            pts = triangulation.points
+            for i in range(5, len(pts)):
+                v = pts[i]
+                stdout_lines.append("v " + str(v[0]) + " " + str(v[1]) + " " + str(v[2]) + "\n")
 
         stdout_lines.append(input_line)
 
         sys.stdout.write("".join(stdout_lines))
         sys.stdout.flush()
-
-        # sys.stderr.write(current_process().name + " - FINISHED.\n")
 
 
 
@@ -160,8 +160,8 @@ if __name__ == "__main__":
             triangulation.set_bbox(float(data[0]), float(data[1]), float(data[2]), float(data[3]))
             sys.stdout.write(input_line)
 
-            sys.stderr.write(input_line)
-            sys.stderr.flush()
+            # sys.stderr.write(input_line)
+            # sys.stderr.flush()
 
         elif identifier == "v":
             vertices[vertex_id] = [float(data[0]), float(data[1]), float(data[2])]
