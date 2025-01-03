@@ -10,7 +10,7 @@ extern crate log; //info/debug/error
 use std::io::BufRead;
 use std::io::{self, Write};
 
-use clap::App;
+use clap::{App, Arg};
 
 pub enum Outputmode {
     Sma,   //-- streaming mesh ascii
@@ -23,8 +23,14 @@ fn main() -> io::Result<()> {
     let matches = App::new("sstdt")
         .version("0.2")
         .about("streaming startin -- Delaunay triangulation")
-        .arg("--stars...       'output stars instead of .sma'")
-        .arg("--both...        'output both vertices and stars'")
+        .arg(Arg::new("stars")
+            .long("stars")
+            .help("output stars instead of .sma")
+            .takes_value(false))
+        .arg(Arg::new("both")
+            .long("both")
+            .help("output both vertices and stars")
+            .takes_value(false))
         .get_matches();
 
     env_logger::init();

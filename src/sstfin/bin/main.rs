@@ -10,7 +10,7 @@ use std::io::{self, Write};
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
-use clap::App;
+use clap::{App, Arg};
 use num_format::{Locale, ToFormattedString};
 
 extern crate las;
@@ -53,10 +53,23 @@ fn main() {
     let matches = App::new("sstfin")
         .version("0.1")
         .about("streaming startin -- finalisation")
-        .arg("<INPUT>             'The input LAS/LAZ/XYZ file(s) to use.'")
-        .arg("<RESOLUTION>        'The cell resolution (integer, eg '5' for 5mX5m)'")
-        .arg("-g...               'Use only ground in LAS files'")
-        .arg("--sprinkle...       'Value to use (0.001 is default; totalpts * 0.001)'")
+        .arg(Arg::new("INPUT")
+            .help("The input LAS/LAZ/XYZ file(s) to use")
+            .required(true)
+            .index(1))
+        .arg(Arg::new("RESOLUTION")
+            .help("The cell resolution (integer, eg '5' for 5mX5m)")
+            .required(true)
+            .index(2))
+        .arg(Arg::new("g")
+            .short('g')
+            .help("Use only ground in LAS files")
+            .takes_value(false))
+        .arg(Arg::new("sprinkle")
+            .long("sprinkle")
+            .help("Value to use (0.001 is default; totalpts * 0.001)")
+            .takes_value(true)
+            .default_value("0.001"))
         .get_matches();
 
     env_logger::init();
