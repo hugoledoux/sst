@@ -63,7 +63,7 @@ fn main() {
 }
 
 fn input_las(path: &Path) {
-    let reader = las::Reader::from_path(path.clone()).expect("Unable to open reader");
+    let reader = las::Reader::from_path(path).expect("Unable to open reader");
     let totalpts = reader.header().number_of_points();
     let b = reader.header().bounds();
     let bbox = vec![b.min.x, b.min.y, b.max.x, b.max.y];
