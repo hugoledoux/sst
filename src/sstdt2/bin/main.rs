@@ -147,11 +147,26 @@ fn main() -> io::Result<()> {
 
     // dt.print_ds();
 
+    let _re = dt.flush_output();
+
     // info!("Finished reading the stream");
     info!("dt.number_of_vertices() = {}", dt.number_of_vertices());
 
     info!("max # points in DT during process: {}", dt.max_vs);
     info!("max # triangles in DT during process: {}", dt.max_ts);
+
+    info!(
+        "# insertions: {}; # flips22: {} (avg {:.2} per insertion)",
+        dt.n_inserts,
+        dt.n_flips22,
+        dt.n_flips22 as f64 / dt.n_inserts as f64
+    );
+    info!(
+        "# walks: {}; # walk steps: {} (avg {:.2} per walk)",
+        dt.n_walks,
+        dt.n_walksteps,
+        dt.n_walksteps as f64 / dt.n_walks as f64
+    );
 
     info!("✅");
     Ok(())
