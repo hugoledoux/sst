@@ -18,16 +18,19 @@ struct Qtcell {
     pts: Vec<usize>,
     ts: HashMap<usize, (usize, usize, usize)>,
     finalised: bool,
+    walk_hints: Vec<usize>,
 }
 
 impl Qtcell {
     pub fn new() -> Qtcell {
         let p: Vec<usize> = Vec::new();
         let t: HashMap<usize, (usize, usize, usize)> = HashMap::new();
+        let wh: Vec<usize> = Vec::new();
         Qtcell {
             pts: p,
             ts: t,
             finalised: false,
+            walk_hints: wh,
         }
     }
 
@@ -49,6 +52,16 @@ impl Qtcell {
 
     pub fn set_final(&mut self, b: bool) {
         self.finalised = b
+    }
+
+    //-- keep a list of the most recently created triangles of this cell;
+    //-- used to restart the walk when it falls into finalised space
+    //-- (the mechanism prescribed by Isenburg et al. §4.1)
+    pub fn add_walk_hint(&mut self, ti: usize) {
+        if self.walk_hints.len() >= 16 {
+            self.walk_hints.remove(0);
+        }
+        self.walk_hints.push(ti);
     }
 }
 
@@ -232,6 +245,7 @@ pub struct Triangulation {
     vs: Vec<[f64; 3]>,
     vs_no_incident: Vec<usize>, //-- number of incident triangles to each vertex (to know when to finalise)
     vs_active: Vec<bool>,       //-- is the vertex active (ie written once to the stream)
+    vs_dead: Vec<bool>,         //-- is the vertex finalised (dead ids are swept from the qt cells at merges)
     vs_incident_tr: Vec<usize>, //-- link to one incident triangle
     ts: Vec<[usize; 6]>,
     qt: Quadtree,
@@ -243,8 +257,13 @@ pub struct Triangulation {
     freelist_vs: Vec<usize>,
     sma_ids: HashMap<usize, usize>,
     sma_count_vertices: usize,
+    out: io::BufWriter<io::Stdout>,
     pub max_vs: usize,
     pub max_ts: usize,
+    pub n_inserts: u64,
+    pub n_flips22: u64,
+    pub n_walks: u64,
+    pub n_walksteps: u64,
 }
 
 impl Triangulation {
@@ -259,6 +278,8 @@ impl Triangulation {
         thevs_i_tr.push(0);
         let mut thevs_active: Vec<bool> = Vec::new();
         thevs_active.push(false);
+        let mut thevs_dead: Vec<bool> = Vec::new();
+        thevs_dead.push(true); //-- the infinity vertex is never a data point
         let mut thets: Vec<[usize; 6]> = Vec::new();
         let t: [usize; 6] = [0, 0, 0, 0, 0, 0]; //-- add a dummy triangle to simulate missing triangles (null pointers)
         thets.push(t);
@@ -270,6 +291,7 @@ impl Triangulation {
             vs: thevs,
             vs_no_incident: thevs_incident,
             vs_active: thevs_active,
+            vs_dead: thevs_dead,
             vs_incident_tr: thevs_i_tr,
             ts: thets,
             qt: q,
@@ -281,8 +303,15 @@ impl Triangulation {
             freelist_ts: theflt,
             sma_ids: thesma_ids,
             sma_count_vertices: 1,
+            //-- buffered output: one syscall per finalised cell instead of
+            //-- one per line (flushes happen in finalise_qt_leaf/root)
+            out: io::BufWriter::with_capacity(1 << 16, io::stdout()),
             max_vs: 0,
             max_ts: 0,
+            n_inserts: 0,
+            n_flips22: 0,
+            n_walks: 0,
+            n_walksteps: 0,
         }
     }
 
@@ -331,7 +360,9 @@ impl Triangulation {
                 }
             }
             for vi in &self.qt.cells[&q2].pts {
-                nc.add_pt(*vi);
+                if self.vs_dead[*vi] == false {
+                    nc.add_pt(*vi);
+                }
             }
             self.qt.cells.remove(&q2);
         }
@@ -352,6 +383,10 @@ impl Triangulation {
         for ti in &fin_ts {
             let _re = self.finalise_triangle(*ti, &q2);
         }
+        //-- sweep the ids of dead vertices out of the new parent cell
+        let vs_dead = &self.vs_dead;
+        let q = self.qt.cells.get_mut(&q2).unwrap();
+        q.pts.retain(|vi| vs_dead[*vi] == false);
         Ok(())
     }
 
@@ -371,6 +406,9 @@ impl Triangulation {
         let allpts = &self.qt.cells.get(&qtc).unwrap().pts;
         let mut allts: HashMap<usize, (usize, usize, usize)> = HashMap::new();
         for vi in allpts {
+            if self.vs_dead[*vi] == true {
+                continue;
+            }
             let l: Vec<usize> = self.incident_triangles_to_vertex(*vi).unwrap();
             for ti in &l {
                 allts.insert(*ti, (self.ts[*ti][0], self.ts[*ti][1], self.ts[*ti][2]));
@@ -411,37 +449,40 @@ impl Triangulation {
                 break;
             }
         }
+        //-- the output of this finalisation is complete: flush the
+        //-- buffer so a downstream tool can consume it now
+        self.out.flush()?;
+        //-- sweep the ids of dead vertices out of this cell's points
+        //-- (they were only marked as dead); doing this here —and not
+        //-- only at the merge with the siblings— keeps the memory bound
+        //-- tight even for incoherent streams where a cell waits for
+        //-- its siblings until the very end
+        let vs_dead = &self.vs_dead;
+        let q = self.qt.cells.get_mut(&qtc).unwrap();
+        q.pts.retain(|vi| vs_dead[*vi] == false);
         Ok(())
     }
 
     fn activate_vertex(&mut self, vi: usize) -> io::Result<()> {
         self.sma_ids.insert(vi, self.sma_count_vertices);
         self.sma_count_vertices += 1;
-        io::stdout().write_all(
-            &format!(
-                "v {} {} {}\n",
-                &self.vs[vi][0], &self.vs[vi][1], &self.vs[vi][2]
-            )
-            .as_bytes(),
+        write!(
+            self.out,
+            "v {} {} {}\n",
+            &self.vs[vi][0], &self.vs[vi][1], &self.vs[vi][2]
         )?;
         self.vs_active[vi] = true;
         Ok(())
     }
 
     fn finalise_vertex(&mut self, vi: usize, qtc: &Vec<u8>) -> io::Result<()> {
-        io::stdout().write_all(&format!("x {}\n", self.sma_ids[&vi]).as_bytes())?;
+        write!(self.out, "x {}\n", self.sma_ids[&vi])?;
         self.sma_ids.remove(&vi);
-        // self.qt.cells.get_mut(qtc).unwrap().pts.remove(vi);
-        let pos = self
-            .qt
-            .cells
-            .get(qtc)
-            .unwrap()
-            .pts
-            .iter()
-            .position(|&x| x == vi)
-            .unwrap();
-        self.qt.cells.get_mut(qtc).unwrap().pts.remove(pos);
+        //-- the vertex is only *marked* dead here; its id is swept from
+        //-- the qt cell's list of points in one pass when the cell
+        //-- merges with its siblings (or at the root). This keeps the
+       //-- removal O(k) per cell instead of O(k²).
+        self.vs_dead[vi] = true;
         self.freelist_vs.push(vi);
         Ok(())
     }
@@ -456,12 +497,10 @@ impl Triangulation {
             }
         }
         //-- write the triangle to the stream
-        io::stdout().write_all(
-            &format!(
-                "f {} {} {}\n",
-                self.sma_ids[&t0[0]], self.sma_ids[&t0[1]], self.sma_ids[&t0[2]],
-            )
-            .as_bytes(),
+        write!(
+            self.out,
+            "f {} {} {}\n",
+            self.sma_ids[&t0[0]], self.sma_ids[&t0[1]], self.sma_ids[&t0[2]],
         )?;
         //-- add to free list to reuse in the future
         self.freelist_ts.insert(ti);
@@ -486,7 +525,20 @@ impl Triangulation {
         self.qt.cells.get_mut(qtc).unwrap().ts.remove(&ti);
         // println!("qtcell: {} -- {:?}", ti, self.qt.cells[qtc].ts);
         if self.curt == ti {
+            //-- do not throw the walk hint away: re-point it to one of the
+            //-- still-alive neighbours (eg. one straddling the frontier
+            //-- between finalised and unfinalised space)
             self.curt = 0;
+            for i in 3..6 {
+                let n = t0[i];
+                if n != 0
+                    && self.freelist_ts.contains(&n) == false
+                    && self.is_triangle_finite(n) == true
+                {
+                    self.curt = n;
+                    break;
+                }
+            }
         }
         Ok(())
     }
@@ -537,9 +589,17 @@ impl Triangulation {
 
         let allpts = self.qt.cells.get(&q2).unwrap().pts.clone();
         for vi in &allpts {
-            let _re = self.finalise_vertex(*vi, &q2);
+            if self.vs_dead[*vi] == false {
+                let _re = self.finalise_vertex(*vi, &q2);
+            }
         }
+        self.out.flush()?;
         Ok(())
+    }
+
+    //-- make sure everything written is pushed to the stream
+    pub fn flush_output(&mut self) -> io::Result<()> {
+        self.out.flush()
     }
 
     fn insert_one_pt_init_phase(&mut self, x: f64, y: f64, z: f64) -> Result<usize, usize> {
@@ -556,6 +616,7 @@ impl Triangulation {
         self.vs_no_incident.push(0);
         self.vs_incident_tr.push(0);
         self.vs_active.push(false);
+        self.vs_dead.push(false);
         let l = self.vs.len();
         if l >= 4 {
             let a = l - 3;
@@ -586,10 +647,11 @@ impl Triangulation {
             self.vs_no_incident[a] = 3;
             self.vs_no_incident[b] = 3;
             self.vs_no_incident[c] = 3;
-            //-- all 3 vertices point to the new triangle (the first, thus "0")
-            self.vs_incident_tr[a] = 0;
-            self.vs_incident_tr[b] = 0;
-            self.vs_incident_tr[c] = 0;
+            //-- all 3 vertices point to the first real triangle ("1";
+            //-- "0" is the dummy triangle, never a valid hint)
+            self.vs_incident_tr[a] = 1;
+            self.vs_incident_tr[b] = 1;
+            self.vs_incident_tr[c] = 1;
         }
         self.curt = 1;
         // TODO: add those lines
@@ -672,6 +734,7 @@ impl Triangulation {
             self.vs.push([px, py, pz]);
             self.vs_no_incident.push(3); //-- b/c of flip13
             self.vs_active.push(false);
+            self.vs_dead.push(false);
             self.vs_incident_tr.push(0);
         } else {
             // println!("freelist used: {:?}", self.freelist_vs);
@@ -679,11 +742,15 @@ impl Triangulation {
             self.vs[pi] = [px, py, pz];
             self.vs_no_incident[pi] = 3; //-- b/c of flip13
             self.vs_active[pi] = false;
-            self.vs_incident_tr.push(0);
+            self.vs_dead[pi] = false;
+            self.vs_incident_tr[pi] = 0;
         }
 
         //-- flip13()
         let incidents = self.flip13(pi, ti);
+
+        //-- add one of the new triangles as walk hint to the cell
+        self.add_walk_hint_to_cell(pi, incidents);
 
         //-- update_dt()
         let mut mystack: Vec<usize> = Vec::new();
@@ -768,6 +835,7 @@ impl Triangulation {
     }
 
     fn flip13(&mut self, vi: usize, ti: usize) -> (usize, usize, usize) {
+        self.n_inserts += 1;
         let newi0;
         let newi1;
         let mut reuse: bool = false;
@@ -886,7 +954,34 @@ impl Triangulation {
         total
     }
 
-    fn walk(&self, x: &[f64]) -> usize {
+    //-- add one of the triangles incident to the newly inserted point as
+    //-- a restart hint to the quadtree cell containing that point
+    //-- (mechanism of Isenburg et al. §4.1: a walk that falls into
+    //-- finalised space is restarted from triangles known to be near)
+    fn add_walk_hint_to_cell(&mut self, vi: usize, tris: (usize, usize, usize)) {
+        if vi == 0 {
+            return;
+        }
+        //-- prefer a finite triangle as hint (an infinite one would be
+        //-- rejected by the walk anyway)
+        let mut thet: usize = tris.0;
+        if self.is_triangle_finite(thet) == false {
+            thet = tris.1;
+            if self.is_triangle_finite(thet) == false {
+                thet = tris.2;
+            }
+        }
+        let g = self.qt.get_gxgy(self.vs[vi][0], self.vs[vi][1]);
+        let qtc = self.qt.get_qtc_from_gxgy(g.0, g.1);
+        if let Some(c) = self.qt.cells.get_mut(&qtc) {
+            if c.finalised == false {
+                c.add_walk_hint(thet);
+            }
+        }
+    }
+
+    fn walk(&mut self, x: &[f64]) -> usize {
+        self.n_walks += 1;
         //-- 1. try walk from latest
         let tr = self.curt;
         if tr != 0 {
@@ -896,58 +991,83 @@ impl Triangulation {
             }
         }
 
-        //-- 2. try walk from the closest in the same cell
-        // warn!("walk.2");
+        //-- 2. try to restart the walk from the triangles hinted in the
+        //--    cell containing the point, then in its neighbouring cells
+        //--    (cf. Isenburg et al. §4.1: restart from triangles on the
+        //--    quadrant's list, then on neighbouring quadrants' lists)
         let g = self.qt.get_gxgy(x[0], x[1]);
-        // let allpts: Vec<usize> = self.qt.get_cell_pts(g.0, g.1);
         let qtc = self.qt.get_qtc_from_gxgy(g.0, g.1);
-        let allpts = &self.qt.cells.get(&qtc).unwrap().pts;
-        let mut rng = thread_rng();
-        let mut dmin: f64 = std::f64::MAX;
-        let n = (allpts.len() as f64).powf(0.25);
-        let mut v0: usize = 0;
-        if allpts.is_empty() == false {
-            for _i in 0..n as usize {
-                let re: usize = rng.gen_range(0..allpts.len());
-                let dtemp = geom::distance2d_squared(&self.vs[allpts[re]], &x);
-                if dtemp < dmin {
-                    v0 = allpts[re];
-                    dmin = dtemp;
+        let mut cells_to_try: Vec<Vec<u8>> = Vec::new();
+        cells_to_try.push(qtc);
+        for dy in -1..2 as isize {
+            for dx in -1..2 as isize {
+                if dx == 0 && dy == 0 {
+                    continue; //-- own cell is already first in the list
+                }
+                let gx = g.0 as isize + dx;
+                let gy = g.1 as isize + dy;
+                if gx < 0 || gy < 0 {
+                    continue;
+                }
+                let gx = gx as usize;
+                let gy = gy as usize;
+                if gx >= self.qt.griddim || gy >= self.qt.griddim {
+                    continue;
+                }
+                let qtc2 = self.qt.get_qtc_from_gxgy(gx, gy);
+                cells_to_try.push(qtc2);
+            }
+        }
+        let mut hint_candidates: Vec<usize> = Vec::new();
+        for eachqtc in &cells_to_try {
+            if let Some(cell) = self.qt.cells.get(eachqtc) {
+                for each in &cell.walk_hints {
+                    if *each != 0
+                        && self.freelist_ts.contains(each) == false
+                        && self.is_triangle_finite(*each) == true
+                    {
+                        hint_candidates.push(*each);
+                    }
                 }
             }
-            let re = self.walk_safe(x, self.vs_incident_tr[v0]);
+        }
+        for each in &hint_candidates {
+            let re = self.walk_safe(x, *each);
             if re.is_some() {
                 return re.unwrap();
             }
         }
 
-        //-- 2. try walk from a few randomly chosen in the cell
-        // warn!("walk.2");
-        // let g = self.qt.get_gxgy(x[0], x[1]);
-        // let allpts: Vec<usize> = self.qt.get_cell_pts(g.0, g.1);
-        // let mut rng = thread_rng();
-        // let mut dmin: f64 = std::f64::MAX;
-        // let n = (allpts.len() as f64).powf(0.2);
-        // let mut v0: usize = 0;
-        // if allpts.is_empty() == false {
-        //     for _i in 0..n as usize {
-        //         let re: usize = rng.gen_range(0..allpts.len());
-        //         // let dtemp = geom::distance2d_squared(&self.vs[allpts[re]], &x);
-
-        //         let re = self.walk_safe(x, self.vs_incident_tr[allpts[re]]);
-        //         if re.is_some() {
-        //             return re.unwrap();
-        //         }
-        //     }
-        // }
-
-        //-- 3. try from all vertices in the qtcell then
-        warn!("walk.3");
-        for vi in allpts {
-            let t0 = self.vs_incident_tr[*vi];
-            let re = self.walk_safe(x, t0);
-            if re.is_some() {
-                return re.unwrap();
+        //-- 3. try from a few randomly chosen vertices of the cell
+        //--    (bounded: at most 256 attempts, each with a valid hint)
+        let empty: Vec<usize> = Vec::new();
+        let allpts: &Vec<usize> = match self.qt.cells.get(&cells_to_try[0]) {
+            Some(c) => &c.pts,
+            None => &empty,
+        };
+        if allpts.is_empty() == false {
+            warn!("walk.3");
+            let mut rng = thread_rng();
+            let nattempts = allpts.len().min(256);
+            let mut candidates: Vec<usize> = Vec::with_capacity(nattempts);
+            for _i in 0..nattempts {
+                let vi = allpts[rng.gen_range(0..allpts.len())];
+                if self.vs_dead[vi] == true {
+                    continue;
+                }
+                let t0 = self.vs_incident_tr[vi];
+                if t0 != 0
+                    && self.freelist_ts.contains(&t0) == false
+                    && self.is_triangle_finite(t0) == true
+                {
+                    candidates.push(t0);
+                }
+            }
+            for t0 in &candidates {
+                let re = self.walk_safe(x, *t0);
+                if re.is_some() {
+                    return re.unwrap();
+                }
             }
         }
 
@@ -976,8 +1096,13 @@ impl Triangulation {
         return 0;
     }
 
-    fn walk_safe(&self, x: &[f64], mut tr: usize) -> Option<usize> {
+    fn walk_safe(&mut self, x: &[f64], mut tr: usize) -> Option<usize> {
+        if tr == 0 {
+            //-- the dummy triangle: never a valid starting point
+            return None;
+        }
         loop {
+            self.n_walksteps += 1;
             if self.is_triangle_finite(tr) == false {
                 return Some(tr);
             }
@@ -1076,6 +1201,7 @@ impl Triangulation {
     // }
 
     fn flip22(&mut self, t0i: usize, t1i: usize) {
+        self.n_flips22 += 1;
         // println!("flip22");
         // self.print_ds();
         let t0 = self.ts[t0i];

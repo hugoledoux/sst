@@ -322,6 +322,10 @@ fn pass_3_las(
     let cellno: usize = g[0].len();
     let mut gpts: Vec<Vec<Vec<Point>>> = vec![vec![Vec::new(); cellno]; cellno];
 
+    //-- buffered output: one big write per chunk instead of one per line
+    let stdout = io::stdout();
+    let mut w = std::io::BufWriter::with_capacity(1 << 20, stdout.lock());
+
     //-- total number of points
     let mut total: usize = 0;
     for (i, _gx) in g.iter().enumerate() {
@@ -329,26 +333,24 @@ fn pass_3_las(
             total += g[i][j];
         }
     }
-    io::stdout().write_all(b"# sstfin\n")?;
-    io::stdout().write_all(&format!("n {}\n", total).as_bytes())?;
+    w.write_all(b"# sstfin\n")?;
+    write!(w, "n {}\n", total)?;
     //-- number of cells cXc
-    io::stdout().write_all(&format!("c {}\n", cellno).as_bytes())?;
+    write!(w, "c {}\n", cellno)?;
     //-- cellsize
-    io::stdout().write_all(&format!("s {}\n", cellsize).as_bytes())?;
+    write!(w, "s {}\n", cellsize)?;
     //-- bbox
-    io::stdout().write_all(
-        &format!(
-            "b {:.3} {:.3} {:.3} {:.3}\n",
-            bbox[0], bbox[1], bbox[2], bbox[3]
-        )
-        .as_bytes(),
+    write!(
+        w,
+        "b {:.3} {:.3} {:.3} {:.3}\n",
+        bbox[0], bbox[1], bbox[2], bbox[3]
     )?;
 
     //-- cells that have no points
     for (i, _gx) in g.iter().enumerate() {
         for (j, _gy) in g[i].iter().enumerate() {
             if g[i][j] == 0 {
-                io::stdout().write_all(&format!("x {} {}\n", i, j).as_bytes())?;
+                write!(w, "x {} {}\n", i, j)?;
             }
         }
     }
@@ -361,10 +363,9 @@ fn pass_3_las(
 
     //-- chunker: promote these points at the top of the stream
     for (_, pt) in sprinkled {
-        io::stdout().write_all(
-            &format!("w {0:.3$} {1:.3$} {2:.3$}\n", pt.x, pt.y, pt.z, impdigits).as_bytes(),
-        )?;
+        write!(w, "w {0:.3$} {1:.3$} {2:.3$}\n", pt.x, pt.y, pt.z, impdigits)?;
     }
+    w.flush()?;
 
     //-- read again the files
     let mut count: usize = 0;
@@ -383,18 +384,16 @@ fn pass_3_las(
             }
             if g[gxy.0][gxy.1] == 0 {
                 for pt in gpts[gxy.0][gxy.1].iter() {
-                    io::stdout().write_all(
-                        &format!("v {0:.3$} {1:.3$} {2:.3$}\n", pt.x, pt.y, pt.z, impdigits)
-                            .as_bytes(),
-                    )?;
+                    write!(w, "v {0:.3$} {1:.3$} {2:.3$}\n", pt.x, pt.y, pt.z, impdigits)?;
                 }
-                io::stdout().write_all(&format!("x {} {}\n", gxy.0, gxy.1).as_bytes())?;
+                write!(w, "x {} {}\n", gxy.0, gxy.1)?;
                 gpts[gxy.0][gxy.1].clear();
                 gpts[gxy.0][gxy.1].shrink_to_fit();
             }
             count += 1;
         }
     }
+    w.flush()?;
     Ok(())
 }
 
@@ -410,6 +409,10 @@ fn pass_3_xyz(
     let cellno: usize = g[0].len();
     let mut gpts: Vec<Vec<Vec<Point>>> = vec![vec![Vec::new(); cellno]; cellno];
 
+    //-- buffered output: one big write per chunk instead of one per line
+    let stdout = io::stdout();
+    let mut w = std::io::BufWriter::with_capacity(1 << 20, stdout.lock());
+
     //-- total number of points
     let mut total: usize = 0;
     for (i, _gx) in g.iter().enumerate() {
@@ -417,34 +420,33 @@ fn pass_3_xyz(
             total += g[i][j];
         }
     }
-    io::stdout().write_all(b"# sstfin\n")?;
-    io::stdout().write_all(&format!("n {}\n", total).as_bytes())?;
+    w.write_all(b"# sstfin\n")?;
+    write!(w, "n {}\n", total)?;
     //-- number of cells cXc
-    io::stdout().write_all(&format!("c {}\n", cellno).as_bytes())?;
+    write!(w, "c {}\n", cellno)?;
     //-- cellsize
-    io::stdout().write_all(&format!("s {}\n", cellsize).as_bytes())?;
+    write!(w, "s {}\n", cellsize)?;
     //-- bbox
-    io::stdout().write_all(
-        &format!(
-            "b {:.3} {:.3} {:.3} {:.3}\n",
-            bbox[0], bbox[1], bbox[2], bbox[3]
-        )
-        .as_bytes(),
+    write!(
+        w,
+        "b {:.3} {:.3} {:.3} {:.3}\n",
+        bbox[0], bbox[1], bbox[2], bbox[3]
     )?;
 
     //-- cells that have no points
     for (i, _gx) in g.iter().enumerate() {
         for (j, _gy) in g[i].iter().enumerate() {
             if g[i][j] == 0 {
-                io::stdout().write_all(&format!("x {} {}\n", i, j).as_bytes())?;
+                write!(w, "x {} {}\n", i, j)?;
             }
         }
     }
 
     //-- chunker: promote these points at the top of the stream
     for (_, pt) in sprinkled {
-        io::stdout().write_all(&format!("w {} {} {}\n", pt.x, pt.y, pt.z).as_bytes())?;
+        write!(w, "w {} {} {}\n", pt.x, pt.y, pt.z)?;
     }
+    w.flush()?;
 
     //-- read again the files
     //-- read again the files
@@ -466,16 +468,16 @@ fn pass_3_xyz(
             }
             if g[gxy.0][gxy.1] == 0 {
                 for pt in gpts[gxy.0][gxy.1].iter() {
-                    io::stdout()
-                        .write_all(&format!("v {} {} {}\n", pt.x, pt.y, pt.z).as_bytes())?;
+                    write!(w, "v {} {} {}\n", pt.x, pt.y, pt.z)?;
                 }
-                io::stdout().write_all(&format!("x {} {}\n", gxy.0, gxy.1).as_bytes())?;
+                write!(w, "x {} {}\n", gxy.0, gxy.1)?;
                 gpts[gxy.0][gxy.1].clear();
                 gpts[gxy.0][gxy.1].shrink_to_fit();
             }
             count += 1;
         }
     }
+    w.flush()?;
     Ok(())
 }
 
