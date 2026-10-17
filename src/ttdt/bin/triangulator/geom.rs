@@ -1,0 +1,233 @@
+//! # geom
+//!
+//! Geometric predicates functions are declared here.
+//! Notice that [Shewchuk's predicates](https://www.cs.cmu.edu/~quake/robust.html)
+//! are used (activated by default by startin), but also possible to rely on floating-point
+//! arithmetic (not recommended).
+
+extern crate robust;
+
+pub fn det3x3t(a: &[f64], b: &[f64], c: &[f64]) -> f64 {
+    ((a[0] - c[0]) * (b[1] - c[1])) - ((a[1] - c[1]) * (b[0] - c[0]))
+}
+
+pub fn area_triangle(a: &[f64], b: &[f64], c: &[f64]) -> f64 {
+    det3x3t(a, b, c) / 2.0
+}
+
+pub fn circle_centre(a: &[f64], b: &[f64], c: &[f64]) -> Vec<f64> {
+    //-- nicked from http://www.ambrsoft.com/trigocalc/circle3d.htm
+    let val_a = det3x3t(&[a[0], a[1], 1.0], &[b[0], b[1], 1.0], &[c[0], c[1], 1.0]);
+    let val_b = det3x3t(
+        &[a[0] * a[0] + a[1] * a[1], a[1], 1.0],
+        &[b[0] * b[0] + b[1] * b[1], b[1], 1.0],
+        &[c[0] * c[0] + c[1] * c[1], c[1], 1.0],
+    );
+    let val_c = det3x3t(
+        &[a[0] * a[0] + a[1] * a[1], a[0], 1.0],
+        &[b[0] * b[0] + b[1] * b[1], b[0], 1.0],
+        &[c[0] * c[0] + c[1] * c[1], c[0], 1.0],
+    );
+    let x = val_b / (2.0 * val_a);
+    let y = -val_c / (2.0 * val_a);
+    vec![x, y, 0.0]
+}
+
+pub fn distance2d_squared(a: &[f64], b: &[f64]) -> f64 {
+    (b[0] - a[0]) * (b[0] - a[0]) + (b[1] - a[1]) * (b[1] - a[1])
+}
+
+pub fn distance2d(a: &[f64], b: &[f64]) -> f64 {
+    let d2 = (b[0] - a[0]) * (b[0] - a[0]) + (b[1] - a[1]) * (b[1] - a[1]);
+    d2.sqrt()
+}
+
+pub fn orient2d(a: &[f64], b: &[f64], c: &[f64], robust_predicates: bool) -> i8 {
+    //-- CCW    = +1
+    //-- CW     = -1
+    //-- colinear = 0
+    if robust_predicates == true {
+        return orient2d_robust(&a, &b, &c);
+    } else {
+        return orient2d_fast(&a, &b, &c);
+    }
+}
+
+pub fn orient2d_robust(a: &[f64], b: &[f64], c: &[f64]) -> i8 {
+    //-- CCW    = +1
+    //-- CW     = -1
+    //-- colinear = 0
+    let re = robust::orient2d(
+        robust::Coord { x: a[0], y: a[1] },
+        robust::Coord { x: b[0], y: b[1] },
+        robust::Coord { x: c[0], y: c[1] },
+    );
+    if re == 0.0_f64 {
+        return 0;
+    } else if re.is_sign_positive() {
+        return 1;
+    } else {
+        return -1;
+    }
+}
+
+pub fn orient2d_fast(a: &[f64], b: &[f64], c: &[f64]) -> i8 {
+    //-- CCW    = +1
+    //-- CW     = -1
+    //-- colinear = 0
+    let re: f64 = ((a[0] - c[0]) * (b[1] - c[1])) - ((a[1] - c[1]) * (b[0] - c[0]));
+    if re.abs() < 1e-12 {
+        return 0;
+    } else if re > 0.0 {
+        return 1;
+    } else {
+        return -1;
+    }
+}
+
+pub fn incircle(a: &[f64], b: &[f64], c: &[f64], p: &[f64], robust_predicates: bool) -> i8 {
+    //-- p is INSIDE   == +1
+    //-- p is OUTSIDE  == -1
+    //-- p is ONCIRCLE == 0
+    if robust_predicates == true {
+        return incircle_robust(&a, &b, &c, &p);
+    } else {
+        return incircle_fast(&a, &b, &c, &p);
+    }
+}
+
+pub fn intriangle(a: &[f64], b: &[f64], c: &[f64], p: &[f64], robust_predicates: bool) -> i8 {
+    //-- p is INSIDE   == +1
+    //-- p is OUTSIDE  == -1
+    //-- p is ON == 0
+    //-- (abc is CCW oriented)
+    if robust_predicates == true {
+        return intriangle_robust(&a, &b, &c, &p);
+    } else {
+        return intriangle_fast(&a, &b, &c, &p);
+    }
+}
+
+pub fn intriangle_robust(a: &[f64], b: &[f64], c: &[f64], p: &[f64]) -> i8 {
+    //-- p is INSIDE   == +1
+    //-- p is OUTSIDE  == -1
+    //-- p is ON == 0
+    //-- (abc is CCW oriented)
+    if (orient2d_robust(a, b, p) >= 0)
+        && (orient2d_robust(b, c, p) >= 0)
+        && (orient2d_robust(c, a, p) >= 0)
+    {
+        1
+    } else {
+        -1
+    }
+}
+
+pub fn intriangle_fast(a: &[f64], b: &[f64], c: &[f64], p: &[f64]) -> i8 {
+    //-- p is INSIDE   == +1
+    //-- p is OUTSIDE  == -1
+    //-- p is ON == 0
+    //-- (abc is CCW oriented)
+    if (orient2d_fast(a, b, p) >= 0)
+        && (orient2d_fast(b, c, p) >= 0)
+        && (orient2d_fast(c, a, p) >= 0)
+    {
+        1
+    } else {
+        -1
+    }
+}
+
+pub fn incircle_robust(a: &[f64], b: &[f64], c: &[f64], p: &[f64]) -> i8 {
+    //-- p is INSIDE   == +1
+    //-- p is OUTSIDE  == -1
+    //-- p is ONCIRCLE == 0
+    let re = robust::incircle(
+        robust::Coord { x: a[0], y: a[1] },
+        robust::Coord { x: b[0], y: b[1] },
+        robust::Coord { x: c[0], y: c[1] },
+        robust::Coord { x: p[0], y: p[1] },
+    );
+    if re == 0.0_f64 {
+        return 0;
+    } else if re.is_sign_positive() {
+        return 1;
+    } else {
+        return -1;
+    }
+}
+pub fn incircle_fast(a: &[f64], b: &[f64], c: &[f64], p: &[f64]) -> i8 {
+    //-- p is INSIDE   == +1
+    //-- p is OUTSIDE  == -1
+    //-- p is ONCIRCLE == 0
+    let at = (
+        a[0] - p[0],
+        a[1] - p[1],
+        (a[0] * a[0] + a[1] * a[1]) - (p[0] * p[0] + p[1] * p[1]),
+    );
+    let bt = (
+        b[0] - p[0],
+        b[1] - p[1],
+        (b[0] * b[0] + b[1] * b[1]) - (p[0] * p[0] + p[1] * p[1]),
+    );
+    let ct = (
+        c[0] - p[0],
+        c[1] - p[1],
+        (c[0] * c[0] + c[1] * c[1]) - (p[0] * p[0] + p[1] * p[1]),
+    );
+    let i = at.0 * (bt.1 * ct.2 - bt.2 * ct.1);
+    let j = at.1 * (bt.0 * ct.2 - bt.2 * ct.0);
+    let k = at.2 * (bt.0 * ct.1 - bt.1 * ct.0);
+    let re = i - j + k;
+    // println!("INCIRCLE TEST: {}", re);
+    if re.abs() < 1e-12 {
+        return 0;
+    } else if re > 0.0 {
+        return 1;
+    } else {
+        return -1;
+    }
+}
+
+pub fn circumcircle_encroach_bbox(a: &[f64], b: &[f64], c: &[f64], bbox: &[f64]) -> bool {
+    //-- true  -> circumcircle of triangle encoarches on the bbox
+    //-- false -> circumcircle of triangle does not encoarches on the bbox
+    let cc = circle_centre(a, b, c);
+    // println!("bbox={:?}", bbox);
+    // println!("cc={:?}", c);
+    let radius: f64 = distance2d(&cc, a);
+    let mut xaxis: f64 = cc[0] - bbox[0];
+    if (bbox[2] - cc[0]) < xaxis {
+        xaxis = bbox[2] - cc[0];
+    }
+    //-- the cc is outside the bbox
+    if xaxis < 0.0 {
+        return true;
+    }
+    let mut yaxis: f64 = cc[1] - bbox[1];
+    if (bbox[3] - cc[1]) < yaxis {
+        yaxis = bbox[3] - cc[1];
+    }
+    //-- the cc is outside the bbox
+    if yaxis < 0.0 {
+        return true;
+    }
+    let mut mind: f64 = xaxis;
+    if yaxis < xaxis {
+        mind = yaxis;
+    }
+    // println!("d={}", d);
+    // println!("radius={}", radius);
+    return if radius < mind { false } else { true };
+}
+
+/// |XXXXXXXXXXX
+/// |          X
+/// |          X
+/// |          X
+/// |          X
+/// |          X
+/// +-----------
+pub fn point_in_box(p: &[f64], bbox: &[f64]) -> bool {
+    p[0] >= bbox[0] && p[0] < bbox[2] && p[1] >= bbox[1] && p[1] < bbox[3]
+}
