@@ -13,6 +13,11 @@ use std::collections::HashSet;
 
 use rand::{thread_rng, Rng};
 
+//-- number of triangles kept in the "most recently created" ring buffer;
+//-- the walk's brute-force fallback scans these first, since the triangle
+//-- containing a query point is almost always a recent one (Isenburg et al. §4.1)
+const RECENT_TS_CAP: usize = 4096;
+
 //----------------------
 struct Qtcell {
     pts: Vec<usize>,
@@ -255,6 +260,8 @@ pub struct Triangulation {
     robust_predicates: bool,
     freelist_ts: HashSet<usize>,
     freelist_vs: Vec<usize>,
+    recent_ts: Vec<usize>,   //-- ring of the most recently created triangles
+    recent_ts_cursor: usize, //-- position in the ring to write the next id
     sma_ids: HashMap<usize, usize>,
     sma_count_vertices: usize,
     out: io::BufWriter<io::Stdout>,
@@ -286,6 +293,7 @@ impl Triangulation {
         let q = Quadtree::new();
         let theflt: HashSet<usize> = HashSet::new();
         let theflv: Vec<usize> = Vec::new();
+        let therecent: Vec<usize> = Vec::with_capacity(RECENT_TS_CAP);
         let thesma_ids: HashMap<usize, usize> = HashMap::new();
         Triangulation {
             vs: thevs,
@@ -301,6 +309,8 @@ impl Triangulation {
             robust_predicates: true,
             freelist_vs: theflv,
             freelist_ts: theflt,
+            recent_ts: therecent,
+            recent_ts_cursor: 0,
             sma_ids: thesma_ids,
             sma_count_vertices: 1,
             //-- buffered output: one syscall per finalised cell instead of
@@ -834,6 +844,17 @@ impl Triangulation {
         Ok(pi)
     }
 
+    //-- remember a (re)created triangle in the "most recently created"
+    //-- ring, used by the brute-force walk fallback
+    fn add_recent_triangle(&mut self, ti: usize) {
+        if self.recent_ts.len() < RECENT_TS_CAP {
+            self.recent_ts.push(ti);
+        } else {
+            self.recent_ts[self.recent_ts_cursor] = ti;
+        }
+        self.recent_ts_cursor = (self.recent_ts_cursor + 1) % RECENT_TS_CAP;
+    }
+
     fn flip13(&mut self, vi: usize, ti: usize) -> (usize, usize, usize) {
         self.n_inserts += 1;
         let newi0;
@@ -901,6 +922,10 @@ impl Triangulation {
             self.ts[newi0] = t1;
             self.ts[newi1] = t2;
         }
+        //-- remember the 3 new triangles for the brute-force walk fallback
+        self.add_recent_triangle(ti);
+        self.add_recent_triangle(newi0);
+        self.add_recent_triangle(newi1);
         (ti, newi0, newi1)
     }
 
@@ -1041,9 +1066,9 @@ impl Triangulation {
         //-- 3. try from a few randomly chosen vertices of the cell
         //--    (bounded: at most 256 attempts, each with a valid hint)
         let empty: Vec<usize> = Vec::new();
-        let allpts: &Vec<usize> = match self.qt.cells.get(&cells_to_try[0]) {
-            Some(c) => &c.pts,
-            None => &empty,
+        let allpts: Vec<usize> = match self.qt.cells.get(&cells_to_try[0]) {
+            Some(c) => c.pts.clone(),
+            None => empty,
         };
         if allpts.is_empty() == false {
             warn!("walk.3");
@@ -1067,6 +1092,36 @@ impl Triangulation {
                 let re = self.walk_safe(x, *t0);
                 if re.is_some() {
                     return re.unwrap();
+                }
+            }
+        }
+
+        //-- 3.5. the walk cannot reach the containing triangle (there is
+        //--      finalised space in between), but for a query in an
+        //--      unfinalised cell it is incident to one of that cell's
+        //--      vertices: search the stars of the cell's points directly
+        if allpts.is_empty() == false {
+            for vi in &allpts {
+                if self.vs_dead[*vi] == true {
+                    continue;
+                }
+                let l = self.incident_triangles_to_vertex(*vi).unwrap();
+                for ti in &l {
+                    if self.freelist_ts.contains(ti) == false
+                        && self.is_triangle_finite(*ti) == true
+                    {
+                        let t = self.ts[*ti];
+                        if geom::intriangle(
+                            &self.vs[t[0]],
+                            &self.vs[t[1]],
+                            &self.vs[t[2]],
+                            &x,
+                            self.robust_predicates,
+                        ) == 1
+                        {
+                            return *ti;
+                        }
+                    }
                 }
             }
         }
@@ -1167,6 +1222,28 @@ impl Triangulation {
 
     fn walk_bruteforce_triangles(&self, x: &[f64]) -> Option<usize> {
         // warn!("walk_bruteforce_triangles()");
+        //-- the triangle containing x is almost always one of the most
+        //-- recently created ones: scan the ring first (newest first)
+        let nring = self.recent_ts.len();
+        let mut idx = self.recent_ts_cursor;
+        for _i in 0..nring {
+            idx = (idx + RECENT_TS_CAP - 1) % RECENT_TS_CAP;
+            let ti = self.recent_ts[idx];
+            if self.freelist_ts.contains(&ti) == false && self.is_triangle_finite(ti) == true {
+                let t = self.ts[ti];
+                if geom::intriangle(
+                    &self.vs[t[0]],
+                    &self.vs[t[1]],
+                    &self.vs[t[2]],
+                    &x,
+                    self.robust_predicates,
+                ) == 1
+                {
+                    return Some(ti);
+                }
+            }
+        }
+        //-- not found among the recent ones: full sweep
         for (id, t) in self.ts.iter().enumerate() {
             if self.freelist_ts.contains(&id) == false && self.is_triangle_finite(id) == true {
                 if geom::intriangle(
@@ -1260,6 +1337,9 @@ impl Triangulation {
         if let Some(x) = self.ts.get_mut(t1i) {
             (*x) = nt1;
         }
+        //-- remember the 2 recreated triangles for the brute-force walk fallback
+        self.add_recent_triangle(t0i);
+        self.add_recent_triangle(t1i);
     }
 
     pub fn print_ds(&self) {
