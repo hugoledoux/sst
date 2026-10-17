@@ -11,7 +11,8 @@ use std::io::BufRead;
 use std::io::{self, Write};
 
 use rand::seq::SliceRandom;
-use rand::thread_rng;
+
+use startin::interpolation;
 
 use clap::Parser;
 #[derive(Parser)]
@@ -168,11 +169,14 @@ impl Surface {
 
         //-- shuffle the input points
         let mut ids: Vec<usize> = (0..self.pts.len()).collect();
-        ids.shuffle(&mut thread_rng());
+        ids.shuffle(&mut rand::rng());
         for i in ids {
             let p = &self.pts[i];
             if self.close_to_bbox(&p, 0.02) == false {
-                let z2 = dt.interpolate_tin_linear(p[0], p[1]).unwrap();
+                let locs = vec![[p[0], p[1]]];
+                let mut re =
+                    interpolation::interpolate(&interpolation::TIN {}, &mut dt, &locs);
+                let z2 = re.remove(0).unwrap();
                 let e = (p[2] - z2).abs();
                 if e > self.max_epsilon {
                     let _ = dt.insert_one_pt(p[0], p[1], p[2]);

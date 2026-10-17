@@ -5,13 +5,13 @@ use std::fs::File;
 use std::io::Write;
 use std::io::{self};
 
-use geojson::{Feature, FeatureCollection, Geometry, Value};
+use geojson::{Feature, FeatureCollection, Geometry, GeometryValue, Position};
 use serde_json::{to_value, Map};
 
 use hashbrown::HashMap;
 use std::collections::HashSet;
 
-use rand::{thread_rng, Rng};
+use rand::RngExt;
 
 //-- number of triangles kept in the "most recently created" ring buffer;
 //-- the walk's brute-force fallback scans these first, since the triangle
@@ -1072,11 +1072,11 @@ impl Triangulation {
         };
         if allpts.is_empty() == false {
             warn!("walk.3");
-            let mut rng = thread_rng();
+            let mut rng = rand::rng();
             let nattempts = allpts.len().min(256);
             let mut candidates: Vec<usize> = Vec::with_capacity(nattempts);
             for _i in 0..nattempts {
-                let vi = allpts[rng.gen_range(0..allpts.len())];
+                let vi = allpts[rng.random_range(0..allpts.len())];
                 if self.vs_dead[vi] == true {
                     continue;
                 }
@@ -1396,7 +1396,11 @@ impl Triangulation {
             let n = self.qt.cells[key].number_pts();
             attributes.insert(String::from("no_pts"), to_value(n).unwrap());
             attributes.insert(String::from("qtc"), to_value(key).unwrap());
-            let gtr = Geometry::new(Value::Polygon(l));
+            let coords: Vec<Vec<Position>> = l
+                .into_iter()
+                .map(|ring| ring.into_iter().map(Position::from).collect())
+                .collect();
+            let gtr = Geometry::new(GeometryValue::Polygon { coordinates: coords });
             let f = Feature {
                 bbox: None,
                 geometry: Some(gtr),
@@ -1424,7 +1428,9 @@ impl Triangulation {
             if i == 0 {
                 continue;
             }
-            let pt = Geometry::new(Value::Point(vec![v[0], v[1]]));
+            let pt = Geometry::new(GeometryValue::Point {
+                coordinates: Position::from(vec![v[0], v[1]]),
+            });
             let mut attributes = Map::new();
             attributes.insert(String::from("id"), to_value(i.to_string()).unwrap());
             attributes.insert(
@@ -1457,7 +1463,11 @@ impl Triangulation {
             l[0][2].push(self.vs[t[2]][1]);
             l[0][3].push(self.vs[t[0]][0]);
             l[0][3].push(self.vs[t[0]][1]);
-            let gtr = Geometry::new(Value::Polygon(l));
+            let coords: Vec<Vec<Position>> = l
+                .into_iter()
+                .map(|ring| ring.into_iter().map(Position::from).collect())
+                .collect();
+            let gtr = Geometry::new(GeometryValue::Polygon { coordinates: coords });
             let mut attributes = Map::new();
             attributes.insert(String::from("tid"), to_value(i.to_string()).unwrap());
             let f = Feature {

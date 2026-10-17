@@ -1,7 +1,7 @@
 //-- ttfin
 
 use hashbrown::HashMap;
-use rand::{thread_rng, Rng};
+use rand::RngExt;
 
 use std::fmt;
 use std::fs::File;
@@ -14,7 +14,8 @@ use num_format::{Locale, ToFormattedString};
 
 extern crate las;
 
-use las::Read;
+/// number of points decoded per chunk when streaming a LAS/LAZ file
+const CHUNK_PTS: u64 = 1_000_000;
 
 #[macro_use]
 extern crate log; //info/debug/error
@@ -106,11 +107,11 @@ fn main() {
     info!("First pass 🏁");
 
     //-- sprinkler
-    let mut rng = thread_rng();
+    let mut rng = rand::rng();
     let mut sprinkled: HashMap<usize, Point> = HashMap::new();
     let nc: usize = (totalpts as f64 * sprinkle_param) as usize; //-- TODO: what is a good value?
     for _i in 0..nc {
-        sprinkled.insert(rng.gen_range(0..totalpts), Point::new());
+        sprinkled.insert(rng.random_range(0..totalpts), Point::new());
     }
     info!("Sprinkled points: {}", sprinkled.len());
 
@@ -174,20 +175,31 @@ fn pass_2(
     let mut count: usize = 0;
     for path in paths {
         let mut reader = las::Reader::from_path(path).expect("Unable to open reader");
-        for each in reader.points() {
-            let p = each.unwrap();
-            let gxy: (usize, usize) = get_gx_gy(p.x, p.y, bbox[0], bbox[1], cellsize);
-            g[gxy.0][gxy.1] += 1;
-            //-- chunking
-            if sprinkled.contains_key(&count) == true {
-                let pc = sprinkled.entry(count).or_insert(Point::new());
-                *pc = Point {
-                    x: p.x,
-                    y: p.y,
-                    z: p.z,
-                };
+        let mut points = las::PointDataBuilder::new()
+            .for_header(reader.header())
+            .build();
+        loop {
+            let n = reader
+                .fill_points(CHUNK_PTS, &mut points)
+                .expect("Unable to read points");
+            if n == 0 {
+                break;
             }
-            count += 1;
+            for each in points.points() {
+                let p = each.unwrap();
+                let gxy: (usize, usize) = get_gx_gy(p.x, p.y, bbox[0], bbox[1], cellsize);
+                g[gxy.0][gxy.1] += 1;
+                //-- chunking
+                if sprinkled.contains_key(&count) == true {
+                    let pc = sprinkled.entry(count).or_insert(Point::new());
+                    *pc = Point {
+                        x: p.x,
+                        y: p.y,
+                        z: p.z,
+                    };
+                }
+                count += 1;
+            }
         }
     }
     g
@@ -256,30 +268,41 @@ fn pass_3(
     let mut count: usize = 0;
     for path in paths {
         let mut reader = las::Reader::from_path(path).expect("Unable to open reader");
-        for each in reader.points() {
-            let p = each.unwrap();
-            let gxy: (usize, usize) = get_gx_gy(p.x, p.y, bbox[0], bbox[1], cellsize);
-            g[gxy.0][gxy.1] -= 1;
-            if !sprinkled.contains_key(&count) {
-                gpts[gxy.0][gxy.1].push(Point {
-                    x: p.x,
-                    y: p.y,
-                    z: p.z,
-                });
+        let mut points = las::PointDataBuilder::new()
+            .for_header(reader.header())
+            .build();
+        loop {
+            let n = reader
+                .fill_points(CHUNK_PTS, &mut points)
+                .expect("Unable to read points");
+            if n == 0 {
+                break;
             }
-            if g[gxy.0][gxy.1] == 0 {
-                for pt in gpts[gxy.0][gxy.1].iter() {
-                    write!(
-                        w,
-                        "v {0:.3$} {1:.3$} {2:.3$}\n",
-                        pt.x, pt.y, pt.z, impdigits
-                    )?;
+            for each in points.points() {
+                let p = each.unwrap();
+                let gxy: (usize, usize) = get_gx_gy(p.x, p.y, bbox[0], bbox[1], cellsize);
+                g[gxy.0][gxy.1] -= 1;
+                if !sprinkled.contains_key(&count) {
+                    gpts[gxy.0][gxy.1].push(Point {
+                        x: p.x,
+                        y: p.y,
+                        z: p.z,
+                    });
                 }
-                write!(w, "x {} {}\n", gxy.0, gxy.1)?;
-                gpts[gxy.0][gxy.1].clear();
-                gpts[gxy.0][gxy.1].shrink_to_fit();
+                if g[gxy.0][gxy.1] == 0 {
+                    for pt in gpts[gxy.0][gxy.1].iter() {
+                        write!(
+                            w,
+                            "v {0:.3$} {1:.3$} {2:.3$}\n",
+                            pt.x, pt.y, pt.z, impdigits
+                        )?;
+                    }
+                    write!(w, "x {} {}\n", gxy.0, gxy.1)?;
+                    gpts[gxy.0][gxy.1].clear();
+                    gpts[gxy.0][gxy.1].shrink_to_fit();
+                }
+                count += 1;
             }
-            count += 1;
         }
     }
     w.flush()?;
