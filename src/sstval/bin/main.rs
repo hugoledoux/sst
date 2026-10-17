@@ -14,10 +14,16 @@ use clap::Parser;
 #[command(name = "sstval")]
 #[command(about = "streaming startin -- validate the sma file [sstval]")]
 #[command(author, version)]
-struct Cli {}
+struct Cli {
+    #[clap(flatten)]
+    verbose: clap_verbosity_flag::Verbosity,
+}
 
 fn main() -> io::Result<()> {
-    let _cli = Cli::parse();
+    let cli = Cli::parse();
+    env_logger::Builder::new()
+        .filter_level(cli.verbose.log_level_filter())
+        .init();
 
     let mut total_vs: usize = 0;
     let mut total_ts: usize = 0;
