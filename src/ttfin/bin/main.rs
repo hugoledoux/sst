@@ -1,4 +1,4 @@
-//-- sstfin
+//-- ttfin
 
 use hashbrown::HashMap;
 use rand::{thread_rng, Rng};
@@ -21,8 +21,8 @@ extern crate log; //info/debug/error
 
 use clap::Parser;
 #[derive(Parser)]
-#[command(name = "sstfin")]
-#[command(about = "streaming startin -- finalisation [sstfin]")]
+#[command(name = "ttfin")]
+#[command(about = "tintin -- finalisation [ttfin]")]
 #[command(author, version)]
 struct Cli {
     /// The input LAS/LAZ/XYZ file(s) to use
@@ -214,7 +214,7 @@ fn pass_3(
             total += g[i][j];
         }
     }
-    w.write_all(b"# sstfin\n")?;
+    w.write_all(b"# ttfin\n")?;
     write!(w, "n {}\n", total)?;
     //-- number of cells cXc
     write!(w, "c {}\n", cellno)?;

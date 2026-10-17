@@ -1,4 +1,4 @@
-//-- sstsimpl
+//-- ttsimpl
 
 #[allow(dead_code)]
 #[allow(unused_variables)]
@@ -15,8 +15,8 @@ use rand::thread_rng;
 
 use clap::Parser;
 #[derive(Parser)]
-#[command(name = "sstsimpl")]
-#[command(about = "streaming startin -- simplify the terrain [sstsimpl]")]
+#[command(name = "ttsimpl")]
+#[command(about = "tintin -- simplify the terrain [ttsimpl]")]
 #[command(author, version)]
 struct Cli {
     /// vertical epsilon

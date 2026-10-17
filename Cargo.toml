@@ -1,8 +1,8 @@
 [package]
 name = "sst"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["Hugo Ledoux <h.ledoux@tudelft.nl>"]
-edition = "2018"
+edition = "2021"
 
 # [dependencies.startin]
 # path = "../startin/"
@@ -23,29 +23,21 @@ startin = "0.6.2"
 rayon = "1.6.1"
 
 [[bin]]
-name = "sstats"
-path = "src/sstats/bin/main.rs"
+name = "ttfin"
+path = "src/ttfin/bin/main.rs"
 
 [[bin]]
-name = "sstfin"
-path = "src/sstfin/bin/main.rs"
+name = "ttdt"
+path = "src/ttdt/bin/main.rs"
 
 [[bin]]
-name = "sstdt"
-path = "src/sstdt/bin/main.rs"
+name = "ttstats"
+path = "src/ttstats/bin/main.rs"
 
 [[bin]]
-name = "sstdt2"
-path = "src/sstdt2/bin/main.rs"
+name = "ttsimpl"
+path = "src/ttsimpl/bin/main.rs"
 
 [[bin]]
-name = "sstsimpl"
-path = "src/sstsimpl/bin/main.rs"
-
-[[bin]]
-name = "sstsimpl2"
-path = "src/sstsimpl2/bin/main.rs"
-
-[[bin]]
-name = "sstval"
-path = "src/sstval/bin/main.rs"
+name = "ttval"
+path = "src/ttval/bin/main.rs"

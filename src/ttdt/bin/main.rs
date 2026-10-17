@@ -1,4 +1,4 @@
-//-- sstdt2
+//-- ttdt
 
 #[allow(dead_code)]
 #[allow(unused_variables)]
@@ -7,23 +7,17 @@ mod triangulator;
 #[macro_use]
 extern crate log; //info/debug/error
 
-// use std::fs::File;
-// use std::io::BufReader;
 use std::io::BufRead;
 use std::io::{self, Write};
 
 use clap::Parser;
 #[derive(Parser)]
-#[command(name = "sstdt2")]
-#[command(about = "streaming startin -- Delaunay triangulation [sstdt2]")]
+#[command(name = "ttdt")]
+#[command(about = "tintin -- Delaunay triangulator [ttdt]")]
 #[command(author, version)]
 struct Cli {
     #[clap(flatten)]
     verbose: clap_verbosity_flag::Verbosity,
-    // /// output stars instead of .sma
-    // stars: bool,
-    // /// output both vertices and stars
-    // both: bool,
 }
 
 fn main() -> io::Result<()> {
@@ -102,34 +96,11 @@ fn main() -> io::Result<()> {
                 // count += 1;
                 let v = parse_3_f64(&l);
                 let _re = dt.insert_one_pt_with_grid(v.0, v.1, v.2);
-                // if v.0 > 195.0 && v.0 < 196.0 && v.1 > 2.0 && v.1 < 3.0 {
-                //     //     // println!("that one");
-                //     let fout = format!("/Users/hugo/temp/sstout/tmp.geojson");
-                //     let _re = dt.write_geojson_triangles(fout.to_string());
-                //     //     dt.print_ds();
-                // }
             }
             'x' => {
                 //-- finalise a cell
-                // println!("=>{}", l);
                 let re = parse_2_usize(&l);
-                // let gx = 1;
-                // let gy = 0;
-
-                // if (re.0 == gx) && (re.1 == gy) {
-                //     let fout = format!("/Users/hugo/temp/sstout/c-{}-{}-b.geojson", re.0, re.1);
-                //     let _re = dt.write_geojson_triangles(fout.to_string());
-                // }
-                // info!("Writing GeoJSON file to disk: /Users/hugo/temp/sstout/z.grid.geojson");
-                // let _re =
-                //     dt.write_geojson_grid("/Users/hugo/temp/sstout/z.grid.geojson".to_string());
-
                 let _re = dt.finalise_qt_leaf(re.0, re.1);
-
-                // if (re.0 == gx) && (re.1 == gy) {
-                //     let fout = format!("/Users/hugo/temp/sstout/c-{}-{}.geojson", re.0, re.1);
-                //     let _re = dt.write_geojson_triangles(fout.to_string());
-                // }
             }
             _ => {
                 error!("Wrongly formatted stream. Abort.");
@@ -137,15 +108,6 @@ fn main() -> io::Result<()> {
             }
         }
     }
-
-    // println!("==> {:?}", dt.incident_triangles_to_vertex(3));
-
-    // info!("Writing GeoJSON file to disk: /Users/hugo/temp/sstout/z.grid.geojson");
-    // let _re = dt.write_geojson_grid("/Users/hugo/temp/sstout/z.grid.geojson".to_string());
-
-    // let _re = dt.write_geojson_triangles("/Users/hugo/temp/sstout/tr.geojson".to_string());
-
-    // dt.print_ds();
 
     let _re = dt.flush_output();
 

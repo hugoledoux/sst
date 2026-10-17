@@ -1,4 +1,4 @@
-//-- sstval
+//-- ttval
 
 #[allow(dead_code)]
 #[allow(unused_variables)]
@@ -11,8 +11,8 @@ use std::io::{self};
 
 use clap::Parser;
 #[derive(Parser)]
-#[command(name = "sstval")]
-#[command(about = "streaming startin -- validate the sma file [sstval]")]
+#[command(name = "ttval")]
+#[command(about = "tintin -- validate the sma file [ttval]")]
 #[command(author, version)]
 struct Cli {
     #[clap(flatten)]
