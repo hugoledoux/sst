@@ -46,12 +46,6 @@ pub struct Point {
     pub z: f64,
 }
 
-#[derive(PartialEq, Eq)]
-enum InputType {
-    LAS,
-    XYZ,
-}
-
 impl Point {
     pub fn new() -> Point {
         Point {
@@ -74,8 +68,6 @@ fn main() {
         .filter_level(cli.verbose.log_level_filter())
         .init();
 
-    let mut inputformat: InputType = InputType::LAS;
-
     let mut paths: Vec<String> = Vec::new();
     let path = Path::new(&cli.input);
     if path.extension().unwrap() == "las"
@@ -83,9 +75,6 @@ fn main() {
         || path.extension().unwrap() == "LAS"
         || path.extension().unwrap() == "LAZ"
     {
-        paths.push(path.to_str().unwrap().to_string());
-    } else if path.extension().unwrap() == "xyz" {
-        inputformat = InputType::XYZ;
         paths.push(path.to_str().unwrap().to_string());
     } else if path.extension().unwrap() == "files" {
         let f = File::open(path).expect("Unable to open file");
@@ -109,7 +98,7 @@ fn main() {
     let sprinkle_param = cli.sprinkle;
 
     //-- pass #1
-    let re = pass_1(&paths, &inputformat);
+    let re = pass_1(&paths);
     let bbox = re.0;
     let totalpts: usize = re.1;
     info!("count pts={}", totalpts.to_formatted_string(&Locale::en));
@@ -127,26 +116,18 @@ fn main() {
 
     //-- pass #2
     info!("Second pass ➡️");
-    let mut g: Vec<Vec<usize>> = pass_2(&paths, &bbox, cellsize, &mut sprinkled, &inputformat);
+    let mut g: Vec<Vec<usize>> = pass_2(&paths, &bbox, cellsize, &mut sprinkled);
     info!("Second pass 🏁");
 
     // //-- pass #3
     info!("Third pass ➡️");
-    let _re = pass_3(&paths, &bbox, cellsize, &mut g, &sprinkled, &inputformat);
+    let _re = pass_3(&paths, &bbox, cellsize, &mut g, &sprinkled);
     info!("Third pass 🏁");
 
     info!("✅");
 }
 
-fn pass_1(paths: &Vec<String>, it: &InputType) -> (Vec<f64>, usize) {
-    if *it == InputType::LAS {
-        pass_1_las(&paths)
-    } else {
-        pass_1_xyz(&paths)
-    }
-}
-
-fn pass_1_las(paths: &Vec<String>) -> (Vec<f64>, usize) {
+fn pass_1(paths: &Vec<String>) -> (Vec<f64>, usize) {
     let mut n: usize = 0;
     let mut bbox = vec![std::f64::MAX, std::f64::MAX, std::f64::MIN, std::f64::MIN];
     for path in paths {
@@ -169,48 +150,7 @@ fn pass_1_las(paths: &Vec<String>) -> (Vec<f64>, usize) {
     (bbox, n)
 }
 
-fn pass_1_xyz(paths: &Vec<String>) -> (Vec<f64>, usize) {
-    let mut n: usize = 0;
-    let mut bbox = vec![std::f64::MAX, std::f64::MAX, std::f64::MIN, std::f64::MIN];
-    for path in paths {
-        let f = File::open(path).expect("Unable to open file");
-        let f = BufReader::new(f);
-        for l in f.lines() {
-            let l = l.expect("Unable to read line");
-            let v: Vec<f64> = l.split(' ').map(|s| s.parse().unwrap()).collect();
-            n += 1;
-            //-- minxy
-            for i in 0..2 {
-                if v[i] < bbox[i] {
-                    bbox[i] = v[i];
-                }
-            }
-            //-- maxxy
-            for i in 0..2 {
-                if v[i] > bbox[i + 2] {
-                    bbox[i + 2] = v[i];
-                }
-            }
-        }
-    }
-    (bbox, n)
-}
-
 fn pass_2(
-    paths: &Vec<String>,
-    bbox: &Vec<f64>,
-    cellsize: usize,
-    mut sprinkled: &mut HashMap<usize, Point>,
-    it: &InputType,
-) -> Vec<Vec<usize>> {
-    if *it == InputType::LAS {
-        pass_2_las(&paths, &bbox, cellsize, &mut sprinkled)
-    } else {
-        pass_2_xyz(&paths, &bbox, cellsize, &mut sprinkled)
-    }
-}
-
-fn pass_2_las(
     paths: &Vec<String>,
     bbox: &Vec<f64>,
     cellsize: usize,
@@ -253,66 +193,7 @@ fn pass_2_las(
     g
 }
 
-fn pass_2_xyz(
-    paths: &Vec<String>,
-    bbox: &Vec<f64>,
-    cellsize: usize,
-    sprinkled: &mut HashMap<usize, Point>,
-) -> Vec<Vec<usize>> {
-    let width = (bbox[2] - bbox[0]) / cellsize as f64;
-    let height = (bbox[3] - bbox[1]) / cellsize as f64;
-    //-- make it a square to have a quadtree
-    let mut tmp = width;
-    if height > width {
-        tmp = height;
-    }
-    //-- needs to be a power^2 so that is quadtree
-    let cellno: u32 = (2_u32).pow(tmp.log(2.0).ceil() as u32);
-    info!(
-        "Virtual grid is {}x{}; cellsize={}",
-        cellno, cellno, cellsize
-    );
-    let mut g: Vec<Vec<usize>> = vec![vec![0; cellno as usize]; cellno as usize];
-    let mut count: usize = 0;
-    for path in paths {
-        let f = File::open(path).expect("Unable to open file");
-        let f = BufReader::new(f);
-        for l in f.lines() {
-            let l = l.expect("Unable to read line");
-            let v: Vec<f64> = l.split(' ').map(|s| s.parse().unwrap()).collect();
-            let gxy: (usize, usize) = get_gx_gy(v[0], v[1], bbox[0], bbox[1], cellsize);
-            g[gxy.0][gxy.1] += 1;
-            //-- chunking
-            if sprinkled.contains_key(&count) == true {
-                let pc = sprinkled.entry(count).or_insert(Point::new());
-                *pc = Point {
-                    x: v[0],
-                    y: v[1],
-                    z: v[2],
-                };
-            }
-            count += 1;
-        }
-    }
-    g
-}
-
 fn pass_3(
-    paths: &Vec<String>,
-    bbox: &Vec<f64>,
-    cellsize: usize,
-    mut g: &mut Vec<Vec<usize>>,
-    sprinkled: &HashMap<usize, Point>,
-    it: &InputType,
-) -> io::Result<()> {
-    if *it == InputType::LAS {
-        pass_3_las(&paths, &bbox, cellsize, &mut g, &sprinkled)
-    } else {
-        pass_3_xyz(&paths, &bbox, cellsize, &mut g, &sprinkled)
-    }
-}
-
-fn pass_3_las(
     paths: &Vec<String>,
     bbox: &Vec<f64>,
     cellsize: usize,
@@ -363,7 +244,11 @@ fn pass_3_las(
 
     //-- chunker: promote these points at the top of the stream
     for (_, pt) in sprinkled {
-        write!(w, "w {0:.3$} {1:.3$} {2:.3$}\n", pt.x, pt.y, pt.z, impdigits)?;
+        write!(
+            w,
+            "w {0:.3$} {1:.3$} {2:.3$}\n",
+            pt.x, pt.y, pt.z, impdigits
+        )?;
     }
     w.flush()?;
 
@@ -384,91 +269,11 @@ fn pass_3_las(
             }
             if g[gxy.0][gxy.1] == 0 {
                 for pt in gpts[gxy.0][gxy.1].iter() {
-                    write!(w, "v {0:.3$} {1:.3$} {2:.3$}\n", pt.x, pt.y, pt.z, impdigits)?;
-                }
-                write!(w, "x {} {}\n", gxy.0, gxy.1)?;
-                gpts[gxy.0][gxy.1].clear();
-                gpts[gxy.0][gxy.1].shrink_to_fit();
-            }
-            count += 1;
-        }
-    }
-    w.flush()?;
-    Ok(())
-}
-
-fn pass_3_xyz(
-    paths: &Vec<String>,
-    bbox: &Vec<f64>,
-    cellsize: usize,
-    g: &mut Vec<Vec<usize>>,
-    sprinkled: &HashMap<usize, Point>,
-) -> io::Result<()> {
-    // let width: usize = ((bbox[2] - bbox[0]) / cellsize as f64).ceil() as usize;
-    // let height: usize = ((bbox[3] - bbox[1]) / cellsize as f64).ceil() as usize;
-    let cellno: usize = g[0].len();
-    let mut gpts: Vec<Vec<Vec<Point>>> = vec![vec![Vec::new(); cellno]; cellno];
-
-    //-- buffered output: one big write per chunk instead of one per line
-    let stdout = io::stdout();
-    let mut w = std::io::BufWriter::with_capacity(1 << 20, stdout.lock());
-
-    //-- total number of points
-    let mut total: usize = 0;
-    for (i, _gx) in g.iter().enumerate() {
-        for (j, _gy) in g[i].iter().enumerate() {
-            total += g[i][j];
-        }
-    }
-    w.write_all(b"# sstfin\n")?;
-    write!(w, "n {}\n", total)?;
-    //-- number of cells cXc
-    write!(w, "c {}\n", cellno)?;
-    //-- cellsize
-    write!(w, "s {}\n", cellsize)?;
-    //-- bbox
-    write!(
-        w,
-        "b {:.3} {:.3} {:.3} {:.3}\n",
-        bbox[0], bbox[1], bbox[2], bbox[3]
-    )?;
-
-    //-- cells that have no points
-    for (i, _gx) in g.iter().enumerate() {
-        for (j, _gy) in g[i].iter().enumerate() {
-            if g[i][j] == 0 {
-                write!(w, "x {} {}\n", i, j)?;
-            }
-        }
-    }
-
-    //-- chunker: promote these points at the top of the stream
-    for (_, pt) in sprinkled {
-        write!(w, "w {} {} {}\n", pt.x, pt.y, pt.z)?;
-    }
-    w.flush()?;
-
-    //-- read again the files
-    //-- read again the files
-    let mut count: usize = 0;
-    for path in paths {
-        let f = File::open(path).expect("Unable to open file");
-        let f = BufReader::new(f);
-        for l in f.lines() {
-            let l = l.expect("Unable to read line");
-            let v: Vec<f64> = l.split(' ').map(|s| s.parse().unwrap()).collect();
-            let gxy: (usize, usize) = get_gx_gy(v[0], v[1], bbox[0], bbox[1], cellsize);
-            g[gxy.0][gxy.1] -= 1;
-            if !sprinkled.contains_key(&count) {
-                gpts[gxy.0][gxy.1].push(Point {
-                    x: v[0],
-                    y: v[1],
-                    z: v[2],
-                });
-            }
-            if g[gxy.0][gxy.1] == 0 {
-                for pt in gpts[gxy.0][gxy.1].iter() {
-                    write!(w, "v {} {} {}\n", pt.x, pt.y, pt.z)?;
+                    write!(
+                        w,
+                        "v {0:.3$} {1:.3$} {2:.3$}\n",
+                        pt.x, pt.y, pt.z, impdigits
+                    )?;
                 }
                 write!(w, "x {} {}\n", gxy.0, gxy.1)?;
                 gpts[gxy.0][gxy.1].clear();
