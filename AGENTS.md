@@ -19,6 +19,7 @@ Binaries land in `target/release/`. There are no tests, no CI, and no rustfmt/cl
 | `ttsimpl <vepsilon>` | `.spa` on **stdin** | `.spa` → stdout (thinning filter) |
 | `ttstats <file>` | LAS/LAZ/`.txt`/`.xyz` | per-cell stats → stdout |
 | `ttval` | `.sma` on **stdin** | validation counts → stdout |
+| `ttview [file]` | `.sma` on **stdin** (or a file) | GUI window (2D triangles) |
 
 ```bash
 ./target/release/ttfin ./data/crop.laz 10 | ./target/release/ttdt > ./data/crop.sma
@@ -30,6 +31,7 @@ Gotchas:
 - `ttfin` accepts only `.las`/`.laz`/a `.files` list; other extensions print `input format not accepted`. Multiple files must be listed in a `.files` file that contains **absolute paths** (see `data/crop_1_2.files`), so it is machine-specific.
 - `ttstats` parses `std::env::args` directly (no clap): it has no `--help` and no verbosity flag, unlike the others.
 - `ttdt`, `ttsimpl`, `ttval` only read stdin; a file-path argument is ignored.
+- `ttview` is the only GUI binary (`eframe`/`egui`, default `wgpu` backend); it needs a graphical desktop and pulls in a large dependency tree. `--speed <N>` paces reading for replay. Note `eframe` 0.37's `App` trait uses `fn ui(&mut self, ui, frame)`, not the older `fn update(...)`. It draws **one dot per triangle** on a screen-space grid (not filled triangles): egui-wgpu packs *all* meshes into a single vertex buffer with a 256 MiB cap, so drawing millions of triangles panics — the dot overview keeps the vertex count bounded by the viewport.
 
 ## Stream format (`.spa` in, `.sma` out)
 One record per line; the first character selects the type:

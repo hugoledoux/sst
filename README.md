@@ -6,9 +6,11 @@ The streaming pipeline is (each stage reads/writes an ASCII stream, except the f
 
 ```
 LAS/LAZ files --> ttfin --> [ttsimpl] --> ttdt --> .sma (OBJ-like triangulation)
+                                                      |
+                                                      +--> ttview (2D live viewer)
 ```
 
-There are five binaries, all built together.
+There are six binaries, all built together.
 
 
 ## To compile them all
@@ -160,3 +162,31 @@ y-extent: 99.999
 ```bash
 ./target/release/ttfin ./data/crop.laz 10 | ./target/release/ttdt | ./target/release/ttval -vv
 ```
+
+
+## 6. **ttview**
+
+  - a minimal 2D viewer for the .sma stream of ttdt, for an overview of what is
+    being triangulated as it streams
+  - draws one small dot per triangle (at its centroid) rather than the filled
+    triangles; the dots are placed on a screen-space grid so that the number
+    drawn stays bounded by the viewport — essential because a large LAZ file
+    yields millions of triangles and egui packs all geometry into a single
+    (256 MiB) vertex buffer
+  - reads stdin by default, or replays a saved .sma file
+  - drag to pan, scroll to zoom, "Fit view" to reset
+
+Usage: `ttview [OPTIONS] [INPUT]`
+
+  - `[INPUT]`: optional .sma file to replay; stdin when omitted
+  - `-s, --speed <N>`: records to release per ~16ms tick during replay
+    (`0`, the default, reads as fast as possible)
+
+```bash
+./target/release/ttfin ./data/crop.laz 10 | ./target/release/ttdt | ./target/release/ttview
+# or replay a saved file at ~10000 records per tick:
+./target/release/ttview --speed 10000 ./data/crop_10.sma
+```
+
+Requires a graphical desktop (it opens an eframe/wgpu window).
+

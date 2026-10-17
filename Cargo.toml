@@ -20,6 +20,7 @@ clap = { version = "4.6", features = ["derive"] }
 clap-verbosity-flag = "3.0"
 robust = "1.2"
 startin = "0.8"
+eframe = "0.37"
 
 
 [[bin]]
@@ -41,3 +42,7 @@ path = "src/ttsimpl/bin/main.rs"
 [[bin]]
 name = "ttval"
 path = "src/ttval/bin/main.rs"
+
+[[bin]]
+name = "ttview"
+path = "src/ttview/bin/main.rs"
