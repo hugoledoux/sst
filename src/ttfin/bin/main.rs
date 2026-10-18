@@ -36,6 +36,9 @@ struct Cli {
     /// Value to use (totalpts * 0.001)
     #[arg(short, long, default_value_t = 0.001)]
     sprinkle: f64,
+    /// Write the ASCII `.spa` (default is the binary format)
+    #[arg(long)]
+    ascii: bool,
     #[clap(flatten)]
     verbose: clap_verbosity_flag::Verbosity,
 }
@@ -134,7 +137,7 @@ fn main() {
 
     // //-- pass #3
     info!("Third pass ➡️");
-    let _re = pass_3(&paths, &bbox, cellsize, &mut g, &sprinkled, cli.ground);
+    let _re = pass_3(&paths, &bbox, cellsize, &mut g, &sprinkled, cli.ground, cli.ascii == false);
     info!("Third pass 🏁");
 
     info!("✅");
@@ -231,6 +234,7 @@ fn pass_3(
     g: &mut Vec<Vec<usize>>,
     sprinkled: &HashMap<usize, Point>,
     ground: bool,
+    binary: bool,
 ) -> io::Result<()> {
     let cellno: usize = g[0].len();
     let mut gpts: Vec<Vec<Vec<Point>>> = vec![vec![Vec::new(); cellno]; cellno];
@@ -246,24 +250,39 @@ fn pass_3(
             total += g[i][j];
         }
     }
-    w.write_all(b"# ttfin\n")?;
-    write!(w, "n {}\n", total)?;
-    //-- number of cells cXc
-    write!(w, "c {}\n", cellno)?;
-    //-- cellsize
-    write!(w, "s {}\n", cellsize)?;
-    //-- bbox
-    write!(
-        w,
-        "b {:.3} {:.3} {:.3} {:.3}\n",
-        bbox[0], bbox[1], bbox[2], bbox[3]
-    )?;
+    if binary == true {
+        sst::stream::spa_write_magic(&mut w)?;
+        sst::stream::spa_write(&mut w, &sst::stream::SpaRecord::N(total as u64))?;
+        sst::stream::spa_write(&mut w, &sst::stream::SpaRecord::C(cellno as u32))?;
+        sst::stream::spa_write(&mut w, &sst::stream::SpaRecord::S(cellsize as u64))?;
+        sst::stream::spa_write(
+            &mut w,
+            &sst::stream::SpaRecord::B([bbox[0], bbox[1], bbox[2], bbox[3]]),
+        )?;
+    } else {
+        w.write_all(b"# ttfin\n")?;
+        write!(w, "n {}\n", total)?;
+        //-- number of cells cXc
+        write!(w, "c {}\n", cellno)?;
+        //-- cellsize
+        write!(w, "s {}\n", cellsize)?;
+        //-- bbox
+        write!(
+            w,
+            "b {:.3} {:.3} {:.3} {:.3}\n",
+            bbox[0], bbox[1], bbox[2], bbox[3]
+        )?;
+    }
 
     //-- cells that have no points
     for (i, _gx) in g.iter().enumerate() {
         for (j, _gy) in g[i].iter().enumerate() {
             if g[i][j] == 0 {
-                write!(w, "x {} {}\n", i, j)?;
+                if binary == true {
+                    sst::stream::spa_write(&mut w, &sst::stream::SpaRecord::X(i as u32, j as u32))?;
+                } else {
+                    write!(w, "x {} {}\n", i, j)?;
+                }
             }
         }
     }
@@ -276,11 +295,15 @@ fn pass_3(
 
     //-- chunker: promote these points at the top of the stream
     for (_, pt) in sprinkled {
-        write!(
-            w,
-            "w {0:.3$} {1:.3$} {2:.3$}\n",
-            pt.x, pt.y, pt.z, impdigits
-        )?;
+        if binary == true {
+            sst::stream::spa_write(&mut w, &sst::stream::SpaRecord::W(pt.x, pt.y, pt.z))?;
+        } else {
+            write!(
+                w,
+                "w {0:.3$} {1:.3$} {2:.3$}\n",
+                pt.x, pt.y, pt.z, impdigits
+            )?;
+        }
     }
     w.flush()?;
 
@@ -316,13 +339,27 @@ fn pass_3(
                 }
                 if g[gxy.0][gxy.1] == 0 {
                     for pt in gpts[gxy.0][gxy.1].iter() {
-                        write!(
-                            w,
-                            "v {0:.3$} {1:.3$} {2:.3$}\n",
-                            pt.x, pt.y, pt.z, impdigits
-                        )?;
+                        if binary == true {
+                            sst::stream::spa_write(
+                                &mut w,
+                                &sst::stream::SpaRecord::V(pt.x, pt.y, pt.z),
+                            )?;
+                        } else {
+                            write!(
+                                w,
+                                "v {0:.3$} {1:.3$} {2:.3$}\n",
+                                pt.x, pt.y, pt.z, impdigits
+                            )?;
+                        }
                     }
-                    write!(w, "x {} {}\n", gxy.0, gxy.1)?;
+                    if binary == true {
+                        sst::stream::spa_write(
+                            &mut w,
+                            &sst::stream::SpaRecord::X(gxy.0 as u32, gxy.1 as u32),
+                        )?;
+                    } else {
+                        write!(w, "x {} {}\n", gxy.0, gxy.1)?;
+                    }
                     gpts[gxy.0][gxy.1].clear();
                     gpts[gxy.0][gxy.1].shrink_to_fit();
                 }

@@ -43,6 +43,8 @@ One record per line; the first character selects the type:
 - `x gx gy` finalised cell (`.spa`) · `x id` finalised/dead vertex (`.sma`)
 - `f a b c` triangle, 1-based ids (`.sma` output only)
 
+Both formats also have a **binary variant, the default for `ttfin`/`ttdt` output** (`--ascii` opts back into text; every reader auto-detects via the magic `TTSPA1\n` / `TTSMA1\n`, so no reader flag exists). Records are the ASCII ones with fixed little-endian payloads: tag byte + `n` u64 · `c` u32 · `s` u64 · `b` 4×f64 · `v`/`w` 3×f64 · `x` 2×u32 (`.spa`); `b` 4×f64 · `v` 3×f64 · `f` 3×u32 · `x` u32 (`.sma`). The single codec lives in `src/stream.rs` (`sst::stream`); `record.to_line()` converts a decoded record back to its ASCII line, which is how the GUI viewers consume binary streams unchanged. `ttsimpl` mirrors the format of its input. Binary carries full f64 coordinates; `ttfin --ascii` quantises to the LAS scale digits.
+
 Writing a stream by hand or synthesising one: **`c` must appear before any `v`/`x`** — `ttdt` initialises its quadtree on `c` and `insert_one_vi` panics on a missing key otherwise. `c` must also be a power of two (`ttfin` derives it as `2^ceil(log2(...))`). `.sma` vertex/triangle ids are 1-based.
 
 ## Layout

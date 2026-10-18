@@ -277,6 +277,7 @@ pub struct Triangulation {
     sma_ids: HashMap<usize, usize>,
     sma_count_vertices: usize,
     out: io::BufWriter<io::Stdout>,
+    binary_out: bool,
     pub max_vs: usize,
     pub max_ts: usize,
     pub n_inserts: u64,
@@ -328,6 +329,7 @@ impl Triangulation {
             //-- buffered output: one syscall per finalised cell instead of
             //-- one per line (flushes happen in finalise_qt_leaf/root)
             out: io::BufWriter::with_capacity(1 << 16, io::stdout()),
+            binary_out: true,
             max_vs: 0,
             max_ts: 0,
             n_inserts: 0,
@@ -346,6 +348,31 @@ impl Triangulation {
         self.qt.miny = miny;
         self.qt.maxx = maxx;
         self.qt.maxy = maxy;
+    }
+
+    /// Choose the `.sma` output encoding: binary (default) or ASCII.
+    pub fn set_binary_output(&mut self, b: bool) {
+        self.binary_out = b;
+    }
+
+    /// Set the bbox and write it as the first record of the `.sma` stream
+    /// (in the current output encoding). In binary mode the magic header
+    /// precedes it: the bbox is always the first record of a `.sma`.
+    pub fn write_bbox(&mut self, minx: f64, miny: f64, maxx: f64, maxy: f64) -> io::Result<()> {
+        self.set_bbox(minx, miny, maxx, maxy);
+        if self.binary_out == true {
+            sst::stream::sma_write_magic(&mut self.out)?;
+            sst::stream::sma_write(
+                &mut self.out,
+                &sst::stream::SmaRecord::B([minx, miny, maxx, maxy]),
+            )
+        } else {
+            write!(
+                self.out,
+                "b {:.3} {:.3} {:.3} {:.3}\n",
+                minx, miny, maxx, maxy
+            )
+        }
     }
 
     pub fn set_grid_dimensions(&mut self, s: usize) {
@@ -489,17 +516,28 @@ impl Triangulation {
     fn activate_vertex(&mut self, vi: usize) -> io::Result<()> {
         self.sma_ids.insert(vi, self.sma_count_vertices);
         self.sma_count_vertices += 1;
-        write!(
-            self.out,
-            "v {} {} {}\n",
-            &self.vs[vi][0], &self.vs[vi][1], &self.vs[vi][2]
-        )?;
+        if self.binary_out == true {
+            sst::stream::sma_write(
+                &mut self.out,
+                &sst::stream::SmaRecord::V(self.vs[vi][0], self.vs[vi][1], self.vs[vi][2]),
+            )?;
+        } else {
+            write!(
+                self.out,
+                "v {} {} {}\n",
+                &self.vs[vi][0], &self.vs[vi][1], &self.vs[vi][2]
+            )?;
+        }
         self.vs_active[vi] = true;
         Ok(())
     }
 
     fn finalise_vertex(&mut self, vi: usize, qtc: &Vec<u8>) -> io::Result<()> {
-        write!(self.out, "x {}\n", self.sma_ids[&vi])?;
+        if self.binary_out == true {
+            sst::stream::sma_write(&mut self.out, &sst::stream::SmaRecord::X(*self.sma_ids.get(&vi).unwrap() as u32))?;
+        } else {
+            write!(self.out, "x {}\n", self.sma_ids[&vi])?;
+        }
         self.sma_ids.remove(&vi);
         //-- the vertex is only *marked* dead here; its id is swept from
         //-- the qt cell's list of points in one pass when the cell
@@ -520,11 +558,22 @@ impl Triangulation {
             }
         }
         //-- write the triangle to the stream
-        write!(
-            self.out,
-            "f {} {} {}\n",
-            self.sma_ids[&t0[0]], self.sma_ids[&t0[1]], self.sma_ids[&t0[2]],
-        )?;
+        if self.binary_out == true {
+            sst::stream::sma_write(
+                &mut self.out,
+                &sst::stream::SmaRecord::F(
+                    *self.sma_ids.get(&t0[0]).unwrap() as u32,
+                    *self.sma_ids.get(&t0[1]).unwrap() as u32,
+                    *self.sma_ids.get(&t0[2]).unwrap() as u32,
+                ),
+            )?;
+        } else {
+            write!(
+                self.out,
+                "f {} {} {}\n",
+                self.sma_ids[&t0[0]], self.sma_ids[&t0[1]], self.sma_ids[&t0[2]],
+            )?;
+        }
         //-- add to free list to reuse in the future
         self.freelist_ts.insert(ti);
         // println!("{:?}", self.ts[ti]);

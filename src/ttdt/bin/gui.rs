@@ -25,15 +25,19 @@ const BG: Color32 = Color32::WHITE;
 const WIRE: Color32 = Color32::from_gray(90);
 const WIRE_W: f32 = 1.0;
 
-pub fn run() -> std::io::Result<()> {
+pub fn run(ascii: bool) -> std::io::Result<()> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1200.0, 800.0])
             .with_title("ttdt"),
         ..Default::default()
     };
-    eframe::run_native("ttdt", options, Box::new(|cc| Ok(Box::new(View::new(cc)))))
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
+    eframe::run_native(
+        "ttdt",
+        options,
+        Box::new(move |cc| Ok(Box::new(View::new(cc, ascii)))),
+    )
+    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
 }
 
 struct View {
@@ -52,10 +56,12 @@ struct View {
 }
 
 impl View {
-    fn new(cc: &eframe::CreationContext<'_>) -> View {
+    fn new(cc: &eframe::CreationContext<'_>, ascii: bool) -> View {
         let rx = spawn_lines(None, 0, cc.egui_ctx.clone());
+        let mut dt = Triangulation::new();
+        dt.set_binary_output(ascii == false);
         View {
-            dt: Triangulation::new(),
+            dt,
             rx,
             cam: Cam::new(),
             need_fit: true,

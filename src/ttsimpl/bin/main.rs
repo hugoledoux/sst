@@ -154,7 +154,7 @@ impl Surface {
         ]
     }
 
-    fn finalise(&mut self) -> io::Result<()> {
+    fn finalise(&mut self, out: &mut SpaOut) -> io::Result<()> {
         // info!("->: {}", self.pts.len());
         let bbox = &self.bbox;
         // let zavg = self.get_average_elevation();
@@ -184,16 +184,11 @@ impl Surface {
             }
         }
         //-- stream out the vertices
-        let impdigits = 3; // TODO : impdigit to store in the stream?
         let allv = &dt.all_vertices();
         for i in 5..dt.number_of_vertices() {
-            io::stdout().write_all(
-                &format!(
-                    "v {0:.3$} {1:.3$} {2:.3$}\n",
-                    allv[i][0], allv[i][1], allv[i][2], impdigits
-                )
-                .as_bytes(),
-            )?;
+            out.rec(&sst::stream::SpaRecord::V(
+                allv[i][0], allv[i][1], allv[i][2],
+            ))?;
         }
         info!(
             "{:.1?}% kept",
@@ -203,75 +198,138 @@ impl Surface {
     }
 }
 
+//-- the `.spa` output of this tool: it mirrors the format of its input
+//-- (a binary stream is simplified to a binary stream, an ASCII one to
+//-- ASCII) and is buffered
+struct SpaOut {
+    w: std::io::BufWriter<std::io::StdoutLock<'static>>,
+    binary: bool,
+}
+
+impl SpaOut {
+    fn rec(&mut self, r: &sst::stream::SpaRecord) -> io::Result<()> {
+        if self.binary == true {
+            sst::stream::spa_write(&mut self.w, r)
+        } else {
+            self.w.write_all(r.to_line().as_bytes())
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.w.flush()
+    }
+}
+
 fn main() -> io::Result<()> {
     let cli = Cli::parse();
     env_logger::Builder::new()
         .filter_level(cli.verbose.log_level_filter())
         .init();
 
-    // let mut pts: Vec<Vec<f64>> = Vec::new();
     let mut s = Surface::new(cli.vepsilon);
 
+    //-- a binary input is answered with a binary output; the records are
+    //-- the same either way
     let stdin = std::io::stdin();
-    for line in stdin.lock().lines() {
-        let l = line.unwrap();
-        if l.is_empty() {
-            continue;
-        }
+    let mut r = std::io::BufReader::new(stdin.lock());
+    let binary = sst::stream::peek_is_binary(&mut r, sst::stream::SPA_MAGIC)?;
+    if binary == true {
+        sst::stream::skip_magic(&mut r, sst::stream::SPA_MAGIC)?;
+    }
+    let stdout = io::stdout();
+    let mut out = SpaOut {
+        w: std::io::BufWriter::with_capacity(1 << 20, stdout.lock()),
+        binary,
+    };
+    if binary == true {
+        sst::stream::spa_write_magic(&mut out.w)?;
+    }
 
-        let ch = l.chars().next().unwrap();
-        match ch {
-            '#' => continue,
-            'n' => {
-                //-- number of points
-                io::stdout().write_all(&format!("{}\n", &l).as_bytes())?;
-            }
-            's' => {
-                //-- cellsize
-                io::stdout().write_all(&format!("{}\n", &l).as_bytes())?;
-            }
-            'c' => {
-                //-- dimension grid (always square cXc)
-                io::stdout().write_all(&format!("{}\n", &l).as_bytes())?;
-            }
-            'b' => {
-                //-- bbox
-                io::stdout().write_all(&format!("{}\n", &l).as_bytes())?;
-            }
-            'v' => {
-                //-- a vertex
-                s.add_pt(parse_3_f64(&l));
-            }
-            'w' => {
-                //-- sprinkled point
-                io::stdout().write_all(&format!("{}\n", &l).as_bytes())?;
-            }
-            'x' => {
-                //-- finalise a cell
-                if s.is_empty() {
-                    io::stdout().write_all(&format!("{}\n", &l).as_bytes())?;
-                } else {
-                    let _ = s.finalise();
-                    s.clear();
-                    io::stdout().write_all(&format!("{}\n", &l).as_bytes())?;
-                }
+    if binary == true {
+        while let Some(rec) = sst::stream::spa_read(&mut r)? {
+            handle_record(&mut s, &mut out, &rec)?;
+        }
+    } else {
+        for line in r.lines() {
+            let l = line.unwrap();
+            if l.is_empty() {
                 continue;
             }
-            _ => {
-                error!("Wrongly formatted stream. Abort.");
-                std::process::exit(1);
+            let ch = l.chars().next().unwrap();
+            if ch == '#' {
+                continue;
+            }
+            match parse_sp_record(&l) {
+                Some(rec) => handle_record(&mut s, &mut out, &rec)?,
+                None => {
+                    error!("Wrongly formatted stream. Abort.");
+                    std::process::exit(1);
+                }
             }
         }
     }
+    out.flush()?;
 
     info!("✅");
     Ok(())
 }
 
-fn parse_3_f64(l: &String) -> Vec<f64> {
-    let ls: Vec<&str> = l.split_whitespace().collect();
-    let a: f64 = ls[1].parse::<f64>().unwrap();
-    let b: f64 = ls[2].parse::<f64>().unwrap();
-    let c: f64 = ls[3].parse::<f64>().unwrap();
-    vec![a, b, c]
+/// One `.spa` record, from an ASCII line (the binary path decodes the same
+/// enum directly).
+fn handle_record(s: &mut Surface, out: &mut SpaOut, rec: &sst::stream::SpaRecord) -> io::Result<()> {
+    use sst::stream::SpaRecord;
+    match rec {
+        SpaRecord::N(_) | SpaRecord::C(_) | SpaRecord::S(_) | SpaRecord::B(_) => {
+            out.rec(rec)?;
+        }
+        SpaRecord::W(..) => {
+            //-- sprinkled points are not simplified, just passed on
+            out.rec(rec)?;
+        }
+        SpaRecord::V(x, y, z) => {
+            s.add_pt(vec![*x, *y, *z]);
+        }
+        SpaRecord::X(_, _) => {
+            //-- finalise a cell: simplify what was buffered, then pass it on
+            if s.is_empty() == false {
+                s.finalise(out)?;
+                s.clear();
+            }
+            out.rec(rec)?;
+        }
+    }
+    Ok(())
+}
+
+/// Parse one ASCII `.spa` line into a record; `None` when malformed.
+fn parse_sp_record(l: &str) -> Option<sst::stream::SpaRecord> {
+    use sst::stream::SpaRecord;
+    let mut it = l.split_whitespace();
+    let tag = it.next()?;
+    Some(match tag {
+        "n" => SpaRecord::N(it.next()?.parse::<u64>().ok()?),
+        "c" => SpaRecord::C(it.next()?.parse::<u32>().ok()?),
+        "s" => SpaRecord::S(it.next()?.parse::<u64>().ok()?),
+        "b" => SpaRecord::B([
+            it.next()?.parse::<f64>().ok()?,
+            it.next()?.parse::<f64>().ok()?,
+            it.next()?.parse::<f64>().ok()?,
+            it.next()?.parse::<f64>().ok()?,
+        ]),
+        "v" => SpaRecord::V(
+            it.next()?.parse::<f64>().ok()?,
+            it.next()?.parse::<f64>().ok()?,
+            it.next()?.parse::<f64>().ok()?,
+        ),
+        "w" => SpaRecord::W(
+            it.next()?.parse::<f64>().ok()?,
+            it.next()?.parse::<f64>().ok()?,
+            it.next()?.parse::<f64>().ok()?,
+        ),
+        "x" => SpaRecord::X(
+            it.next()?.parse::<u32>().ok()?,
+            it.next()?.parse::<u32>().ok()?,
+        ),
+        _ => return None,
+    })
 }

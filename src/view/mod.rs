@@ -110,10 +110,14 @@ pub fn push_line(
 /// Read lines from `input` (stdin when `None`) on a background thread and send
 /// them to the UI. `speed` is the number of lines released per ~16ms tick
 /// (`0` = as fast as possible). Dropping the receiver stops the thread.
+///
+/// A binary stream (`.spa` or `.sma`) is decoded here and its records are sent
+/// as the equivalent ASCII lines, so that the viewers work with either
+/// format without further changes.
 pub fn spawn_lines(input: Option<String>, speed: usize, ctx: egui::Context) -> Receiver<String> {
     let (tx, rx) = mpsc::sync_channel(CHANNEL_CAP);
     thread::spawn(move || {
-        let source: Box<dyn BufRead> = match input {
+        let mut source: Box<dyn BufRead> = match input {
             Some(path) => match File::open(&path) {
                 Ok(f) => Box::new(BufReader::new(f)),
                 Err(e) => {
@@ -125,28 +129,62 @@ pub fn spawn_lines(input: Option<String>, speed: usize, ctx: egui::Context) -> R
             None => Box::new(BufReader::new(io::stdin())),
         };
 
+        let binary_spa = crate::stream::peek_is_binary(&mut source, crate::stream::SPA_MAGIC)
+            .unwrap_or(false);
+        let binary_sma = if binary_spa {
+            false
+        } else {
+            crate::stream::peek_is_binary(&mut source, crate::stream::SMA_MAGIC).unwrap_or(false)
+        };
+
         let mut in_batch: usize = 0;
-        for line in source.lines() {
-            let l = match line {
-                Ok(l) => l,
-                Err(_) => break,
-            };
-            if tx.send(l).is_err() {
-                //-- receiver gone: the window was closed
-                return;
-            }
-            in_batch += 1;
+        let mut tick = |in_batch: &mut usize| {
             let flush = if speed > 0 {
-                in_batch >= speed
+                *in_batch >= speed
             } else {
-                in_batch >= REPAINT_EVERY
+                *in_batch >= REPAINT_EVERY
             };
             if flush {
-                in_batch = 0;
+                *in_batch = 0;
                 ctx.request_repaint();
                 if speed > 0 {
                     thread::sleep(TICK);
                 }
+            }
+        };
+
+        if binary_spa {
+            let _ = crate::stream::skip_magic(&mut source, crate::stream::SPA_MAGIC);
+            while let Ok(Some(rec)) = crate::stream::spa_read(&mut source) {
+                if tx.send(rec.to_line()).is_err() {
+                    //-- receiver gone: the window was closed
+                    return;
+                }
+                in_batch += 1;
+                tick(&mut in_batch);
+            }
+        } else if binary_sma {
+            let _ = crate::stream::skip_magic(&mut source, crate::stream::SMA_MAGIC);
+            while let Ok(Some(rec)) = crate::stream::sma_read(&mut source) {
+                if tx.send(rec.to_line()).is_err() {
+                    //-- receiver gone: the window was closed
+                    return;
+                }
+                in_batch += 1;
+                tick(&mut in_batch);
+            }
+        } else {
+            for line in source.lines() {
+                let l = match line {
+                    Ok(l) => l,
+                    Err(_) => break,
+                };
+                if tx.send(l).is_err() {
+                    //-- receiver gone: the window was closed
+                    return;
+                }
+                in_batch += 1;
+                tick(&mut in_batch);
             }
         }
         ctx.request_repaint();

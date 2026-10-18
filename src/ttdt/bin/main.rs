@@ -10,7 +10,7 @@ mod gui;
 extern crate log; //info/debug/error
 
 use std::io::BufRead;
-use std::io::{self, Write};
+use std::io::{self};
 
 use clap::Parser;
 
@@ -24,6 +24,9 @@ pub(crate) struct Cli {
     /// Show a live 2D view of the current triangulation and the quadtree cells
     #[arg(long)]
     gui: bool,
+    /// Write the ASCII `.sma` (default is the binary format)
+    #[arg(long)]
+    ascii: bool,
     #[clap(flatten)]
     verbose: clap_verbosity_flag::Verbosity,
 }
@@ -35,21 +38,32 @@ fn main() -> io::Result<()> {
         .init();
 
     if cli.gui {
-        gui::run()
+        gui::run(cli.ascii)
     } else {
-        run_cli()
+        run_cli(cli.ascii)
     }
 }
 
-fn run_cli() -> io::Result<()> {
+fn run_cli(ascii: bool) -> io::Result<()> {
     info!("Init DT");
     let mut dt = Triangulation::new();
+    dt.set_binary_output(ascii == false);
 
-    //----- reading from stdin -----//
+    //----- reading from stdin (auto-detect binary or ASCII) -----//
     let stdin = std::io::stdin();
-    for line in stdin.lock().lines() {
-        let l = line.unwrap();
-        handle_line(&mut dt, &l)?;
+    let mut r = std::io::BufReader::new(stdin.lock());
+    if sst::stream::peek_is_binary(&mut r, sst::stream::SPA_MAGIC)? {
+        info!("input stream: binary .spa");
+        sst::stream::skip_magic(&mut r, sst::stream::SPA_MAGIC)?;
+        while let Some(rec) = sst::stream::spa_read(&mut r)? {
+            handle_record(&mut dt, &rec)?;
+        }
+    } else {
+        info!("input stream: ASCII .spa");
+        for line in r.lines() {
+            let l = line.unwrap();
+            handle_line(&mut dt, &l)?;
+        }
     }
 
     let _re = dt.flush_output();
@@ -80,12 +94,9 @@ pub(crate) fn handle_line(dt: &mut Triangulation, l: &str) -> io::Result<()> {
             dt.set_grid_dimensions(c);
         }
         'b' => {
-            //-- bbox
+            //-- bbox (echoed to the .sma in the current output encoding)
             let re = parse_4_f64(l);
-            dt.set_bbox(re.0, re.1, re.2, re.3);
-            io::stdout().write_all(
-                &format!("b {:.3} {:.3} {:.3} {:.3}\n", re.0, re.1, re.2, re.3).as_bytes(),
-            )?;
+            dt.write_bbox(re.0, re.1, re.2, re.3)?;
         }
         'v' | 'w' => {
             //-- vertex
@@ -100,6 +111,31 @@ pub(crate) fn handle_line(dt: &mut Triangulation, l: &str) -> io::Result<()> {
         _ => {
             error!("Wrongly formatted stream. Abort.");
             std::process::exit(1);
+        }
+    }
+    Ok(())
+}
+
+/// Process one binary record of the `.spa` stream; the same semantics as
+/// `handle_line`, which it shares the triangulation calls with.
+pub(crate) fn handle_record(dt: &mut Triangulation, rec: &sst::stream::SpaRecord) -> io::Result<()> {
+    use sst::stream::SpaRecord;
+    match rec {
+        SpaRecord::N(_) => {}
+        SpaRecord::S(s) => {
+            dt.set_cellsize(*s as usize);
+        }
+        SpaRecord::C(c) => {
+            dt.set_grid_dimensions(*c as usize);
+        }
+        SpaRecord::B(b) => {
+            dt.write_bbox(b[0], b[1], b[2], b[3])?;
+        }
+        SpaRecord::V(x, y, z) | SpaRecord::W(x, y, z) => {
+            let _re = dt.insert_one_pt_with_grid(*x, *y, *z);
+        }
+        SpaRecord::X(a, b) => {
+            let _re = dt.finalise_qt_leaf(*a as usize, *b as usize);
         }
     }
     Ok(())

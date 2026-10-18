@@ -31,38 +31,62 @@ fn main() -> io::Result<()> {
     let mut d: HashMap<usize, (f64, f64, f64)> = HashMap::new();
 
     let stdin = std::io::stdin();
-    for line in stdin.lock().lines() {
-        let l = line.unwrap();
-        if l.is_empty() {
-            continue;
+    let mut r = std::io::BufReader::new(stdin.lock());
+    if sst::stream::peek_is_binary(&mut r, sst::stream::SMA_MAGIC)? {
+        info!("input stream: binary .sma");
+        sst::stream::skip_magic(&mut r, sst::stream::SMA_MAGIC)?;
+        while let Some(rec) = sst::stream::sma_read(&mut r)? {
+            match rec {
+                sst::stream::SmaRecord::B(b) => {
+                    info!("bbox: {:?}", b);
+                }
+                sst::stream::SmaRecord::V(x, y, z) => {
+                    let _re = d.insert(total_vs, (x, y, z));
+                    total_vs += 1;
+                }
+                sst::stream::SmaRecord::F(_, _, _) => {
+                    total_ts += 1;
+                }
+                sst::stream::SmaRecord::X(a) => {
+                    d.remove(&(a as usize));
+                }
+            }
         }
-        let ch = l.chars().next().unwrap();
-        match ch {
-            '#' => continue,
-            'b' => {
-                let bbox = parse_4_f64(&l);
-                info!("bbox: {:?}", bbox);
+    } else {
+        info!("input stream: ASCII .sma");
+        for line in r.lines() {
+            let l = line.unwrap();
+            if l.is_empty() {
+                continue;
             }
-            'v' => {
-                //-- a vertex
-                let v = parse_3_f64(&l);
-                let _re = d.insert(total_vs, v);
-                total_vs += 1;
-            }
-            'f' => {
-                //-- a triangle
-                // let re = parse_3_usize(&l);
-                total_ts += 1;
-            }
-            'x' => {
-                //-- finalise a vertex
-                let ls: Vec<&str> = l.split_whitespace().collect();
-                let a: usize = ls[1].parse::<usize>().unwrap();
-                d.remove(&a);
-            }
-            _ => {
-                error!("Wrongly formatted stream. Abort.");
-                std::process::exit(1);
+            let ch = l.chars().next().unwrap();
+            match ch {
+                '#' => continue,
+                'b' => {
+                    let bbox = parse_4_f64(&l);
+                    info!("bbox: {:?}", bbox);
+                }
+                'v' => {
+                    //-- a vertex
+                    let v = parse_3_f64(&l);
+                    let _re = d.insert(total_vs, v);
+                    total_vs += 1;
+                }
+                'f' => {
+                    //-- a triangle
+                    // let re = parse_3_usize(&l);
+                    total_ts += 1;
+                }
+                'x' => {
+                    //-- finalise a vertex
+                    let ls: Vec<&str> = l.split_whitespace().collect();
+                    let a: usize = ls[1].parse::<usize>().unwrap();
+                    d.remove(&a);
+                }
+                _ => {
+                    error!("Wrongly formatted stream. Abort.");
+                    std::process::exit(1);
+                }
             }
         }
     }
