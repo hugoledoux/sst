@@ -36,8 +36,7 @@ Usage: `ttfin <input.laz|input.files> <cellsize> [-g] [-s <sprinkle>]`
   - `<cellsize>`: the cell resolution as an integer, eg `10` for 10m×10m
   - `-s, --sprinkle`: fraction of points "sprinkled" (hoisted to the top of the
     stream), default `0.001`
-  - `-g, --ground`: intended to use only ground points from the LAS file
-    (accepted but not implemented yet)
+  - `-g, --ground`: use only ground points, ie LAS classification `2`
   - verbosity is controlled with `-v`/`-vv`/`-q` (the INFO/WARN logs)
 
 To see the format of the output stream ("spa" is **s**treaming **p**oint **a**scii; binary to follow at some point)
@@ -90,6 +89,25 @@ The records are: `n` (number of points), `c` (square grid dimension, a power of 
 ```
 
 The output file `crop_10.sma` is a valid OBJ file: change its extension and you can open it normally in [MeshLab](https://www.meshlab.net/) for instance.
+
+### `ttdt --gui`
+
+With `--gui`, `ttdt` opens a live 2D window showing its **internal state** (not
+the streamed output), which is useful to watch the algorithm work:
+
+  - the quadtree cells: non-finalised cells are filled light-blue, finalised
+    cells are white (on a white background)
+  - the current (non-finalised) triangulation, drawn as a grey wireframe — this
+    is only the small working set, not the millions of triangles already output
+  - drag to pan, scroll to zoom, "Fit view" to reset
+
+The `.sma` stream is still written to stdout, so it composes:
+
+```bash
+./target/release/ttfin ./data/crop.laz 10 | ./target/release/ttdt --gui > ./data/crop_10.sma
+```
+
+Afterwards, `ttview` (or MeshLab, etc.) can display the resulting `.sma`.
 
 
 __output file__

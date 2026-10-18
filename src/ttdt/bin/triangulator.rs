@@ -18,6 +18,12 @@ use rand::RngExt;
 //-- containing a query point is almost always a recent one (Isenburg et al. §4.1)
 const RECENT_TS_CAP: usize = 4096;
 
+/// A read-only view of one quadtree cell, for the `--gui` viewer.
+pub struct CellView {
+    pub bbox: [f64; 4],
+    pub finalised: bool,
+}
+
 //----------------------
 struct Qtcell {
     pts: Vec<usize>,
@@ -86,6 +92,9 @@ struct Quadtree {
     pub cellsize: usize,
     pub griddim: usize,
     depth: u32,
+    /// bumped whenever the cell partition changes (finalisation / merge), so the
+    /// viewer knows when to rebuild its cell mesh
+    rev: u64,
 }
 
 impl Quadtree {
@@ -100,6 +109,7 @@ impl Quadtree {
             maxx: std::f64::MIN,
             maxy: std::f64::MIN,
             depth: 0,
+            rev: 0,
         }
     }
 
@@ -113,6 +123,7 @@ impl Quadtree {
                 self.cells.insert(qtc, nc);
             }
         }
+        self.rev += 1;
     }
 
     pub fn insert_one_vi(&mut self, x: f64, y: f64, vi: usize) {
@@ -153,6 +164,7 @@ impl Quadtree {
 
     fn set_qtc_as_finalised(&mut self, qtc: &Vec<u8>, b: bool) {
         self.cells.get_mut(qtc).unwrap().set_final(true);
+        self.rev += 1;
     }
 
     fn get_cell_bbox(&self, gx: usize, gy: usize, gbbox: &mut [f64]) {
@@ -397,6 +409,7 @@ impl Triangulation {
         let vs_dead = &self.vs_dead;
         let q = self.qt.cells.get_mut(&q2).unwrap();
         q.pts.retain(|vi| vs_dead[*vi] == false);
+        self.qt.rev += 1;
         Ok(())
     }
 
@@ -610,6 +623,65 @@ impl Triangulation {
     //-- make sure everything written is pushed to the stream
     pub fn flush_output(&mut self) -> io::Result<()> {
         self.out.flush()
+    }
+
+    //---------------------------------
+    //-- read-only views for the `--gui` viewer
+    //---------------------------------
+
+    /// The stream bbox, once it is known.
+    pub fn bbox(&self) -> Option<[f64; 4]> {
+        if self.qt.maxx > self.qt.minx && self.qt.maxy > self.qt.miny {
+            Some([self.qt.minx, self.qt.miny, self.qt.maxx, self.qt.maxy])
+        } else {
+            None
+        }
+    }
+
+    /// A revision that changes whenever the quadtree cell partition changes.
+    pub fn qt_rev(&self) -> u64 {
+        self.qt.rev
+    }
+
+    /// Number of quadtree cells currently in the partition.
+    pub fn number_of_cells(&self) -> usize {
+        self.qt.cells.len()
+    }
+
+    /// The current quadtree cell partition, as bbox + finalised flag.
+    pub fn cell_views(&self) -> Vec<CellView> {
+        let mut re = Vec::with_capacity(self.qt.cells.len());
+        for (qtc, cell) in &self.qt.cells {
+            let mut bbox = [0.0; 4];
+            self.qt.get_cell_bbox_qtc(qtc, &mut bbox);
+            re.push(CellView {
+                bbox,
+                finalised: cell.finalised,
+            });
+        }
+        re
+    }
+
+    /// Number of triangles currently in the (non-finalised) triangulation.
+    pub fn number_of_active_triangles(&self) -> usize {
+        let mut total: usize = 0;
+        for i in 0..self.ts.len() {
+            if self.freelist_ts.contains(&i) == false && self.is_triangle_finite(i) == true {
+                total += 1;
+            }
+        }
+        total
+    }
+
+    /// The triangles currently in the (non-finalised) triangulation, as coords.
+    pub fn active_triangles(&self) -> Vec<[[f64; 3]; 3]> {
+        let mut re: Vec<[[f64; 3]; 3]> = Vec::new();
+        for (i, t) in self.ts.iter().enumerate() {
+            if self.freelist_ts.contains(&i) == false && self.is_triangle_finite(i) == true {
+                re.push([self.vs[t[0]], self.vs[t[1]], self.vs[t[2]]]);
+            }
+        }
+        re
     }
 
     fn insert_one_pt_init_phase(&mut self, x: f64, y: f64, z: f64) -> Result<usize, usize> {

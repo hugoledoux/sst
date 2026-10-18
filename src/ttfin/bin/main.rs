@@ -30,7 +30,7 @@ struct Cli {
     input: String,
     /// The cell resolution (integer, eg '5' for 5mX5m)
     resolution: usize,
-    /// Use only ground in LAS files
+    /// Use only ground points (LAS classification == 2)
     #[arg(short, long)]
     ground: bool,
     /// Value to use (totalpts * 0.001)
@@ -98,11 +98,17 @@ fn main() {
 
     let sprinkle_param = cli.sprinkle;
 
+    if cli.ground {
+        info!("Using only ground points (classification == 2)");
+    }
+
     //-- pass #1
     let re = pass_1(&paths);
     let bbox = re.0;
     let totalpts: usize = re.1;
-    info!("count pts={}", totalpts.to_formatted_string(&Locale::en));
+    if cli.ground == false {
+        info!("count pts={}", totalpts.to_formatted_string(&Locale::en));
+    }
     info!("bbox={:?}", bbox);
     info!("First pass 🏁");
 
@@ -117,12 +123,18 @@ fn main() {
 
     //-- pass #2
     info!("Second pass ➡️");
-    let mut g: Vec<Vec<usize>> = pass_2(&paths, &bbox, cellsize, &mut sprinkled);
+    let mut g: Vec<Vec<usize>> = pass_2(&paths, &bbox, cellsize, &mut sprinkled, cli.ground);
+    if cli.ground {
+        //-- the header count includes every class; report how many ground points
+        //-- are actually kept (this is the `n` that will be written out)
+        let kept: usize = g.iter().flatten().sum();
+        info!("count pts={} (ground only)", kept.to_formatted_string(&Locale::en));
+    }
     info!("Second pass 🏁");
 
     // //-- pass #3
     info!("Third pass ➡️");
-    let _re = pass_3(&paths, &bbox, cellsize, &mut g, &sprinkled);
+    let _re = pass_3(&paths, &bbox, cellsize, &mut g, &sprinkled, cli.ground);
     info!("Third pass 🏁");
 
     info!("✅");
@@ -156,6 +168,7 @@ fn pass_2(
     bbox: &Vec<f64>,
     cellsize: usize,
     sprinkled: &mut HashMap<usize, Point>,
+    ground: bool,
 ) -> Vec<Vec<usize>> {
     let width = (bbox[2] - bbox[0]) / cellsize as f64;
     let height = (bbox[3] - bbox[1]) / cellsize as f64;
@@ -187,6 +200,12 @@ fn pass_2(
             }
             for each in points.points() {
                 let p = each.unwrap();
+                //-- keep `count` running over *all* points so that the
+                //-- sprinkled indices stay aligned with the header count
+                if ground && p.classification != las::point::Classification::Ground {
+                    count += 1;
+                    continue;
+                }
                 let gxy: (usize, usize) = get_gx_gy(p.x, p.y, bbox[0], bbox[1], cellsize);
                 g[gxy.0][gxy.1] += 1;
                 //-- chunking
@@ -211,6 +230,7 @@ fn pass_3(
     cellsize: usize,
     g: &mut Vec<Vec<usize>>,
     sprinkled: &HashMap<usize, Point>,
+    ground: bool,
 ) -> io::Result<()> {
     let cellno: usize = g[0].len();
     let mut gpts: Vec<Vec<Vec<Point>>> = vec![vec![Vec::new(); cellno]; cellno];
@@ -280,6 +300,11 @@ fn pass_3(
             }
             for each in points.points() {
                 let p = each.unwrap();
+                //-- same filter, and same `count` treatment, as pass_2
+                if ground && p.classification != las::point::Classification::Ground {
+                    count += 1;
+                    continue;
+                }
                 let gxy: (usize, usize) = get_gx_gy(p.x, p.y, bbox[0], bbox[1], cellsize);
                 g[gxy.0][gxy.1] -= 1;
                 if !sprinkled.contains_key(&count) {
