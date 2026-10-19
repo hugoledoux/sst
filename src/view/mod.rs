@@ -129,8 +129,8 @@ pub fn spawn_lines(input: Option<String>, speed: usize, ctx: egui::Context) -> R
             None => Box::new(BufReader::new(io::stdin())),
         };
 
-        let binary_spa = crate::stream::peek_is_binary(&mut source, crate::stream::SPA_MAGIC)
-            .unwrap_or(false);
+        let binary_spa =
+            crate::stream::peek_is_binary(&mut source, crate::stream::SPA_MAGIC).unwrap_or(false);
         let binary_sma = if binary_spa {
             false
         } else {
@@ -138,7 +138,7 @@ pub fn spawn_lines(input: Option<String>, speed: usize, ctx: egui::Context) -> R
         };
 
         let mut in_batch: usize = 0;
-        let mut tick = |in_batch: &mut usize| {
+        let tick = |in_batch: &mut usize| {
             let flush = if speed > 0 {
                 *in_batch >= speed
             } else {
