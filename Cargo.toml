@@ -48,5 +48,9 @@ name = "ttval"
 path = "src/ttval/bin/main.rs"
 
 [[bin]]
+name = "spb2obj"
+path = "src/spb2obj/bin/main.rs"
+
+[[bin]]
 name = "ttview"
 path = "src/ttview/bin/main.rs"

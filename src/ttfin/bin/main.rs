@@ -203,6 +203,19 @@ fn pass_2(
             }
             for each in points.points() {
                 let p = each.unwrap();
+                //-- chunking: fill the sprinkled coordinates *before* the
+                //-- ground filter below; with -g, a sprinkled index on a
+                //-- non-ground point must be dropped here, otherwise its
+                //-- (0,0,0) default would be emitted at the top of the stream
+                if ground && p.classification != las::point::Classification::Ground {
+                    sprinkled.remove(&count);
+                } else if let Some(pc) = sprinkled.get_mut(&count) {
+                    *pc = Point {
+                        x: p.x,
+                        y: p.y,
+                        z: p.z,
+                    };
+                }
                 //-- keep `count` running over *all* points so that the
                 //-- sprinkled indices stay aligned with the header count
                 if ground && p.classification != las::point::Classification::Ground {
@@ -211,15 +224,6 @@ fn pass_2(
                 }
                 let gxy: (usize, usize) = get_gx_gy(p.x, p.y, bbox[0], bbox[1], cellsize);
                 g[gxy.0][gxy.1] += 1;
-                //-- chunking
-                if sprinkled.contains_key(&count) == true {
-                    let pc = sprinkled.entry(count).or_insert(Point::new());
-                    *pc = Point {
-                        x: p.x,
-                        y: p.y,
-                        z: p.z,
-                    };
-                }
                 count += 1;
             }
         }
