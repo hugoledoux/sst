@@ -160,7 +160,6 @@ impl eframe::App for View {
             if ui.button("Fit view").clicked() {
                 self.need_fit = true;
             }
-            ui.label(format!("cells: {}", self.dt.number_of_cells()));
             ui.label(format!(
                 "active triangles: {}",
                 self.dt.number_of_active_triangles()
