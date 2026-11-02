@@ -91,7 +91,6 @@ fn main() {
         eprintln!("input format not accepted");
         std::process::exit(1);
     }
-
     info!("Number of input files: {}", paths.len());
     for (i, each) in paths.iter().enumerate() {
         info!("\t{}. {}", i + 1, each);
@@ -135,9 +134,18 @@ fn main() {
     }
     info!("Second pass 🏁");
 
+    //-- the CRS of the input (E)VLRs, carried through the stream as a `p`
+    //-- record so that downstream tools (eg ttdem) can georeference it
+    let crs = extract_crs(&paths);
+    if crs.0 != 0 {
+        info!("CRS: EPSG:{} (vertical EPSG:{})", crs.0, crs.1);
+    } else {
+        info!("no CRS found in the input");
+    }
+
     // //-- pass #3
     info!("Third pass ➡️");
-    let _re = pass_3(&paths, &bbox, cellsize, &mut g, &sprinkled, cli.ground, cli.ascii == false);
+    let _re = pass_3(&paths, &bbox, cellsize, &mut g, &sprinkled, cli.ground, cli.ascii == false, crs);
     info!("Third pass 🏁");
 
     info!("✅");
@@ -164,6 +172,94 @@ fn pass_1(paths: &Vec<String>) -> (Vec<f64>, usize) {
         }
     }
     (bbox, n)
+}
+
+/// Extract (horizontal, vertical) EPSG codes from the CRS (E)VLRs of the
+/// first input file, to emit as a `p` record in the stream.
+///
+/// GeoTIFF keys VLRs give the codes directly; a WKT VLR (or LAS 1.4 WKT
+/// EVLR) is the fallback. In a WKT the CRS's own AUTHORITY is the last
+/// EPSG code inside its element, so the horizontal code comes from the
+/// PROJCS/PROJCRS slice and the vertical one from the VERT_CS/VERTCRS slice
+/// (the nested GEOGCS/VERT_DATUM authorities that appear earlier in those
+/// slices are ignored this way).
+fn extract_crs(paths: &Vec<String>) -> (u32, u32) {
+    let reader = match las::Reader::from_path(&paths[0]) {
+        Ok(r) => r,
+        Err(e) => {
+            info!("could not reopen {} for the CRS: {}", paths[0], e);
+            return (0, 0);
+        }
+    };
+    let header = reader.header();
+
+    if let Ok(Some(gk)) = header.get_geotiff_crs() {
+        let h = gk.get_projected_crs_geo_key_value().unwrap_or(0);
+        let v = gk.get_vertical_crs_geo_key_value().unwrap_or(0);
+        if h != 0 {
+            return (h as u32, v as u32);
+        }
+    }
+
+    let Some(wkt) = header
+        .get_wkt_crs_bytes()
+        .map(|b| String::from_utf8_lossy(b).into_owned())
+    else {
+        info!("no CRS in the input; the output GeoTIFF will have no CRS");
+        return (0, 0);
+    };
+    let h = wkt_element_slice(&wkt, "PROJCS")
+        .or_else(|| wkt_element_slice(&wkt, "PROJCRS"))
+        .as_deref()
+        .and_then(|s| epsg_codes_in_wkt(s).pop())
+        .or_else(|| epsg_codes_in_wkt(&wkt).pop()) //-- plain GEOGCS
+        .unwrap_or(0);
+    let v = wkt_element_slice(&wkt, "VERT_CS")
+        .or_else(|| wkt_element_slice(&wkt, "VERTCRS"))
+        .as_deref()
+        .and_then(|s| epsg_codes_in_wkt(s).pop())
+        .unwrap_or(0);
+    (h, v)
+}
+
+/// The slice of a WKT from the opening bracket of `keyword` to its matching
+/// close bracket, so nested elements can be scanned in isolation.
+fn wkt_element_slice(wkt: &str, keyword: &str) -> Option<String> {
+    let start = wkt.find(keyword)? + keyword.len();
+    let open = wkt[start..].find(['[', '('])? + start;
+    let mut depth = 0usize;
+    for (k, b) in wkt.bytes().enumerate().skip(open) {
+        match b {
+            b'[' | b'(' => depth += 1,
+            b']' | b')' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(wkt[open..k + 1].to_string());
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// Every `AUTHORITY["EPSG", "<code>"]` (WKT1) or `ID["EPSG", <code>]` (WKT2)
+/// code in a WKT string, in order of appearance.
+fn epsg_codes_in_wkt(wkt: &str) -> Vec<u32> {
+    let mut codes = Vec::new();
+    let mut rest = wkt;
+    while let Some(i) = rest.find("EPSG") {
+        rest = &rest[i + 4..];
+        let digits: String = rest
+            .trim_start_matches(|c: char| !c.is_ascii_digit())
+            .chars()
+            .take_while(|c| c.is_ascii_digit())
+            .collect();
+        if let Ok(c) = digits.parse::<u32>() {
+            codes.push(c);
+        }
+    }
+    codes
 }
 
 fn pass_2(
@@ -239,6 +335,7 @@ fn pass_3(
     sprinkled: &HashMap<usize, Point>,
     ground: bool,
     binary: bool,
+    crs: (u32, u32),
 ) -> io::Result<()> {
     let cellno: usize = g[0].len();
     let mut gpts: Vec<Vec<Vec<Point>>> = vec![vec![Vec::new(); cellno]; cellno];
@@ -263,6 +360,7 @@ fn pass_3(
             &mut w,
             &sst::stream::SpaRecord::B([bbox[0], bbox[1], bbox[2], bbox[3]]),
         )?;
+        sst::stream::spa_write(&mut w, &sst::stream::SpaRecord::P(crs.0, crs.1))?;
     } else {
         w.write_all(b"# ttfin\n")?;
         write!(w, "n {}\n", total)?;
@@ -276,6 +374,8 @@ fn pass_3(
             "b {:.3} {:.3} {:.3} {:.3}\n",
             bbox[0], bbox[1], bbox[2], bbox[3]
         )?;
+        //-- CRS: horizontal and vertical EPSG (0 = unknown)
+        write!(w, "p {} {}\n", crs.0, crs.1)?;
     }
 
     //-- cells that have no points

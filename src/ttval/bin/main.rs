@@ -50,6 +50,7 @@ fn main() -> io::Result<()> {
                 sst::stream::SmaRecord::X(a) => {
                     d.remove(&(a as usize));
                 }
+                sst::stream::SmaRecord::P(_, _) => {}
             }
         }
     } else {
@@ -77,6 +78,7 @@ fn main() -> io::Result<()> {
                     // let re = parse_3_usize(&l);
                     total_ts += 1;
                 }
+                'p' => {} //-- CRS record
                 'x' => {
                     //-- finalise a vertex
                     let ls: Vec<&str> = l.split_whitespace().collect();

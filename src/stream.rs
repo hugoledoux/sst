@@ -30,6 +30,7 @@ pub enum SpaRecord {
     V(f64, f64, f64),
     W(f64, f64, f64),
     X(u32, u32),
+    P(u32, u32),
 }
 
 impl SpaRecord {
@@ -43,6 +44,7 @@ impl SpaRecord {
             SpaRecord::V(x, y, z) => format!("v {} {} {}\n", x, y, z),
             SpaRecord::W(x, y, z) => format!("w {} {} {}\n", x, y, z),
             SpaRecord::X(a, b) => format!("x {} {}\n", a, b),
+            SpaRecord::P(h, v) => format!("p {} {}\n", h, v),
         }
     }
 }
@@ -57,6 +59,7 @@ pub enum SmaRecord {
     V(f64, f64, f64),
     F(u32, u32, u32),
     X(u32),
+    P(u32, u32),
 }
 
 impl SmaRecord {
@@ -67,6 +70,7 @@ impl SmaRecord {
             SmaRecord::V(x, y, z) => format!("v {} {} {}\n", x, y, z),
             SmaRecord::F(a, b, c) => format!("f {} {} {}\n", a, b, c),
             SmaRecord::X(a) => format!("x {}\n", a),
+            SmaRecord::P(h, v) => format!("p {} {}\n", h, v),
         }
     }
 }
@@ -89,6 +93,12 @@ pub fn spa_write<W: Write>(w: &mut W, r: &SpaRecord) -> io::Result<()> {
         SpaRecord::N(v) => {
             buf[0] = b'n';
             buf[1..9].copy_from_slice(&v.to_le_bytes());
+            9
+        }
+        SpaRecord::P(h, v) => {
+            buf[0] = b'p';
+            buf[1..5].copy_from_slice(&h.to_le_bytes());
+            buf[5..9].copy_from_slice(&v.to_le_bytes());
             9
         }
         SpaRecord::C(v) => {
@@ -141,6 +151,12 @@ pub fn sma_write<W: Write>(w: &mut W, r: &SmaRecord) -> io::Result<()> {
                 buf[1 + 8 * i..9 + 8 * i].copy_from_slice(&b[i].to_le_bytes());
             }
             33
+        }
+        SmaRecord::P(h, v) => {
+            buf[0] = b'p';
+            buf[1..5].copy_from_slice(&h.to_le_bytes());
+            buf[5..9].copy_from_slice(&v.to_le_bytes());
+            9
         }
         SmaRecord::V(x, y, z) => {
             buf[0] = b'v';
@@ -233,6 +249,7 @@ pub fn spa_read<R: BufRead>(r: &mut R) -> io::Result<Option<SpaRecord>> {
         b'c' => SpaRecord::C(read_u32(r)?),
         b's' => SpaRecord::S(read_u64(r)?),
         b'b' => SpaRecord::B(read_4f64(r)?),
+        b'p' => SpaRecord::P(read_u32(r)?, read_u32(r)?),
         b'v' => {
             let (x, y, z) = read_3f64(r)?;
             SpaRecord::V(x, y, z)
@@ -264,6 +281,7 @@ pub fn sma_read<R: BufRead>(r: &mut R) -> io::Result<Option<SmaRecord>> {
     };
     let rec = match tag {
         b'b' => SmaRecord::B(read_4f64(r)?),
+        b'p' => SmaRecord::P(read_u32(r)?, read_u32(r)?),
         b'v' => {
             let (x, y, z) = read_3f64(r)?;
             SmaRecord::V(x, y, z)

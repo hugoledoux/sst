@@ -25,6 +25,10 @@ clap-verbosity-flag = "3.0"
 robust = "1.2"
 startin = "0.8"
 eframe = "0.37"
+geotiff-writer = "0.9"
+ndarray = "0.17"
+flate2 = "1"
+tempfile = "3"
 
 
 [[bin]]
@@ -54,3 +58,7 @@ path = "src/spb2obj/bin/main.rs"
 [[bin]]
 name = "ttview"
 path = "src/ttview/bin/main.rs"
+
+[[bin]]
+name = "ttdem"
+path = "src/ttdem/bin/main.rs"

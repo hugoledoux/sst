@@ -279,11 +279,8 @@ fn main() -> io::Result<()> {
 fn handle_record(s: &mut Surface, out: &mut SpaOut, rec: &sst::stream::SpaRecord) -> io::Result<()> {
     use sst::stream::SpaRecord;
     match rec {
-        SpaRecord::N(_) | SpaRecord::C(_) | SpaRecord::S(_) | SpaRecord::B(_) => {
-            out.rec(rec)?;
-        }
-        SpaRecord::W(..) => {
-            //-- sprinkled points are not simplified, just passed on
+        SpaRecord::N(_) | SpaRecord::C(_) | SpaRecord::S(_) | SpaRecord::B(_)
+        | SpaRecord::W(..) | SpaRecord::P(..) => {
             out.rec(rec)?;
         }
         SpaRecord::V(x, y, z) => {

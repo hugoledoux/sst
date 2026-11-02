@@ -108,6 +108,11 @@ pub(crate) fn handle_line(dt: &mut Triangulation, l: &str) -> io::Result<()> {
             let re = parse_2_usize(l);
             let _re = dt.finalise_qt_leaf(re.0, re.1);
         }
+        'p' => {
+            //-- CRS: horizontal + vertical EPSG
+            let re = parse_2_u32(l);
+            let _re = dt.write_crs(re.0, re.1);
+        }
         _ => {
             error!("Wrongly formatted stream. Abort.");
             std::process::exit(1);
@@ -136,6 +141,10 @@ pub(crate) fn handle_record(dt: &mut Triangulation, rec: &sst::stream::SpaRecord
         }
         SpaRecord::X(a, b) => {
             let _re = dt.finalise_qt_leaf(*a as usize, *b as usize);
+        }
+        SpaRecord::P(h, v) => {
+            //-- CRS: echo horizontal + vertical EPSG to the .sma
+            let _re = dt.write_crs(*h, *v);
         }
     }
     Ok(())
@@ -167,6 +176,13 @@ fn parse_2_usize(l: &str) -> (usize, usize) {
     let ls: Vec<&str> = l.split_whitespace().collect();
     let a: usize = ls[1].parse::<usize>().unwrap();
     let b: usize = ls[2].parse::<usize>().unwrap();
+    (a, b)
+}
+
+fn parse_2_u32(l: &str) -> (u32, u32) {
+    let ls: Vec<&str> = l.split_whitespace().collect();
+    let a: u32 = ls[1].parse::<u32>().unwrap();
+    let b: u32 = ls[2].parse::<u32>().unwrap();
     (a, b)
 }
 

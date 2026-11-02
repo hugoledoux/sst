@@ -39,7 +39,7 @@ fn main() -> io::Result<()> {
                 }
                 //-- the bbox and the vertex-finalisation records have no
                 //-- place in an OBJ file
-                sst::stream::SmaRecord::B(..) | sst::stream::SmaRecord::X(..) => {}
+                sst::stream::SmaRecord::B(..) | sst::stream::SmaRecord::P(..) | sst::stream::SmaRecord::X(..) => {}
             }
         }
     } else if sst::stream::peek_is_binary(&mut r, sst::stream::SPA_MAGIC)? {
@@ -58,7 +58,7 @@ fn main() -> io::Result<()> {
                     w.write_all(l.as_bytes())?;
                     w.write_all(b"\n")?;
                 }
-                '#' | 'b' | 'x' => {}
+                '#' | 'b' | 'p' | 'x' => {}
                 _ => {
                     error!("Wrongly formatted stream. Abort.");
                     std::process::exit(1);

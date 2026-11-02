@@ -375,6 +375,19 @@ impl Triangulation {
         }
     }
 
+    /// Echo the CRS of the input stream (horizontal + vertical EPSG, 0 =
+    /// unknown) to the `.sma` output, right after the bbox record.
+    pub fn write_crs(&mut self, epsg_h: u32, epsg_v: u32) -> io::Result<()> {
+        if self.binary_out == true {
+            sst::stream::sma_write(
+                &mut self.out,
+                &sst::stream::SmaRecord::P(epsg_h, epsg_v),
+            )
+        } else {
+            write!(self.out, "p {} {}\n", epsg_h, epsg_v)
+        }
+    }
+
     pub fn set_grid_dimensions(&mut self, s: usize) {
         self.qt.init(s);
     }

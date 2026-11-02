@@ -9,7 +9,7 @@ Rust implementation (Cargo package `sst`, toolset "tintin") of a **streaming Del
 ```bash
 cargo build --release   # the only build that is used; performance-critical
 ```
-Binaries land in `target/release/`. There are no tests, no CI, and no rustfmt/clippy config. `Cargo.lock` is gitignored and untracked: in a fresh checkout or `git worktree`, cargo re-resolves `geojson = "*"` to an API-incompatible version and the build fails — copy a live `Cargo.lock` in first.
+Binaries land in `target/release/`. There is no CI and no rustfmt/clippy config; `ttdem` has unit tests (`cargo test`), the rest of the repo does not. `Cargo.lock` is gitignored and untracked: in a fresh checkout or `git worktree`, cargo re-resolves `geojson = "*"` to an API-incompatible version and the build fails — copy a live `Cargo.lock` in first.
 
 ## Binaries
 | bin | input | output |
@@ -21,6 +21,7 @@ Binaries land in `target/release/`. There are no tests, no CI, and no rustfmt/cl
 | `ttval` | `.sma` on **stdin** | validation counts → stdout |
 | `spb2obj` | `.sma` on **stdin** | Wavefront OBJ text (`v`/`f` records only) → stdout |
 | `ttview [file]` | `.sma` on **stdin** (or a file) | GUI window (dot overview) |
+| `ttdem` | `.sma` on **stdin** | COG GeoTIFF (tiled, BigTIFF, deflate + FP predictor) |
 
 ```bash
 ./target/release/ttfin ./data/crop.laz 10 | ./target/release/ttdt > ./data/crop.sma
@@ -37,14 +38,26 @@ Gotchas:
 - `ttview` (`--speed <N>` paces replay) draws **one dot per triangle** on a screen-space grid, not filled triangles: egui-wgpu packs *all* meshes into a single vertex buffer with a 256 MiB cap, so drawing millions of triangles panics — the dot overview keeps the vertex count bounded by the viewport.
 - `ttview` and the `ttdt --gui` view are the only GUI code; both need a graphical desktop and pull a large dependency tree (`eframe`/`egui`, default `wgpu` backend). Shared viewer plumbing lives in the `sst::view` lib module. Note `eframe` 0.37's `App` trait uses `fn ui(&mut self, ui, frame)`, not the older `fn update(...)`.
 
+## ttdem
+
+`ttfin ... | ttdt | ttdem --res 0.5 [--crs EPSG:28992] out.tif` rasterises the `.sma` TIN onto a regular grid by **linear** interpolation (Isenburg 2006 §3.1) and writes a **COG** (tiled, BigTIFF, deflate + floating-point predictor, internal overviews, GeoTIFF EPSG keys). It is the one operator that reads stdin but writes a **file path** — TIFF needs a seekable output, so it cannot stream to stdout. Depends on `geotiff-writer` + `ndarray` (pure Rust, no GDAL).
+
+- Grid: `--res` (required, in CRS units) and the bbox (stream `b` record, or `--bbox`) snapped **outward** onto a global grid aligned at `--origin` (default 0,0). Rows run **north→south**, cell **centres** are sampled, the bbox is the outer pixel edges (PixelIsArea).
+- CRS: taken from the stream's `p` record (extracted by `ttfin` from the LAS GeoTIFF-key VLRs, WKT fallback); `--crs`/`--vertical-crs` override it. With neither, a warning is printed and the GeoTIFF gets no CRS.
+- Memory: the whole raster in RAM when it fits `--mem` (default 2G), else an LRU tile cache + deflate-compressed spill file (tiles are the buckets; no global sort). Both backends produce **byte-identical** COGs — verified by feeding the same `.sma` twice with different `--mem`/`--tile-size`.
+- `--max-edge` (default 0 = off, Isenburg's long-triangle rejection for gaps/water) skips triangles with a 2D edge above the threshold; the longest edge seen is logged at `-vv` to help pick a threshold.
+- Modules in `src/ttdem/bin/`: `main.rs` (CLI + stream loop), `grid.rs` (snapping/tiling), `raster.rs` (scanline interpolation, no per-cell point-in-triangle tests), `store.rs` (full/spill backends), `writer.rs` (COG assembly via `geotiff-writer`). Unit tests live in the modules; run `cargo test`.
+- The output is written to a temp file next to `out.tif` and renamed on success (atomic); a failed run leaves no half-written COG. `--tile-size` default 512 (must be a multiple of 16).
+- COG temp usage ≈ raster raw size + compressed output (`geotiff-writer` spools raw tiles internally); set `--temp` or `TMPDIR` accordingly for big runs.
+
 ## Stream format (`.spa` in, `.sma` out)
 One record per line; the first character selects the type:
 - `#` comment · `n` point count · `c` grid dimension · `s` cell size · `b minx miny maxx maxy`
-- `v x y z` point · `w x y z` "sprinkled" point (hoisted to the top of the stream)
+- `v x y z` point · `w x y z` "sprinkled" point (hoisted to the top of the stream) · `p h v` CRS (horizontal + vertical EPSG)
 - `x gx gy` finalised cell (`.spa`) · `x id` finalised/dead vertex (`.sma`)
 - `f a b c` triangle, 1-based ids (`.sma` output only)
 
-Both formats also have a **binary variant, the default for `ttfin`/`ttdt` output** (`--ascii` opts back into text; every reader auto-detects via the magic `TTSPA1\n` / `TTSMA1\n`, so no reader flag exists). Records are the ASCII ones with fixed little-endian payloads: tag byte + `n` u64 · `c` u32 · `s` u64 · `b` 4×f64 · `v`/`w` 3×f64 · `x` 2×u32 (`.spa`); `b` 4×f64 · `v` 3×f64 · `f` 3×u32 · `x` u32 (`.sma`). The single codec lives in `src/stream.rs` (`sst::stream`); `record.to_line()` converts a decoded record back to its ASCII line, which is how the GUI viewers consume binary streams unchanged. `ttsimpl` mirrors the format of its input. Binary carries full f64 coordinates; `ttfin --ascii` quantises to the LAS scale digits.
+Both formats also have a **binary variant, the default for `ttfin`/`ttdt` output** (`--ascii` opts back into text; every reader auto-detects via the magic `TTSPA1\n` / `TTSMA1\n`, so no reader flag exists). Records are the ASCII ones with fixed little-endian payloads: tag byte + `n` u64 · `c` u32 · `s` u64 · `b` 4×f64 · `v`/`w` 3×f64 · `x` 2×u32 · `p` 2×u32 (`.spa`); `b` 4×f64 · `v` 3×f64 · `f` 3×u32 · `x` u32 · `p` 2×u32 (`.sma`). The single codec lives in `src/stream.rs` (`sst::stream`); `record.to_line()` converts a decoded record back to its ASCII line, which is how the GUI viewers consume binary streams unchanged. `ttsimpl` mirrors the format of its input. Binary carries full f64 coordinates; `ttfin --ascii` quantises to the LAS scale digits.
 
 Writing a stream by hand or synthesising one: **`c` must appear before any `v`/`x`** — `ttdt` initialises its quadtree on `c` and `insert_one_vi` panics on a missing key otherwise. `c` must also be a power of two (`ttfin` derives it as `2^ceil(log2(...))`). `.sma` vertex/triangle ids are 1-based.
 
@@ -59,7 +72,7 @@ Writing a stream by hand or synthesising one: **`c` must appear before any `v`/`
 - `misc_tools/` — throwaway Python helpers.
 
 ## Verifying changes
-There are no tests; the de facto validation of a pipeline change is:
+There are almost no tests (`ttdem` has unit tests, `cargo test`); the de facto validation of a pipeline change is:
 - run it and check Euler: `T = 2n − 2 − h` (h = convex-hull vertices, a small plausible number), plus a duplicate-face check;
 - compare outputs **geometrically** — sorted coordinate triples per face — never by `.sma` vertex ids (they follow activation order) or byte-wise;
 - `ttfin` re-randomises its sprinkles on every run, so two runs on the same input differ marginally (the 1 mm snap-tolerance lottery can shift `n` by a few points). To compare two binaries, feed them the **same** `.spa` file — save one with `ttfin > file.spa` first;
