@@ -47,7 +47,11 @@ pub fn write_cog(
         .tile_size(grid.tile, grid.tile)
         .compression(spec.compression)
         .predictor(spec.predictor)
-        .raster_type(RasterType::PixelIsArea);
+        .raster_type(RasterType::PixelIsArea)
+        //-- the georeferencing affine: (minx, maxy) is the upper-left corner
+        //-- of the upper-left pixel; rows run southwards
+        .pixel_scale(grid.res, grid.res)
+        .origin(grid.minx, grid.maxy);
     let tiff = match spec.epsg {
         Some(e) => tiff.epsg(e),
         None => tiff,

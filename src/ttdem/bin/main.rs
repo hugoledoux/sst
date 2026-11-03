@@ -283,7 +283,7 @@ impl Dem {
         if epsg.is_none() {
             eprintln!(
                 "warning: no CRS found in the stream and no --crs given; \
-                 writing the GeoTIFF without georeferencing"
+                 the GeoTIFF gets a geotransform but no CRS"
             );
         } else if (4000..=4999).contains(&epsg.unwrap()) {
             eprintln!(
