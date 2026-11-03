@@ -2,15 +2,18 @@
 
 A Rust reimplementation (with new operators) of the streaming Delaunay triangulator of Martin Isenburg.
 
-The streaming pipeline is (each stage reads/writes an ASCII stream, except the first):
+The streaming pipeline is (each stage reads/writes a stream — **binary by default**, `--ascii` opts back into text):
 
 ```
 LAS/LAZ files --> ttfin --> [ttsimpl] --> ttdt --> .sma (OBJ-like triangulation)
-                                                      |
-                                                      +--> ttview (2D live viewer)
+                                                   |
+                                                   +--> ttview (2D live viewer)
+                                                   +--> ttdem  (COG GeoTIFF)
+                                                   +--> ttval  (validation counts)
+                                                   +--> spb2obj (Wavefront OBJ text)
 ```
 
-There are six binaries, all built together.
+There are eight binaries, all built together.
 
 
 ## To compile them all
@@ -31,12 +34,13 @@ The binaries end up in `./target/release/`.
     (absolute paths, one per line — see `./data/crop_1_2.files`)
   - reads the files on disk; writes the `.spa` stream to stdout
 
-Usage: `ttfin <input.laz|input.files> <cellsize> [-g] [-s <sprinkle>]`
+Usage: `ttfin <input.laz|input.files> <cellsize> [-g] [-s <sprinkle>] [--ascii]`
 
   - `<cellsize>`: the cell resolution as an integer, eg `10` for 10m×10m
   - `-s, --sprinkle`: fraction of points "sprinkled" (hoisted to the top of the
     stream), default `0.001`
   - `-g, --ground`: use only ground points, ie LAS classification `2`
+  - `--ascii`: write the ASCII `.spa` (the default is binary)
   - verbosity is controlled with `-v`/`-vv`/`-q` (the INFO/WARN logs)
 
 To see the format of the output stream ("spa" is **s**treaming **p**oint **a**scii; binary to follow at some point)
@@ -67,15 +71,13 @@ x 0 11
 v 84601.790 447091.302 6.554
 v 84660.438 447055.597 0.796
 v 84637.450 447010.511 8.879
-v 84662.152 447009.066 3.018
 v 84669.030 447052.681 0.930
-v 84603.720 447072.709 0.105
 ...
 x 2 3
 ...
 ```
 
-The records are: `n` (number of points), `c` (square grid dimension, a power of two), `s` (cell size), `b` (bbox), `x` (finalise a cell), `v` (vertex), `w` (sprinkled vertex).
+The records are: `n` (number of points), `c` (square grid dimension, a power of two), `s` (cell size), `b` (bbox), `x` (finalise a cell), `v` (vertex), `w` (sprinkled vertex), `p` (CRS: horizontal and vertical EPSG, extracted from the LAS VLRs).
 
 
 ## 2. **ttdt**
@@ -97,42 +99,9 @@ the streamed output), which is useful to watch the algorithm work:
 
   - the quadtree cells: non-finalised cells are filled light-blue, finalised
     cells are white (on a white background)
-  - the current (non-finalised) triangulation, drawn as a grey wireframe — this
-    is only the small working set, not the millions of triangles already output
   - drag to pan, scroll to zoom, "Fit view" to reset
 
-The `.sma` stream is still written to stdout, so it composes:
-
-```bash
-./target/release/ttfin ./data/crop.laz 10 | ./target/release/ttdt --gui > ./data/crop_10.sma
-```
-
-Afterwards, `ttview` (or MeshLab, etc.) can display the resulting `.sma`.
-
-
-__output file__
-
-```
-b 84600.000 447000.000 84699.998 447099.999
-v 84693.637 447002.81 1.426
-v 84693.613 447003.032 1.442
-v 84693.468 447002.902 1.451
-v 84693.564 447002.678 1.415
-f 1 2 3
-f 1 3 4
-x 1
-v 84692.714 447003.735 1.768
-v 84692.743 447003.653 1.756
-...
-f 7 8 9
-f 7 11 12
-f 7 12 13
-f 7 13 8
-x 7
-...
-```
-
-Vertices and triangles are 1-based; `x <id>` marks a vertex as finalised (it will no longer be referenced).
+The `.sma` stream is still written to stdout, so it composes.
 
 
 ## 3. **ttsimpl**
@@ -167,8 +136,7 @@ y-extent: 99.999
   32x32       4m           363        661
   64x64       2m            92        224
  128x128      1m            23         87
- 256x256      1m            23         87
- 512x512      1m            23         87  
+ 256x256      1m            23         87  
 ```
 
 
@@ -208,3 +176,53 @@ Usage: `ttview [OPTIONS] [INPUT]`
 
 Requires a graphical desktop (it opens an eframe/wgpu window).
 
+
+## 7. **ttdem**
+
+  - rasterises the .sma stream of ttdt onto a regular grid by linear
+    interpolation, and writes the result as a **Cloud-Optimised GeoTIFF (COG)**
+  - the one binary that does *not* write to stdout: TIFF needs a seekable file
+
+Usage: `ttdem [OPTIONS] <OUTPUT.tif>`
+
+  - `--res <METRES>` (required): the output post spacing, in the units of the
+    input CRS (metres for a projected one)
+  - `--crs <EPSG:CODE>`: override the CRS; by default it is taken from the
+    stream's `p` record (extracted by ttfin from the LAS GeoTIFF-key VLRs).
+    With neither, the GeoTIFF has no CRS and a warning is printed
+  - `--vertical-crs <EPSG:CODE>`: the vertical CRS (eg `5709` for NAP)
+  - `--bbox <MINX MINY MAXX MAXY>`: the raster extent; default is the stream's
+    bbox, snapped outward onto a global grid aligned at `--origin` (default
+    `0 0`), so neighbouring runs line up
+  - `--max-edge <METRES>`: skip triangles with a 2D edge longer than this
+    (default `0` = keep all). Useful to avoid interpolating across gaps in the
+    data (water bodies, areas without returns); the longest edge seen is
+    logged at `-vv` to help pick a threshold
+  - `--tile-size <N>`: COG tile size in pixels (default `512`, must be a
+    multiple of 16)
+  - `--compress <deflate|lzw|none>`: tile compression (default `deflate`)
+  - `--overviews <auto|none>`: internal overviews (default `auto`, powers of
+    two down to the tile size)
+  - `--mem <SIZE>`: memory budget for the raster cache, eg `2G` (the default);
+    beyond it, tiles are deflated and spilled to a temp file, and read back
+    when a later triangle touches them again. Both paths produce identical
+    output
+  - `--temp <DIR>`: directory for the spill file (default: the OS temp dir)
+
+```bash
+./target/release/ttfin ./data/crop.laz 10 | ./target/release/ttdt | ./target/release/ttdem --res 0.5 --crs 28992 ./data/crop_10.tif
+```
+
+The output GeoTIFF is georeferenced (pixel scale + tiepoint from the stream
+bbox) and carries the CRS GeoKeys when known; empty areas are filled with the
+nodata value `-9999`.
+
+
+## 8. **spb2obj**
+
+  - converts the .sma stream to a Wavefront OBJ file (only the `v`/`f`
+    records survive; the finalisation records are dropped)
+
+```bash
+./target/release/ttfin ./data/crop.laz 10 | ./target/release/ttdt | ./target/release/spb2obj > ./data/crop_10.obj
+```

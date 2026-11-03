@@ -3,7 +3,7 @@
 ## What this is
 Rust implementation (Cargo package `sst`, toolset "tintin") of a **streaming Delaunay triangulation pipeline for LiDAR point clouds**, inspired by Isenburg's streaming triangulator. Algorithm reference: `help/Isenburg06.pdf`.
 
-**Trust `Cargo.toml` over `README.md`.** The README predates the `sst*` → `tt*` rename: it still names old binaries (`sstdt`, `sstats`), says "three binaries", and claims `ttfin` reads XYZ (it does not).
+**Trust `Cargo.toml` over `README.md`** for the ground truth (flags, defaults); the README is user-facing documentation of the same binaries and is kept in sync with them.
 
 ## Build
 ```bash
@@ -86,4 +86,4 @@ Verbosity (clap-verbosity-flag): default = errors only; `-v` = WARN — the `wal
 - Load-bearing invariant in `triangulator.rs`: `is_triangle_final` certifies only triangles whose 3 vertices lie in the finalised cell's bbox — that is what keeps the stars of *unfinalised*-cell vertices intact and alive. The walk fallbacks, star collection, and the `vs_dead` mark-and-sweep all rely on it.
 
 ## Repo state
-The `sst*` → `tt*` rename is complete and committed; the only remaining `sst` is the Cargo package/lib name (binaries do `use sst::stream` / `sst::view`). `help/` (the reference paper) is untracked. The README still uses the old binary names — see the note at the top.
+The `sst*` → `tt*` rename is complete and committed; the only remaining `sst` is the Cargo package/lib name (binaries do `use sst::stream` / `sst::view`). `help/` (the reference paper) is untracked.
