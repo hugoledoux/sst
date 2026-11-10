@@ -51,7 +51,8 @@ pub fn write_cog(
         //-- the georeferencing affine: (minx, maxy) is the upper-left corner
         //-- of the upper-left pixel; rows run southwards
         .pixel_scale(grid.res, grid.res)
-        .origin(grid.minx, grid.maxy);
+        .origin(grid.minx, grid.maxy)
+        .nodata(&format!("{}", crate::NODATA));
     let tiff = match spec.epsg {
         Some(e) => tiff.epsg(e),
         None => tiff,
