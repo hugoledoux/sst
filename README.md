@@ -1,8 +1,9 @@
 # tintin
 
-A Rust reimplementation (with new operators) of the streaming Delaunay triangulator of Martin Isenburg.
+A Rust reimplementation of the streaming Delaunay triangulator of Martin Isenburg, and new operators have been added.
 
-The streaming pipeline is (each stage reads/writes a stream — **binary by default**, `--ascii` opts back into text):
+The operator `ttfin` and `ttdt` are the core, they allow to respectively add finalisers the set of LAS points, and to triangulate the stream.
+Other operators allow us to simplify the points (`ttsimpl`), to view the results (`ttview`), and to grid the stream of triangles (`ttdem`).
 
 ```
 LAS/LAZ files --> ttfin --> [ttsimpl] --> ttdt --> .sma (OBJ-like triangulation)
@@ -110,14 +111,14 @@ The `.sma` stream is still written to stdout, so it composes.
   - reads the .spa stream (stdin) and simplifies the points of each cell with a vertical epsilon
   - writes a reduced .spa stream to stdout (the other records are passed through unchanged)
 
-Usage: `ttsimpl <vepsilon>`
+Usage: `ttsimpl <vepsilon> [--edge-keep <fraction>]`
+
+  - `<vepsilon>`: the maximum allowed vertical error (in the z units); points whose error against the current triangulation is below it are discarded
+  - `--edge-keep <fraction>`: points within this fraction of the cell size from the cell edge are always kept (default `0.02`), so neighbouring cells stitch together seamlessly; use `--edge-keep 0.0` to decimate everywhere
 
 ```bash
 ./target/release/ttfin ./data/crop.laz 10 | ./target/release/ttsimpl 0.5 | ./target/release/ttdt > ./data/crop_10.sma
 ```
-
-`<vepsilon>` is the maximum allowed vertical error (in the z units); points whose
-error against the current triangulation is below it are discarded.
 
 
 ## 4. **ttstats**
