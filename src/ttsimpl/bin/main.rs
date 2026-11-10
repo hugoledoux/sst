@@ -22,6 +22,10 @@ use clap::Parser;
 struct Cli {
     /// vertical epsilon
     vepsilon: f64,
+    /// fraction of the cell edge within which points are always kept
+    /// (0.0 = decimate everywhere; default 0.02 = 2%)
+    #[arg(long, default_value_t = 0.02)]
+    edge_keep: f64,
     #[clap(flatten)]
     verbose: clap_verbosity_flag::Verbosity,
 }
@@ -29,16 +33,18 @@ struct Cli {
 struct Surface {
     pts: Vec<Vec<f64>>,
     max_epsilon: f64,
+    edge_keep: f64,
     bbox: Vec<f64>,
 }
 
 impl Surface {
-    fn new(epsilon: f64) -> Surface {
+    fn new(epsilon: f64, edge_keep: f64) -> Surface {
         let l = Vec::new();
         let b = vec![f64::MAX, f64::MAX, f64::MIN, f64::MIN];
         Surface {
             pts: l,
             max_epsilon: epsilon,
+            edge_keep,
             bbox: b,
         }
     }
@@ -172,7 +178,11 @@ impl Surface {
         ids.shuffle(&mut rand::rng());
         for i in ids {
             let p = &self.pts[i];
-            if self.close_to_bbox(&p, 0.02) == false {
+            if self.close_to_bbox(&p, self.edge_keep) {
+                //-- border strip: always keep, so that the quadtree cells
+                //-- stitch together seamlessly
+                let _ = dt.insert_one_pt(p[0], p[1], p[2]);
+            } else {
                 let locs = vec![[p[0], p[1]]];
                 let mut re =
                     interpolation::interpolate(&interpolation::TIN {}, &mut dt, &locs);
@@ -226,7 +236,7 @@ fn main() -> io::Result<()> {
         .filter_level(cli.verbose.log_level_filter())
         .init();
 
-    let mut s = Surface::new(cli.vepsilon);
+    let mut s = Surface::new(cli.vepsilon, cli.edge_keep);
 
     //-- a binary input is answered with a binary output; the records are
     //-- the same either way
