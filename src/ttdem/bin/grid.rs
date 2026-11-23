@@ -35,6 +35,12 @@ impl Grid {
                 format!("--res must be a positive number, got {res}"),
             ));
         }
+        if tile == 0 || tile % 16 != 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("--tile-size must be a multiple of 16, got {tile}"),
+            ));
+        }
         if !bbox.iter().all(|v| v.is_finite()) || bbox[0] >= bbox[2] || bbox[1] >= bbox[3] {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,

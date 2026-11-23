@@ -21,7 +21,7 @@ Binaries land in `target/release/`. There is no CI and no rustfmt/clippy config;
 | `ttval` | `.sma` on **stdin** | validation counts → stdout |
 | `spb2obj` | `.sma` on **stdin** | Wavefront OBJ text (`v`/`f` records only) → stdout |
 | `ttview [file]` | `.sma` on **stdin** (or a file) | GUI window (dot overview) |
-| `ttdem` | `.sma` on **stdin** | COG GeoTIFF (tiled, BigTIFF, deflate + FP predictor) |
+| `ttdem` | `.sma` on **stdin** | COG GeoTIFF (tiled, BigTIFF, deflate + FP predictor); with `--passthrough`, the .sma records are also echoed to stdout |
 
 ```bash
 ./target/release/ttfin ./data/crop.laz 10 | ./target/release/ttdt > ./data/crop.sma
@@ -40,7 +40,7 @@ Gotchas:
 
 ## ttdem
 
-`ttfin ... | ttdt | ttdem --res 0.5 [--crs EPSG:28992] out.tif` rasterises the `.sma` TIN onto a regular grid by **linear** interpolation (Isenburg 2006 §3.1) and writes a **COG** (tiled, BigTIFF, deflate + floating-point predictor, internal overviews, GeoTIFF EPSG keys). It is the one operator that reads stdin but writes a **file path** — TIFF needs a seekable output, so it cannot stream to stdout. Depends on `geotiff-writer` + `ndarray` (pure Rust, no GDAL).
+`ttfin ... | ttdt | ttdem --res 0.5 [--crs EPSG:28992] out.tif` rasterises the `.sma` TIN onto a regular grid by **linear** interpolation (Isenburg 2006 §3.1) and writes a **COG** (tiled, BigTIFF, deflate + floating-point predictor, internal overviews, GeoTIFF EPSG keys). It writes a **file path** (TIFF needs a seekable output); with `--passthrough` it also echoes every incoming `.sma` record to stdout so operators can be chained, eg two DEMs from one triangulation: `ttfin f.laz 10 | ttdt | ttdem --res 0.5 --passthrough coarse.tif | ttdem --res 0.05 fine.tif > /dev/null`. The echo is a codec round-trip in the binary branch (byte-identical, verified) and a verbatim line echo in the ASCII branch; without the flag stdout stays completely empty. Depends on `geotiff-writer` + `ndarray` (pure Rust, no GDAL).
 
 - Grid: `--res` (required, in CRS units) and the bbox (stream `b` record, or `--bbox`) snapped **outward** onto a global grid aligned at `--origin` (default 0,0). Rows run **north→south**, cell **centres** are sampled, the bbox is the outer pixel edges (PixelIsArea).
 - CRS: taken from the stream's `p` record (extracted by `ttfin` from the LAS GeoTIFF-key VLRs, WKT fallback); `--crs`/`--vertical-crs` override it. With neither, a warning is printed and the GeoTIFF gets no CRS.

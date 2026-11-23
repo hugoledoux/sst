@@ -19,7 +19,7 @@ mod writer;
 #[macro_use]
 extern crate log; //info/debug/error
 
-use std::io::{self, BufRead, BufReader};
+use std::io::{self, BufRead, BufReader, BufWriter, Write};
 use std::path::PathBuf;
 use std::time::Instant;
 
@@ -80,6 +80,10 @@ struct Cli {
     /// Directory for the spill file (default: the OS temp dir)
     #[arg(long)]
     temp: Option<PathBuf>,
+    /// Pass the incoming .sma records through to stdout unchanged, so
+    /// operators can be chained (eg two DEMs from one triangulation)
+    #[arg(long)]
+    passthrough: bool,
     #[clap(flatten)]
     verbose: clap_verbosity_flag::Verbosity,
 }
@@ -107,16 +111,30 @@ fn main() -> io::Result<()> {
 
     let stdin = io::stdin();
     let mut r = BufReader::with_capacity(1 << 20, stdin.lock());
+    //-- passthrough: with the flag, the .sma records are echoed unchanged,
+    //-- so a next operator (eg a second ttdem at another resolution) can chain
+    let stdout = io::stdout();
+    let mut pass = BufWriter::with_capacity(1 << 20, stdout.lock());
     if sst::stream::peek_is_binary(&mut r, sst::stream::SMA_MAGIC)? {
         info!("input stream: binary .sma");
         sst::stream::skip_magic(&mut r, sst::stream::SMA_MAGIC)?;
+        if cli.passthrough {
+            sst::stream::sma_write_magic(&mut pass)?;
+        }
         while let Some(rec) = sst::stream::sma_read(&mut r)? {
             dem.apply(rec)?;
+            if cli.passthrough {
+                sst::stream::sma_write(&mut pass, &rec)?;
+            }
         }
     } else {
         info!("input stream: ASCII .sma");
         for line in r.lines() {
             let l = line?;
+            if cli.passthrough {
+                pass.write_all(l.as_bytes())?;
+                pass.write_all(b"\n")?;
+            }
             if l.is_empty() || l.starts_with('#') {
                 continue;
             }
@@ -129,6 +147,7 @@ fn main() -> io::Result<()> {
             }
         }
     }
+    pass.flush()?;
 
     dem.finish(&cli, t0)
 }

@@ -9,7 +9,7 @@ Other operators allow us to simplify the points (`ttsimpl`), to view the results
 LAS/LAZ files --> ttfin --> [ttsimpl] --> ttdt --> .sma (OBJ-like triangulation)
                                                    |
                                                    +--> ttview (2D live viewer)
-                                                   +--> ttdem  (COG GeoTIFF)
+                                                   +--> ttdem  (COG GeoTIFF, opt. --passthrough)
                                                    +--> ttval  (validation counts)
                                                    +--> spb2obj (Wavefront OBJ text)
 ```
@@ -182,7 +182,10 @@ Requires a graphical desktop (it opens an eframe/wgpu window).
 
   - rasterises the .sma stream of ttdt onto a regular grid by linear
     interpolation, and writes the result as a **Cloud-Optimised GeoTIFF (COG)**
-  - the one binary that does *not* write to stdout: TIFF needs a seekable file
+  - with `--passthrough`, the incoming .sma records are echoed unchanged on
+    stdout, so operators can be chained — eg two resolutions from one
+    triangulation:
+    `ttfin file.laz 10 | ttdt | ttdem --res 0.5 --passthrough coarse.tif | ttdem --res 0.05 fine.tif > /dev/null`
 
 Usage: `ttdem [OPTIONS] <OUTPUT.tif>`
 
@@ -209,6 +212,9 @@ Usage: `ttdem [OPTIONS] <OUTPUT.tif>`
     when a later triangle touches them again. Both paths produce identical
     output
   - `--temp <DIR>`: directory for the spill file (default: the OS temp dir)
+  - `--passthrough`: echo the incoming records on stdout unchanged, so another
+    operator can read the stream behind ttdem (default off; with it, the
+    records pass through byte-identical)
 
 ```bash
 ./target/release/ttfin ./data/crop.laz 10 | ./target/release/ttdt | ./target/release/ttdem --res 0.5 --crs 28992 ./data/crop_10.tif

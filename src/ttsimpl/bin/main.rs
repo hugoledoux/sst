@@ -236,6 +236,13 @@ fn main() -> io::Result<()> {
         .filter_level(cli.verbose.log_level_filter())
         .init();
 
+    if !(0.0..=1.0).contains(&cli.edge_keep) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("--edge-keep must be in [0.0, 1.0], got {}", cli.edge_keep),
+        ));
+    }
+
     let mut s = Surface::new(cli.vepsilon, cli.edge_keep);
 
     //-- a binary input is answered with a binary output; the records are
