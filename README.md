@@ -5,13 +5,26 @@ A Rust reimplementation of the streaming Delaunay triangulator of Martin Isenbur
 The operator `ttfin` and `ttdt` are the core, they allow to respectively add finalisers the set of LAS points, and to triangulate the stream.
 Other operators allow us to simplify the points (`ttsimpl`), to view the results (`ttview`), and to grid the stream of triangles (`ttdem`).
 
+The streams between the operators are **binary by default** (full f64 coordinates, more compact and faster); `--ascii` opts back into the text format, on writers and readers. Readers auto-detect the variant from the stream's first bytes, so pipes mix both freely.
+
 ```
-LAS/LAZ files --> ttfin --> [ttsimpl] --> ttdt --> .sma (OBJ-like triangulation)
-                                                   |
-                                                   +--> ttview (2D live viewer)
-                                                   +--> ttdem  (COG GeoTIFF, opt. --passthrough)
-                                                   +--> ttval  (validation counts)
-                                                   +--> spb2obj (Wavefront OBJ text)
+┌─────────┐      ┌─────────┐      ┌─────────┐       .───────────────────.                            
+│  ttfin  ├─────▶│(ttsimpl)│─────▶│  ttdt   │─────▶( stream of triangles )                           
+└─────────┘      └─────────┘      └─────────┘       `───────────────────'                            
+     ▲                                                        │                                      
+     │                                                        │                                      
+     │                                                        │    ┌─────────┐                       
+     │                                                        ├───▶│  ttdem  │(gridding COG/GeoTIFF) 
+     │                                                        │    └─────────┘                       
+.─────────.                                                   │    ┌─────────┐                       
+( LAZ files )                                                 ├───▶│ ttview  │(2D live viewer)       
+`─────────'                                                   │    └─────────┘                       
+                                                              │    ┌─────────┐                       
+                                                              ├───▶│  ttobj  (create an OBJ)         
+                                                              │    └─────────┘                       
+                                                              │    ┌─────────┐                       
+                                                              └───▶│   tt*   │(future ones)          
+                                                                   └─────────┘                       
 ```
 
 There are eight binaries, all built together.
@@ -44,10 +57,10 @@ Usage: `ttfin <input.laz|input.files> <cellsize> [-g] [-s <sprinkle>] [--ascii]`
   - `--ascii`: write the ASCII `.spa` (the default is binary)
   - verbosity is controlled with `-v`/`-vv`/`-q` (the INFO/WARN logs)
 
-To see the format of the output stream ("spa" is **s**treaming **p**oint **a**scii; binary to follow at some point)
+To see the format of the output stream ("spa" is **s**treaming **p**oint **a**scii; output is binary by default, `--ascii` writes the text variant):
 
 ```bash
-./target/release/ttfin -vv ./data/crop.laz 10 > ./data/crop_10.spa
+./target/release/ttfin -vv --ascii ./data/crop.laz 10 > ./data/crop_10.spa
 ```
 
 Multiple LAZ files if you provide them in a `myfiles.files`, see the example in `./data/crop_1_2.files`.
@@ -59,7 +72,7 @@ This reads `crop_1.laz` and then `crop_2.laz` (in that order); I split `crop.laz
 
 (remove `-vv` to remove the INFO and WARN)
 
-__.spa file__
+__.spa file (the ASCII variant as written by `--ascii`)__
 
 ```
 # ttfin
@@ -67,6 +80,7 @@ n 212550
 c 16
 s 10
 b 84600.000 447000.000 84699.998 447099.999
+p 0 0
 x 0 10
 x 0 11
 v 84601.790 447091.302 6.554
@@ -85,13 +99,13 @@ The records are: `n` (number of points), `c` (square grid dimension, a power of 
 
   - conceptually equivalent to Isenburg's *spdelaunay*
   - takes as input (stdin) the .spa output of ttfin and creates a DT of the points
-  - outputs a variation of an .obj file where a few vertex finalisers (`x`) are added. It's simpler than Isenburg's .sma (**s**treaming **m**esh **a**scii) and can be opened as an .obj file by different software (MeshLab just ignores the extra lines, so you can open the file with it)
+  - outputs a variation of an .obj file where a few vertex finalisers (`x`) are added. It's simpler than Isenburg's .sma (**s**treaming **m**esh **a**scii) and can be opened as an .obj file by different software (MeshLab just ignores the extra lines, so you can open the file with it); write it with `--ascii` for this, as the default binary variant is not OBJ-compatible
 
 ```bash
-./target/release/ttfin -vv ./data/crop.laz 10 | ./target/release/ttdt -vv > ./data/crop_10.sma
+./target/release/ttfin -vv ./data/crop.laz 10 | ./target/release/ttdt -vv --ascii > ./data/crop_10.sma
 ```
 
-The output file `crop_10.sma` is a valid OBJ file: change its extension and you can open it normally in [MeshLab](https://www.meshlab.net/) for instance.
+The output file `crop_10.sma` (written with `--ascii`) is a valid OBJ file: change its extension and you can open it normally in [MeshLab](https://www.meshlab.net/) for instance.
 
 ### `ttdt --gui`
 
@@ -160,7 +174,8 @@ y-extent: 99.999
     drawn stays bounded by the viewport — essential because a large LAZ file
     yields millions of triangles and egui packs all geometry into a single
     (256 MiB) vertex buffer
-  - reads stdin by default, or replays a saved .sma file
+  - reads stdin by default, or replays a saved .sma file (binary or ASCII,
+    auto-detected)
   - drag to pan, scroll to zoom, "Fit view" to reset
 
 Usage: `ttview [OPTIONS] [INPUT]`
@@ -225,11 +240,11 @@ bbox) and carries the CRS GeoKeys when known; empty areas are filled with the
 nodata value `-9999`.
 
 
-## 8. **spb2obj**
+## 8. **ttobj**
 
   - converts the .sma stream to a Wavefront OBJ file (only the `v`/`f`
     records survive; the finalisation records are dropped)
 
 ```bash
-./target/release/ttfin ./data/crop.laz 10 | ./target/release/ttdt | ./target/release/spb2obj > ./data/crop_10.obj
+./target/release/ttfin ./data/crop.laz 10 | ./target/release/ttdt | ./target/release/ttobj > ./data/crop_10.obj
 ```

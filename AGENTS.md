@@ -19,7 +19,7 @@ Binaries land in `target/release/`. There is no CI and no rustfmt/clippy config;
 | `ttsimpl <vepsilon>` | `.spa` on **stdin** | `.spa` → stdout (thinning filter) |
 | `ttstats <file>` | LAS/LAZ/`.txt`/`.xyz` | per-cell stats → stdout |
 | `ttval` | `.sma` on **stdin** | validation counts → stdout |
-| `spb2obj` | `.sma` on **stdin** | Wavefront OBJ text (`v`/`f` records only) → stdout |
+| `ttobj` | `.sma` on **stdin** | Wavefront OBJ text (`v`/`f` records only) → stdout |
 | `ttview [file]` | `.sma` on **stdin** (or a file) | GUI window (dot overview) |
 | `ttdem` | `.sma` on **stdin** | COG GeoTIFF (tiled, BigTIFF, deflate + FP predictor); with `--passthrough`, the .sma records are also echoed to stdout |
 
@@ -33,7 +33,7 @@ Gotchas:
 - `ttfin` accepts only `.las`/`.laz`/a `.files` list; other extensions print `input format not accepted`. Multiple files must be listed in a `.files` file that contains **absolute paths** (see `data/crop_1_2.files`), so it is machine-specific.
 - `ttfin -g/--ground` keeps only LAS points with `Classification::Ground` (value 2). It is applied in passes 2 and 3 while `count` still advances over *all* points, so the sprinkled indices stay aligned with the header point count (pass 1 stays header-only). `ttstats` has no such filter.
 - `ttstats` parses `std::env::args` directly (no clap): it has no `--help` and no verbosity flag, unlike the others.
-- `ttdt`, `ttsimpl`, `ttval`, `spb2obj` only read stdin; a file-path argument is ignored.
+- `ttdt`, `ttsimpl`, `ttval`, `ttobj` only read stdin; a file-path argument is ignored.
 - `ttdt --gui` shows a live view of `ttdt`'s **internal** state (quadtree cells + the current, non-finalised triangulation) — it still writes `.sma` to stdout. The GUI runs on the main thread (eframe requirement); stdin is read on a background thread and fed in under a per-frame time budget. The triangulation accessors it uses (`cell_views`, `active_triangles`, `number_of_cells`, `qt_rev`, `bbox`) were added to `triangulator.rs`.
 - `ttview` (`--speed <N>` paces replay) draws **one dot per triangle** on a screen-space grid, not filled triangles: egui-wgpu packs *all* meshes into a single vertex buffer with a 256 MiB cap, so drawing millions of triangles panics — the dot overview keeps the vertex count bounded by the viewport.
 - `ttview` and the `ttdt --gui` view are the only GUI code; both need a graphical desktop and pull a large dependency tree (`eframe`/`egui`, default `wgpu` backend). Shared viewer plumbing lives in the `sst::view` lib module. Note `eframe` 0.37's `App` trait uses `fn ui(&mut self, ui, frame)`, not the older `fn update(...)`.

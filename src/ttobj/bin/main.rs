@@ -1,4 +1,4 @@
-//-- spb2obj
+//-- ttobj
 
 #[allow(dead_code)]
 #[allow(unused_variables)]
@@ -10,8 +10,8 @@ use std::io::{self, Write};
 
 use clap::Parser;
 #[derive(Parser)]
-#[command(name = "spb2obj")]
-#[command(about = "tintin -- convert the .sma stream of ttdt to a Wavefront OBJ [spb2obj]")]
+#[command(name = "ttobj")]
+#[command(about = "tintin -- convert the .sma stream of ttdt to a Wavefront OBJ [ttobj]")]
 #[command(author, version)]
 struct Cli {
     #[clap(flatten)]
@@ -43,7 +43,7 @@ fn main() -> io::Result<()> {
             }
         }
     } else if sst::stream::peek_is_binary(&mut r, sst::stream::SPA_MAGIC)? {
-        error!("this is a .spa stream (points); spb2obj expects the .sma stream of ttdt");
+        error!("this is a .spa stream (points); ttobj expects the .sma stream of ttdt");
         std::process::exit(1);
     } else {
         info!("input stream: ASCII .sma");
