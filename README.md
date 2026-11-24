@@ -1,5 +1,6 @@
 
-A Rust reimplementation of the streaming Delaunay triangulator of Martin Isenburg, and new operators have been added.
+A Rust reimplementation of the [streaming Delaunay triangulator of Martin Isenburg et al.](https://doi.org/10.1145/1179352.1141992), and new operators have been added.
+This allows us to triangulate and process LAZ datasets that are larger than the main memory of a computer.
 
 The operator `ttfin` and `ttdt` are the core, they allow to respectively add finalisers the set of LAS points, and to triangulate the stream.
 Other operators allow us to simplify the points (`ttsimpl`), to view the results (`ttview`), and to grid the stream of triangles (`ttdem`).
@@ -194,11 +195,8 @@ Requires a graphical desktop (it opens an eframe/wgpu window).
 
 ## 7. **ttdem**
 
-  - rasterises the .sma stream of ttdt onto a regular grid by linear
-    interpolation, and writes the result as a **Cloud-Optimised GeoTIFF (COG)**
-  - with `--passthrough`, the incoming .sma records are echoed unchanged on
-    stdout, so operators can be chained — eg two resolutions from one
-    triangulation:
+  - rasterises the stream of `ttdt` onto a regular grid by linear interpolation, and writes the result as a **Cloud-Optimised GeoTIFF (COG)**
+  - with `--passthrough`, the incoming stream is echoed unchanged on stdout, so operators can be chained, eg two resolutions from one triangulation:
     `ttfin file.laz 10 | ttdt | ttdem --res 0.5 --passthrough coarse.tif | ttdem --res 0.05 fine.tif > /dev/null`
 
 Usage: `ttdem [OPTIONS] <OUTPUT.tif>`
