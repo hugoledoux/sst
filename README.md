@@ -1,4 +1,3 @@
-# tintin
 
 A Rust reimplementation of the streaming Delaunay triangulator of Martin Isenburg, and new operators have been added.
 
@@ -8,23 +7,23 @@ Other operators allow us to simplify the points (`ttsimpl`), to view the results
 The streams between the operators are **binary by default** (full f64 coordinates, more compact and faster); `--ascii` opts back into the text format, on writers and readers. Readers auto-detect the variant from the stream's first bytes, so pipes mix both freely.
 
 ```
-┌─────────┐      ┌─────────┐      ┌─────────┐       .───────────────────.                            
-│  ttfin  ├─────▶│(ttsimpl)│─────▶│  ttdt   │─────▶( stream of triangles )                           
-└─────────┘      └─────────┘      └─────────┘       `───────────────────'                            
-     ▲                                                        │                                      
-     │                                                        │                                      
-     │                                                        │    ┌─────────┐                       
-     │                                                        ├───▶│  ttdem  │(gridding COG/GeoTIFF) 
-     │                                                        │    └─────────┘                       
-.─────────.                                                   │    ┌─────────┐                       
-( LAZ files )                                                 ├───▶│ ttview  │(2D live viewer)       
-`─────────'                                                   │    └─────────┘                       
-                                                              │    ┌─────────┐                       
-                                                              ├───▶│  ttobj  (create an OBJ)         
-                                                              │    └─────────┘                       
-                                                              │    ┌─────────┐                       
-                                                              └───▶│   tt*   │(future ones)          
-                                                                   └─────────┘                       
+┌─────────┐     ┌─────────┐     ┌─────────┐      .───────────────────.                            
+│  ttfin  ├────▶│(ttsimpl)│────▶│  ttdt   │────▶( stream of triangles )                           
+└─────────┘     └─────────┘     └─────────┘      `───────────────────'                            
+     ▲                                              │                                      
+     │                                              │                                      
+     │                                              │    ┌─────────┐                       
+     │                                              ├───▶│  ttdem  │(gridding COG/GeoTIFF) 
+     │                                              │    └─────────┘                       
+.─────────.                                         │    ┌─────────┐                       
+( LAZ files )                                       ├───▶│ ttview  │(2D live viewer)       
+`─────────'                                         │    └─────────┘                       
+                                                    │    ┌─────────┐                       
+                                                    ├───▶│  ttobj  (create an OBJ)         
+                                                    │    └─────────┘                       
+                                                    │    ┌─────────┐                       
+                                                    └───▶│   tt*   │(future ones)          
+                                                         └─────────┘                       
 ```
 
 There are eight binaries, all built together.
